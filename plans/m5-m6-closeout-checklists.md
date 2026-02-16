@@ -20,7 +20,7 @@ Checklist:
 - [x] Prompt context builder is wired into live share generation.
 - [x] Callback scanner runs post-meeting and persists callback candidates.
 - [x] Prompt templates include memory/callback sections when data exists.
-- [ ] Retrieval rule parity with spec is exact (`>=7`, `>=6` involving current user, plus last 3 meetings).
-- [ ] Continuity notes include attendance count and prior-user continuity details.
-- [ ] Two-meeting verification evidence captured and documented.
-- [ ] Integration test proves callback context is present in second meeting prompts.
+- [x] Retrieval rule parity with spec is exact (`>=7`, `>=6` involving current user, plus last 3 meetings).
+- [x] Continuity notes include attendance count and prior-user continuity details.
+- [x] Two-meeting verification evidence captured and documented.
+- [x] Integration test proves callback context is present in second meeting prompts.

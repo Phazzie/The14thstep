@@ -34,6 +34,16 @@ const shares: ShareRecord[] = [
 		significanceScore: 8,
 		sequenceOrder: 3,
 		createdAt: '2026-02-12T00:00:00.000Z'
+	},
+	{
+		id: 's4',
+		meetingId: 'm4',
+		characterId: 'gypsy',
+		isUserShare: false,
+		content: 'low score but in last meeting',
+		significanceScore: 2,
+		sequenceOrder: 4,
+		createdAt: '2026-02-13T00:00:00.000Z'
 	}
 ];
 
@@ -87,16 +97,26 @@ describe('buildPromptContext', () => {
 			meetingId: 'meeting-1',
 			database: {
 				getHeavyMemory: async () => ok(shares),
-				getActiveCallbacks: async () => ok(callbacks)
+				getActiveCallbacks: async () => ok(callbacks),
+				getUserById: async () =>
+					ok({
+						id: 'user-1',
+						displayName: 'trap',
+						cleanTime: '19 days',
+						meetingCount: 12,
+						firstMeetingAt: '2025-12-01T00:00:00.000Z',
+						lastMeetingAt: '2026-02-13T00:00:00.000Z'
+					})
 			}
 		});
 
 		expect(result.ok).toBe(true);
 		if (result.ok) {
-			expect(result.value.heavyMemory).toHaveLength(2);
+			expect(result.value.heavyMemory).toHaveLength(3);
 			expect(result.value.callbacks).toHaveLength(2);
 			expect(result.value.heavyMemoryLines[0]).toContain('score 6');
 			expect(result.value.callbackLines[0]).toContain('quirk_habit');
+			expect(result.value.continuityLines.join(' ')).toContain('Attendance count');
 		}
 	});
 

@@ -283,10 +283,9 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 				.select(
 					'id, meeting_id, character_id, is_user_share, content, significance_score, sequence_order, created_at, meetings!inner(user_id)'
 				)
-				.gte('significance_score', 7)
 				.eq('meetings.user_id', userId)
-				.order('significance_score', { ascending: false })
-				.order('created_at', { ascending: false })) as QueryResponseLike<unknown[]>;
+				.order('created_at', { ascending: false })
+				.limit(500)) as QueryResponseLike<unknown[]>;
 
 			if (response.error) return mapUpstreamError('getHeavyMemory', response);
 			if (!Array.isArray(response.data)) {

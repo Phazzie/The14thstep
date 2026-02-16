@@ -32,6 +32,8 @@ This file captures practical lessons we want future work to reuse.
 - A minimal CI workflow that runs `check` + core/contract verify lanes gives immediate regression signal even before full Milestone 9 coverage is complete.
 - EventSource-driven SSE clients are easier to reason about when the route also supports a GET input path and derives recent context from persistence instead of requiring request-body context.
 - Close-phase persistence should remain behind the database seam (`completeMeeting`) to preserve seam-driven boundaries and avoid route-level SQL/client drift.
+- For dual-track memory systems, keep retrieval-rule composition in a pure core module and treat adapter methods as raw data providers; this keeps milestone acceptance logic directly unit-testable.
+- Continuity prompts become more stable when user-profile attendance metadata and recent user-share snippets are emitted as explicit prompt sections instead of implicit heuristics.
 
 ## 2026-02-15
 

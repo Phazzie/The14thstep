@@ -25,12 +25,22 @@ interface MockResponses {
 	heavyMemorySelect?: QueryResponse;
 }
 
-function createHeavyMemoryChain(response: QueryResponse) {
+function createCallbackLookupChain(response: QueryResponse) {
 	return {
-		gte: () => ({
-			eq: () => ({
+		eq: () => ({
+			maybeSingle: async () => response
+		})
+	};
+}
+
+function createCallbacksSelectChain(response: QueryResponse) {
+	return {
+		in: () => ({
+			or: () => ({
 				order: () => ({
-					order: async () => response
+					order: () => ({
+						limit: async () => response
+					})
 				})
 			})
 		})
@@ -89,7 +99,36 @@ function createHarness(responses: MockResponses = {}) {
 							})
 						};
 					},
-					select: () => createHeavyMemoryChain(heavyMemorySelect)
+					select: () => ({
+						eq: () => ({
+							maybeSingle: async () => shareSingle,
+							order: () => ({
+								order: async () => heavyMemorySelect,
+								limit: async () => heavyMemorySelect
+							})
+						})
+					})
+				};
+			}
+
+			if (table === 'callbacks') {
+				return {
+					select: () => ({
+						...createCallbacksSelectChain(heavyMemorySelect),
+						...createCallbackLookupChain(shareSingle)
+					}),
+					insert: (_payload: unknown) => ({
+						select: () => ({
+							single: async () => shareSingle
+						})
+					}),
+					update: (_payload: unknown) => ({
+						eq: () => ({
+							select: () => ({
+								single: async () => shareSingle
+							})
+						})
+					})
 				};
 			}
 

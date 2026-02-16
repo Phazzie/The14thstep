@@ -65,6 +65,8 @@ All notable changes to this repository are documented in this file.
   - `app/src/app.css`
 - Milestone 5/6 closeout checklist tracker:
   - `plans/m5-m6-closeout-checklists.md`
+- Milestone 6 continuity verification test:
+  - `app/src/lib/core/milestone6-continuity.spec.ts`
   - `app/src/lib/seams/database/fixtures/createCallback.sample.json`
   - `app/src/lib/seams/database/fixtures/getActiveCallbacks.sample.json`
 
@@ -94,6 +96,9 @@ All notable changes to this repository are documented in this file.
 - `app/src/routes/meeting/[id]/share/+server.ts` now supports both POST and GET request modes for SSE generation (GET used by EventSource client path).
 - `app/src/routes/meeting/[id]/close/+server.ts` now generates character memory summaries and persists meeting completion metadata.
 - `app/src/lib/seams/database/contract.ts` / `mock.ts` / adapter now include `completeMeeting` operation for meeting close persistence.
+- `app/src/lib/core/memory-builder.ts` now enforces exact retrieval rules (`>=7`, `>=6` user shares, plus last 3 meetings) and emits continuity lines from user profile + recent user continuity context.
+- `app/src/lib/core/prompt-templates.ts` now emits explicit Milestone 6 prompt sections: `YOUR HISTORY`, `CONTINUITY NOTES`, and `CALLBACK OPPORTUNITIES THIS MEETING`.
+- `app/src/lib/server/seams/database/adapter.ts` `getHeavyMemory` now returns ordered user meeting-share history for rule evaluation in core memory builder.
 - `app/src/lib/core/meeting.ts` now exports reusable crisis/heavy/breakthrough detectors.
 - `app/src/lib/core/prompt-templates.ts` now includes `buildExpandSharePrompt`.
 
@@ -105,6 +110,7 @@ All notable changes to this repository are documented in this file.
 - Full integrated adapter + domain suite passes with 64 unit tests and clean `svelte-check`.
 - Post-integration validation passes with clean `svelte-check` and `75` passing unit tests (`npm run test:unit -- --run`).
 - After Milestone 5 closeout refactor, `npm run check` passes clean and unit suite passes with `77` tests.
+- After Milestone 6 closeout updates, `npm run check` passes clean and unit suite passes with `78` tests including continuity verification.
 
 ## [2026-02-15]
 

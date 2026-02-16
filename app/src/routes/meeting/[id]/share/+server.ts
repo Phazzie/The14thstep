@@ -338,8 +338,9 @@ function createShareStream(
 		start(controller) {
 			void (async () => {
 				const memoryUserId = locals.userId ?? process.env.PROBE_USER_ID?.trim() ?? null;
-				let heavyMemoryLines: string[] | undefined;
-				let selectedCallbacks: Array<{
+	let heavyMemoryLines: string[] | undefined;
+	let continuityLines: string[] | undefined;
+	let selectedCallbacks: Array<{
 					id: string;
 					callbackType: string;
 					scope: string;
@@ -354,9 +355,10 @@ function createShareStream(
 						meetingId,
 						database: locals.seams.database
 					});
-					if (memoryResult.ok) {
-						heavyMemoryLines = memoryResult.value.heavyMemoryLines.slice(0, 6);
-						const latestUserShare = [...recentShares].reverse().find((share) => share.isUserShare)?.content;
+		if (memoryResult.ok) {
+			heavyMemoryLines = memoryResult.value.heavyMemoryLines.slice(0, 6);
+			continuityLines = memoryResult.value.continuityLines.slice(0, 4);
+			const latestUserShare = [...recentShares].reverse().find((share) => share.isUserShare)?.content;
 						const originatedCallbacksCount = memoryResult.value.callbacks.filter(
 							(callback) => callback.characterId === selectedCharacter.id
 						).length;
@@ -394,6 +396,7 @@ function createShareStream(
 						content: share.content
 					})),
 					heavyMemoryLines,
+					continuityLines,
 					callbackLines: selectedCallbacks.map(formatCallbackLine)
 				});
 

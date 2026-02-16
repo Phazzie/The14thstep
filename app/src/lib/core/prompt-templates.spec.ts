@@ -19,12 +19,14 @@ describe('prompt templates', () => {
 			userMood: 'anxious',
 			recentShares: [{ speaker: 'User', content: 'I almost left.' }],
 			heavyMemoryLines: ['Last week user called sponsor before using.'],
+			continuityLines: ['Attendance count: 12 meetings.'],
 			callbackLines: ['Coffee cup joke from meeting 2.']
 		});
 
 		expect(prompt).toContain('You are Marcus');
-		expect(prompt).toContain('Heavy memory');
-		expect(prompt).toContain('Callback opportunities');
+		expect(prompt).toContain('YOUR HISTORY');
+		expect(prompt).toContain('CONTINUITY NOTES');
+		expect(prompt).toContain('CALLBACK OPPORTUNITIES THIS MEETING');
 		expect(prompt).toContain('Staying when I want to leave');
 	});
 

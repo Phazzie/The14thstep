@@ -8,6 +8,7 @@ export interface MeetingPromptContext {
 	recentShares: Array<{ speaker: string; content: string }>;
 	heavyMemoryLines?: string[];
 	callbackLines?: string[];
+	continuityLines?: string[];
 }
 
 function renderShares(shares: Array<{ speaker: string; content: string }>): string {
@@ -30,10 +31,10 @@ export function buildCharacterSharePrompt(
 		`Wound: ${character.wound}`,
 		`Contradiction: ${character.contradiction}`,
 		`Quirk: ${character.quirk}`,
-		`Current topic: ${context.topic}`,
-		renderOptionalSection('Heavy memory', context.heavyMemoryLines),
-		renderOptionalSection('Callback opportunities', context.callbackLines),
-		`Recent shares:\n${renderShares(context.recentShares)}`,
+		renderOptionalSection('YOUR HISTORY', context.heavyMemoryLines),
+		renderOptionalSection('CONTINUITY NOTES', context.continuityLines),
+		renderOptionalSection('CALLBACK OPPORTUNITIES THIS MEETING', context.callbackLines),
+		`MEETING CONTEXT:\nCurrent topic: ${context.topic}\nRecent shares:\n${renderShares(context.recentShares)}`,
 		'Write exactly 3-4 sentences. Concrete language only. No therapy-speak. Include one physical action if natural.'
 	].join('\n\n');
 }

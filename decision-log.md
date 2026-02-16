@@ -26,3 +26,5 @@
 - Added a minimal GitHub Actions `verify` workflow to run `check`, `verify:contracts`, and `verify:core` on push/PR so regressions surface before deeper Milestone 9 automation lands.
 - Completed Milestone 5 closeout by explicitly favoring componentized route composition and EventSource GET streaming consumption, while keeping POST share endpoint compatibility for non-EventSource callers/tests.
 - Added a dedicated `database.completeMeeting` seam operation to persist close-state metadata through the adapter boundary instead of writing close updates directly inside route handlers.
+- Enforced Milestone 6 retrieval logic in the pure memory-builder core (rather than adapter-only filtering) so memory rules remain deterministic and testable with fixture/mocked seam inputs.
+- Retained `getHeavyMemory` seam name but shifted semantics to return ordered user meeting-share history; rule selection now occurs in `memory-builder` to support last-3-meetings continuity and prompt composition.
