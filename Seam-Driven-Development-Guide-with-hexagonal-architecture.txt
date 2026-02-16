@@ -1,0 +1,454 @@
+Seam driven development in a SvelteKit app using hexagonal architecture
+
+This guide is a practical way to build a SvelteKit app where integrations stop surprising you. The core idea is simple: anything unpredictable lives behind a seam, and you only believe what you can probe and fixture.
+
+Hexagonal architecture gives you the shape. Seam driven development gives you the evidence.
+
+1) The shape: hexagonal architecture, but enforced
+The core (inside the hexagon)
+
+Pure logic only.
+
+domain rules
+
+workflows (use cases)
+
+policy (timeouts, retries, redaction, error messaging rules)
+
+Forbidden inside the core:
+
+fetch
+
+database clients
+
+reading cookies
+
+filesystem
+
+random IDs
+
+“just this one SDK call”
+
+Seams (ports)
+
+Seams are the doors in the wall. Each seam is a contracted interface that the core can call.
+
+A seam is required when:
+
+you cross I/O (network, DB, filesystem, browser storage, queue)
+
+you depend on volatile behavior (vendor quirks, time, locale, pricing rules)
+
+you want proof before integration
+
+Adapters (outside the hexagon)
+
+Adapters are doormen. They are the only code allowed to touch reality.
+
+Adapters:
+
+perform real I/O
+
+validate inputs and outputs against the contract
+
+map upstream failures into your error codes
+
+return the standard result envelope
+
+Inbound adapters (how requests enter)
+
+These are SvelteKit’s server entry points:
+
++page.server.ts / +layout.server.ts
+
+actions
+
++server.ts
+
+Inbound adapters should be boring: validate request input, call a workflow, return a response.
+
+2) The one contract shape that makes everything compose
+
+If seams “play nice,” it’s because they all share a single language for success and failure.
+
+Standard result envelope
+
+Every seam returns:
+
+{ ok: true, value: T }
+
+{ ok: false, error: { code, message, details? } }
+
+No throwing for expected outcomes. Exceptions are bugs, not business outcomes.
+
+Shared error taxonomy
+
+Keep this small and universal. A solid minimum set:
+
+INPUT_INVALID
+
+NOT_FOUND
+
+RATE_LIMITED
+
+UPSTREAM_UNAVAILABLE (timeouts, DNS, network)
+
+UPSTREAM_ERROR (other upstream failures)
+
+CONTRACT_VIOLATION (upstream response does not match schema)
+
+UNEXPECTED (bug bucket)
+
+Optional, if you need them:
+
+UNAUTHORIZED, FORBIDDEN, CONFLICT
+
+Rule: workflows make decisions based on these codes (retry, fallback, stop early). Adapters do not invent policy.
+
+3) Pure seams vs I/O seams
+I/O seams
+
+Cross a real boundary (API, DB, filesystem). They require:
+
+Contract
+
+Probe
+
+Fixtures
+
+Mock
+
+Contract tests
+
+Adapter
+
+Pure seams
+
+Computation-only (formatting, transformations, validation rules). They require:
+
+Contract
+
+Fixtures (hand-crafted allowed)
+
+Mock
+
+Contract tests
+
+Adapter (real implementation)
+
+Probe is N/A.
+
+This distinction matters because you should not fake “evidence” for something you could just unit test.
+
+4) The artifact workflow (the order matters)
+Step 1: Contract
+
+Define schema, constraints, and explicit failure codes. Be specific about limits, enums, formats, and required fields.
+
+Contract rules:
+
+The contract is the law.
+
+Inputs and outputs both have schemas.
+
+Failure modes are explicit.
+
+The result envelope is mandatory.
+
+Step 2: Probe (I/O seams only)
+
+Probe scripts run against the real system and write fixtures as JSON.
+
+Probe rules:
+
+probe sandbox or synthetic accounts only
+
+no screenshots, no summaries, JSON only
+
+record probe date and environment
+
+capture at least one real failure mode
+
+Step 3: Fixtures
+
+Fixtures are deterministic snapshots of real behavior.
+
+Fixture rules:
+
+I/O seam fixtures are never hand-edited
+
+store input alongside output
+
+include probedAt and environment
+
+define a freshness threshold (default 7 days, override per seam)
+
+Step 4: Mock
+
+Mocks are fixture readers, not mini simulators.
+
+Mock rules:
+
+zero transformation logic
+
+return fixture outputs exactly
+
+scenario is bound at mock construction
+
+Step 5: Contract tests
+
+Contract tests prove three things:
+
+fixtures validate against schema
+
+mock returns fixtures exactly
+
+adapter returns contract-conformant results (with I/O stubbed)
+
+Negative Proof (the important one)
+
+Your fault fixture must yield ok:false through the mock before the adapter exists.
+This proves your system can represent failure states cleanly, not just happy paths.
+
+Step 6: Adapter
+
+The adapter does real I/O and validates both input and output.
+
+Adapter rules:
+
+validate input against the input schema
+
+map upstream status/errors to your error taxonomy
+
+validate output against the output schema
+
+never “patch” upstream payloads into shape
+
+if reality differs, update contract and re-probe
+
+5) SvelteKit layout that makes cheating hard
+
+Use SvelteKit’s server-only boundary to enforce the hexagon.
+
+Recommended structure:
+
+src/lib/core/                    # domain + workflows + policy (pure)
+src/lib/seams/<seam>/            # contracts, probes, fixtures, mock (no secrets)
+src/lib/server/seams/<seam>/     # adapters only (real I/O)
+src/routes/                      # inbound adapters (server loads/actions/endpoints)
+src/hooks.server.ts              # request-scoped wiring (event.locals)
+seam-registry.json               # governance inventory
+decision-log.md                  # contract-change receipts
+
+
+Hard rule:
+
+real I/O code must live in src/lib/server/**
+
+That prevents accidental imports into browser code and keeps your core honest.
+
+6) Wiring seams per request (the conductor pattern)
+
+You want one conductor that hands workflows the exact seam implementations for the current request.
+
+How to do it
+
+In hooks.server.ts, build event.locals.seams using real adapters.
+
+Workflows accept { seams } (and optionally policy) as an argument.
+
+Tests pass { seams } built from fixture-backed mocks.
+
+This yields:
+
+easy dependency injection without a framework
+
+request-scoped context (auth, headers, tracing)
+
+clean testing with zero I/O
+
+7) How to make all seams play nice
+
+“Playing nice” is mostly about refusing to allow private dialects.
+
+Compatibility rules (enforce in code)
+
+every seam uses the same result envelope
+
+every seam uses the same error taxonomy
+
+every adapter validates input and output
+
+no adapter throws expected errors
+
+fixtures must parse against schemas
+
+nondeterminism is handled consistently (see next section)
+
+Composition tests (where the real truth shows up)
+
+Beyond per-seam contract tests, add workflow-level composition tests:
+
+build a seam bundle out of mocks
+
+run the workflow end to end
+
+include at least one failure from each seam
+
+assert the workflow’s behavior (stop early, fallback, user messaging)
+
+This is where you catch:
+
+mismatched meanings of “not found”
+
+one seam returning UPSTREAM_ERROR for a 404
+
+one adapter forgetting to validate output
+
+retries happening twice
+
+8) Nondeterminism policy (choose it now or suffer later)
+
+External systems love producing chaos:
+
+timestamps
+
+request IDs
+
+ordering differences
+
+eventually consistent reads
+
+“lastSeen” fields that change every call
+
+Pick one standard approach and enforce it in probe tooling:
+
+Option A: canonicalize in probes
+
+strip volatile fields
+
+sort arrays if order is not meaningful
+
+normalize timestamps if needed
+
+Option B: define a stable view
+
+fixtures store only the stable subset the contract cares about
+
+volatile values go into metadata, not the contract output
+
+If you skip this decision, someone will start hand-editing fixtures “just once,” and your evidence chain snaps.
+
+9) Fixture hygiene (no heroic assumptions here)
+
+If you probe real user data into your repo, you built a compliance incident generator.
+
+Non-negotiable rules:
+
+probe only sandbox or synthetic test records
+
+deterministically redact/tokenize sensitive fields
+
+never store secrets (API keys, cookies, auth headers)
+
+restrict fixture details fields so they cannot carry raw upstream payloads by default
+
+Add automated scanning:
+
+block commits with common secret patterns
+
+block fixtures containing forbidden keys (token, cookie, authorization)
+
+10) Governance that actually works
+Seam registry
+
+Keep an inventory that verification reads, including:
+
+seam name
+
+pure vs I/O
+
+paths to contract/probe/fixtures/mock/tests/adapter
+
+lastProbedAt or N/A
+
+freshnessDays override
+
+idempotent (for retry policy)
+
+data classification
+
+Verification pipeline
+
+One command that fails CI if:
+
+any seam is missing required artifacts
+
+any I/O seam fixtures are stale
+
+fixtures do not validate against schemas
+
+contract tests fail
+
+adapter validation is missing (lintable pattern)
+
+contract changed without a decision log entry (hash check)
+
+Decision log
+
+When contracts change, require a dated entry:
+
+what changed
+
+why
+
+evidence (probe output + test results)
+
+risks and rollout notes
+
+This is your audit trail and your future debugging shortcut.
+
+11) The blunt parts people avoid saying
+
+This can become bureaucracy cosplay.
+If people treat probes and logs as checkboxes, you get false confidence. The antidote is automation, minimal artifacts, and ruthless scope control.
+
+Probes can become flaky integration tests in disguise.
+If probes are unreliable, teams stop trusting them. Run probes in controlled environments, capture metadata, and keep probe-specific retries inside probe tooling only.
+
+Overly strict contracts can make vendor evolution painful.
+If you forbid extra fields or assume perfect stability, minor upstream changes become fire drills. Decide where to be strict vs tolerant per seam.
+
+Seam sprawl is real.
+If everything is a seam, nothing is. Make seams where uncertainty lives: I/O, side effects, volatility.
+
+People will cheat unless cheating is expensive.
+Hand-editing fixtures, skipping validation, hiding errors in UNEXPECTED. Your pipeline should catch this automatically.
+
+12) Minimal “add a new seam” checklist
+
+Classify: pure or I/O
+
+Write contract (schemas + error codes + result envelope)
+
+Register seam in seam registry
+
+If I/O: write probe and generate sample.json + fault.json
+
+Write mock (fixture-backed)
+
+Write contract tests, including Negative Proof
+
+Write adapter (real I/O, validates input/output)
+
+Run verify and commit decision log if contract changed
+
+If you want, I can compress this further into a single README page with:
+
+a seam registry template
+
+a standard error schema module
+
+a reference folder layout
+
+and one example seam skeleton (contract + probe + fixtures + mock + adapter + tests) tuned to your first real integration (DB or external API).

@@ -1,0 +1,33 @@
+# Local environment / secrets
+app/.env.local
+app/.env.*
+!app/.env.example
+!app/.env.test
+
+# Dependencies
+**/node_modules/
+
+# SvelteKit / Vite build outputs
+app/.svelte-kit/
+app/build/
+app/.output/
+
+# Vercel
+app/.vercel/
+
+# Playwright artifacts
+app/test-results/
+app/playwright-report/
+
+# Logs / OS cruft
+*.log
+.DS_Store
+Thumbs.db
+
+
+# Supabase CLI temp
+app/supabase/.temp/
+
+# Python caches
+**/__pycache__/
+**/*.pyc

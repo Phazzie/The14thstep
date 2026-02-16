@@ -1,0 +1,122 @@
+Here are the official xAI-doc specifics for using the grok-4-1-fast-reasoning model in API calls (plus a few “sharp edges” worth knowing).
+
+What the model is (and why it’s named like a train)
+
+grok-4-1-fast-reasoning is part of Grok 4.1 Fast, which xAI describes as a tool-calling focused model with a 2M token context window.
+
+The recommended endpoint (Responses API)
+
+xAI’s docs steer you to the Responses API:
+
+Base host: https://api.x.ai (global routing)
+
+Endpoint: POST /v1/responses
+
+Auth header: Authorization: Bearer $XAI_API_KEY
+
+Body: model + input (message array)
+
+A minimal cURL looks like this (straight from the pattern in the quickstart, with the model swapped in):
+
+curl https://api.x.ai/v1/responses \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $XAI_API_KEY" \
+  -m 3600 \
+  -d '{
+    "model": "grok-4-1-fast-reasoning",
+    "input": [
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "Say hello in the voice of a pirate mathematician."}
+    ]
+  }'
+
+OpenAI-SDK compatibility (useful for existing tooling)
+
+If you’re using tools that want an OpenAI-style base URL, xAI’s docs explicitly call out setting the base to:
+https://api.x.ai/v1
+
+Stateful conversations (and the storage “gotcha”)
+
+Responses API can be stateful: you can continue a conversation using previous_response_id instead of resending full history.
+Docs also say responses are stored for 30 days, then removed.
+
+You can disable server-side conversation storage with store: false.
+
+The part people miss: the security FAQ still says API requests/responses are temporarily stored for 30 days for audit/abuse purposes. So store: false is about conversation memory and retrieval, not necessarily “nothing ever touches disk.”
+
+Reasoning content (it’s there, but not in plain text)
+
+xAI’s docs emphasize that for Grok 4-class reasoning, you don’t generally get a plain “reasoning_content” trace; instead you can request encrypted reasoning content via:
+
+include: ["reasoning.encrypted_content"] in Responses API
+
+or use_encrypted_content=True in the SDK
+
+Streaming
+
+Streaming uses SSE and is enabled by setting "stream": true in the request.
+xAI also recommends longer timeouts for reasoning models to avoid cutting the connection early.
+
+Parameters that will error (easy foot-guns)
+
+xAI notes several parameters that are not supported by reasoning models and will cause errors if included:
+
+presencePenalty, frequencyPenalty, stop
+
+reasoning_effort (explicitly called out as “will return an error” for Grok 4)
+Also, in Responses API docs: instructions is currently not supported (will error if specified).
+
+Rate limits, caching, and “why did I just get a 429”
+
+Rate limits vary by model and by your team; xAI says to check your team’s limits in the console.
+If you hit limits you’ll see 429 Too Many Requests.
+
+There’s also a neat caching hint: sending an x-grok-conv-id: <uuid4> header can increase cache-hit likelihood for repeated prompts.
+
+Regional endpoints (privacy vs reliability trade)
+
+Default https://api.x.ai routes you automatically for low latency.
+If you must pin processing to a region, use:
+https://<region-name>.api.x.ai
+…but if they can’t handle it in that region, the request fails (no automatic fallback).
+
+SvelteKit usage pattern (keep your key off the client)
+
+In a SvelteKit app, call xAI from a server route (or +server.ts) so the API key stays private.
+
+Example src/routes/api/ask/+server.ts:
+
+import { json } from '@sveltejs/kit';
+import { XAI_API_KEY } from '$env/static/private';
+
+export async function POST({ request, fetch }) {
+  const { prompt } = await request.json();
+
+  const r = await fetch('https://api.x.ai/v1/responses', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${XAI_API_KEY}`
+    },
+    body: JSON.stringify({
+      model: 'grok-4-1-fast-reasoning',
+      input: [
+        { role: 'system', content: 'You are a helpful assistant.' },
+        { role: 'user', content: prompt }
+      ]
+    })
+  });
+
+  if (!r.ok) {
+    // xAI docs list common HTTP errors and causes (401/403/404/422/429, etc.)
+    // so bubble up status + body for debugging.
+    const errText = await r.text();
+    return new Response(errText, { status: r.status });
+  }
+
+  const data = await r.json();
+  return json(data);
+}
+
+
+(Endpoint/headers match the official patterns. )
