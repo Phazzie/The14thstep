@@ -20,3 +20,4 @@
 - Expanded the `database` seam contract/adapter to include callback and share-lookup methods (`getShareById`, `getMeetingShares`, `createCallback`, `getActiveCallbacks`, `markCallbackReferenced`) to unblock Milestone 6 integration.
 - Integrated callback-aware memory prompts in `meeting/[id]/share/+server.ts` via `buildPromptContext` and a new pure `callback-engine.ts` probability matrix.
 - Added close-route callback scanning/persistence and a new expand-share endpoint (`meeting/[id]/expand/+server.ts`) to complete Milestone 5/6 functional flow and advance Milestone 7.
+- Added a dedicated crisis endpoint (`meeting/[id]/crisis/+server.ts`) and client-side crisis-mode gating so normal character shares pause once crisis is detected.

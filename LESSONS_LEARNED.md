@@ -24,6 +24,7 @@ This file captures practical lessons we want future work to reuse.
 - Advancing a seam-driven milestone often requires expanding seam contracts first; route-level integration is much faster once adapter methods exist.
 - Prompt-quality retry loops can be implemented with the same generation seam by treating validator calls as first-class seam interactions.
 - Callback engines are safest as pure, test-first modules; route wiring then becomes straightforward and low-risk.
+- Crisis-mode behavior is easiest to keep safe when normal generation paths are explicitly gated in both client and server routes.
 
 ## 2026-02-15
 

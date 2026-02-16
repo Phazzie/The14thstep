@@ -46,6 +46,7 @@ Optional but useful for Supabase CLI operations:
 - [x] (2026-02-16 09:35Z) Completed Milestone 5 functional meeting flow baseline: setup form action (`+page.server.ts`), live meeting route/UI (`meeting/[id]/+page.svelte`), SSE share generation endpoint (`share/+server.ts`), user-share endpoint flags (`crisis`/`heavy`), close endpoint wiring, and new expand-share endpoint (`meeting/[id]/expand/+server.ts`).
 - [x] (2026-02-16 09:38Z) Completed Milestone 6 dual-track memory integration in server flow by extending the database seam with callback/share retrieval methods, wiring `buildPromptContext` into character-share generation, and triggering callback scanning/persistence during close.
 - [x] (2026-02-16 09:40Z) Implemented Milestone 7 callback probability core (`callback-engine.ts`) with rule-matrix tests and integrated callback selection + reference marking in `share/+server.ts`; lifecycle evolution/retirement rules remain as follow-up.
+- [x] (2026-02-16 09:48Z) Advanced Milestone 8 crisis flow by adding dedicated crisis-support endpoint (`meeting/[id]/crisis/+server.ts`) and client automation that pauses normal character shares during crisis mode and injects Marcus/Heather supportive responses.
 - [x] Milestone 0: Repository bootstrap and reality probes complete
 - [x] Milestone 1: Hexagonal skeleton with all seam contracts, mocks, and contract tests green
 - [x] Milestone 2: Domain core (pure meeting workflow logic) tested with zero I/O

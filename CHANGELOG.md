@@ -37,6 +37,7 @@ All notable changes to this repository are documented in this file.
   - `app/src/routes/meeting/[id]/+page.svelte`
   - `app/src/routes/meeting/[id]/+page.server.ts`
   - `app/src/routes/meeting/[id]/expand/+server.ts`
+  - `app/src/routes/meeting/[id]/crisis/+server.ts`
 - Milestone 7 callback-engine core and tests:
   - `app/src/lib/core/callback-engine.ts`
   - `app/src/lib/core/callback-engine.spec.ts`
@@ -59,6 +60,8 @@ All notable changes to this repository are documented in this file.
 - `app/src/routes/meeting/[id]/share/+server.ts` now uses memory-builder context, callback-engine selection, quality-validation retries, and callback reference marking.
 - `app/src/routes/meeting/[id]/close/+server.ts` now scans completed shares for callbacks and persists scanner results.
 - `app/src/routes/meeting/[id]/user-share/+server.ts` now returns `crisis` and `heavy` flags with saved user-share payloads.
+- `app/src/routes/meeting/[id]/+page.svelte` now auto-triggers crisis-support responses and pauses normal character-share generation during crisis mode.
+- `app/src/routes/meeting/[id]/share/+server.ts` now rejects normal character-share generation when crisis mode is active.
 - `app/src/lib/core/meeting.ts` now exports reusable crisis/heavy/breakthrough detectors.
 - `app/src/lib/core/prompt-templates.ts` now includes `buildExpandSharePrompt`.
 

@@ -23,6 +23,7 @@ interface ShareStreamRequest {
 	topic: string;
 	characterId?: string;
 	sequenceOrder: number;
+	crisisMode?: boolean;
 	interactionType?: ShareInteractionType;
 	userName?: string;
 	userMood?: string;
@@ -169,6 +170,9 @@ async function parseRequest(request: Request): Promise<SeamResult<ShareStreamReq
 	if (body.characterId !== undefined && !isNonEmptyString(body.characterId)) {
 		return err(SeamErrorCodes.INPUT_INVALID, 'characterId must be a non-empty string when provided');
 	}
+	if (body.crisisMode !== undefined && typeof body.crisisMode !== 'boolean') {
+		return err(SeamErrorCodes.INPUT_INVALID, 'crisisMode must be boolean when provided');
+	}
 	if (body.interactionType !== undefined && !isShareInteractionType(body.interactionType)) {
 		return err(SeamErrorCodes.INPUT_INVALID, 'Invalid interactionType');
 	}
@@ -186,6 +190,7 @@ async function parseRequest(request: Request): Promise<SeamResult<ShareStreamReq
 		topic: body.topic.trim(),
 		sequenceOrder,
 		characterId: body.characterId?.trim(),
+		crisisMode: body.crisisMode,
 		interactionType: body.interactionType,
 		userName: body.userName?.trim(),
 		userMood: body.userMood?.trim(),
@@ -269,6 +274,12 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 	}
 
 	const input = inputResult.value;
+	if (input.crisisMode) {
+		return json(err(SeamErrorCodes.INPUT_INVALID, 'Character shares are paused during crisis mode'), {
+			status: 409
+		});
+	}
+
 	const selectedCharacter = pickCharacter(input.characterId, input.sequenceOrder);
 	const recentShares = input.recentShares ?? [];
 	const userName = input.userName ?? 'You';

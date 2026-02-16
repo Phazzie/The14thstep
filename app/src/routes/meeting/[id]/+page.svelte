@@ -40,6 +40,11 @@ interface ExpandShareValue {
 	expandedText: string;
 }
 
+interface CrisisResponseValue {
+	shares: ShareRecord[];
+	resources: string[];
+}
+
 let { data }: { data: PageData } = $props();
 const defaultTopic = $derived(data.defaultTopic);
 const defaultCharacterId = $derived(data.characters[0]?.id ?? 'marcus');
@@ -60,6 +65,7 @@ let sharing = $state(false);
 let postingShare = $state(false);
 let closing = $state(false);
 let expandingShareId = $state<string | null>(null);
+let crisisResponding = $state(false);
 
 $effect(() => {
 	if (!topic) topic = defaultTopic;
@@ -171,6 +177,10 @@ $effect(() => {
 				: heavyMode
 					? 'Your share was saved (heavy topic noted).'
 					: 'Your share was saved.';
+
+			if (crisisMode) {
+				await requestCrisisSupport(content);
+			}
 		} catch (cause) {
 			errorMessage = cause instanceof Error ? cause.message : String(cause);
 		} finally {
@@ -223,7 +233,7 @@ $effect(() => {
 	}
 
 	async function requestCharacterShare() {
-		if (sharing) return;
+		if (sharing || crisisMode) return;
 
 		errorMessage = '';
 		statusLine = '';
@@ -238,6 +248,7 @@ $effect(() => {
 					topic,
 					characterId: selectedCharacterId,
 					sequenceOrder: transcript.length,
+					crisisMode,
 					interactionType: 'respond_to',
 					userName,
 					userMood,
@@ -305,6 +316,45 @@ $effect(() => {
 			errorMessage = cause instanceof Error ? cause.message : String(cause);
 		} finally {
 			sharing = false;
+		}
+	}
+
+	async function requestCrisisSupport(userText: string) {
+		if (crisisResponding) return;
+
+		errorMessage = '';
+		crisisResponding = true;
+		statusLine = '... room goes quiet ...';
+
+		try {
+			const response = await fetch(`/meeting/${data.meetingId}/crisis`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					userText,
+					userName,
+					sequenceOrder: transcript.length
+				})
+			});
+			const payload = parseSeamResult<CrisisResponseValue>(await response.json());
+
+			if (!payload) {
+				errorMessage = 'Unexpected crisis response format.';
+				return;
+			}
+			if (!payload.ok) {
+				errorMessage = payload.error.message;
+				return;
+			}
+
+			for (const share of payload.value.shares) {
+				upsertShare(share);
+			}
+			statusLine = 'Crisis support responses added. You are not alone.';
+		} catch (cause) {
+			errorMessage = cause instanceof Error ? cause.message : String(cause);
+		} finally {
+			crisisResponding = false;
 		}
 	}
 
@@ -378,8 +428,8 @@ $effect(() => {
 	</section>
 
 	<section class="button-row">
-		<button onclick={requestCharacterShare} disabled={sharing || postingShare || closing}>
-			{sharing ? 'Generating share...' : 'Generate Character Share (SSE)'}
+		<button onclick={requestCharacterShare} disabled={sharing || postingShare || closing || crisisMode}>
+			{crisisMode ? 'Character Shares Paused (Crisis Mode)' : sharing ? 'Generating share...' : 'Generate Character Share (SSE)'}
 		</button>
 		<button onclick={requestCloseSummary} disabled={closing || sharing}>
 			{closing ? 'Closing...' : 'Request Close Summary'}
@@ -394,7 +444,7 @@ $effect(() => {
 			bind:value={userShareText}
 			placeholder="Type your share to post to the room..."
 		></textarea>
-		<button onclick={submitUserShare} disabled={postingShare || sharing || !userShareText.trim()}>
+		<button onclick={submitUserShare} disabled={postingShare || sharing || crisisResponding || !userShareText.trim()}>
 			{postingShare ? 'Saving...' : 'Submit User Share'}
 		</button>
 	</section>
