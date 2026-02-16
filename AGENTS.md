@@ -1,18 +1,19 @@
-﻿# ExecPlans
+# Repository Agent Guide
 
-When writing complex features or significant refactors, use an ExecPlan from design to implementation.
+This root file defines global rules. For detailed instructions, also read the nearest nested `AGENTS.md` in the directory you are editing.
 
-For this repository, the active ExecPlan is:
-- `plans/the-14th-step-execplan.md`
+## Global rules
 
-ExecPlan requirements are defined in:
-- `PLANS.md`
+- Keep repository governance artifacts current as work proceeds:
+  - `plans/the-14th-step-execplan.md`
+  - `decision-log.md`
+  - `CHANGELOG.md`
+  - `LESSONS_LEARNED.md`
+- Proceed milestone by milestone unless blocked by missing credentials, missing infrastructure access, or conflicting product direction.
+- Do not commit secrets. Keep credentials in local env files only.
+- Prefer Linux shell commands and Bash-oriented workflows for reproducibility.
 
-Execution rules:
-- Read `PLANS.md` before authoring or revising any ExecPlan.
-- Keep the ExecPlan as a living document by updating `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` as work proceeds.
-- Proceed milestone by milestone without asking for "next steps" unless blocked by missing credentials, missing infrastructure access, or conflicting product direction.
-- If the plan changes, record what changed and why in the plan's revision note.
+## Nested guides
 
-Environment note:
-- Prefer Linux for implementing this project because the concrete commands in the ExecPlan are Bash-oriented and assume Unix tooling.
+- App implementation rules: `app/AGENTS.md`
+- ExecPlan authoring and maintenance rules: `plans/AGENTS.md`
