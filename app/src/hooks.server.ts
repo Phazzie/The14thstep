@@ -34,6 +34,9 @@ function createUnavailableDatabaseAdapter(message: string): DatabasePort {
 		},
 		async markCallbackReferenced() {
 			return err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, message);
+		},
+		async completeMeeting() {
+			return err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, message);
 		}
 	};
 }

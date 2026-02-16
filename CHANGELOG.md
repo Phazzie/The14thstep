@@ -54,6 +54,17 @@ All notable changes to this repository are documented in this file.
   - `.github/workflows/verify.yml`
 - Crisis-mode regression test:
   - `app/src/lib/server/routes/meeting-share.spec.ts`
+- New meeting UI component set for Milestone 5 flow:
+  - `app/src/lib/components/SetupFlow.svelte`
+  - `app/src/lib/components/MeetingCircle.svelte`
+  - `app/src/lib/components/ShareMessage.svelte`
+  - `app/src/lib/components/SystemMessage.svelte`
+  - `app/src/lib/components/UserInput.svelte`
+  - `app/src/lib/components/MeetingReflection.svelte`
+- App stylesheet bootstrap:
+  - `app/src/app.css`
+- Milestone 5/6 closeout checklist tracker:
+  - `plans/m5-m6-closeout-checklists.md`
   - `app/src/lib/seams/database/fixtures/createCallback.sample.json`
   - `app/src/lib/seams/database/fixtures/getActiveCallbacks.sample.json`
 
@@ -75,6 +86,14 @@ All notable changes to this repository are documented in this file.
 - `app/src/routes/meeting/[id]/share/+server.ts` now rejects normal character-share generation when crisis mode is active.
 - `app/package.json` now includes `verify` scaffolding commands (`verify:fixtures`, `verify:contracts`, `verify:core`, `verify:composition`).
 - Added `TODO(M7/M8/M9)` anchors in active route and verify scaffold files to pinpoint unfinished milestone logic.
+- `app/src/routes/+layout.svelte` now imports global app stylesheet.
+- `app/src/routes/+page.svelte` now delegates setup UX to `SetupFlow` multi-step flow.
+- `app/src/routes/+page.server.ts` now handles setup-phase fields (`userName`, `cleanTime`, `mood`, `mind`) and redirects with meeting-context query params.
+- `app/src/routes/meeting/[id]/+page.server.ts` now loads setup context (`initialUserName`, `initialCleanTime`, `initialMood`, `listeningOnly`).
+- `app/src/routes/meeting/[id]/+page.svelte` now uses componentized meeting UI, EventSource SSE consumption, phase-aware input behavior, pass action, and transcript auto-scroll.
+- `app/src/routes/meeting/[id]/share/+server.ts` now supports both POST and GET request modes for SSE generation (GET used by EventSource client path).
+- `app/src/routes/meeting/[id]/close/+server.ts` now generates character memory summaries and persists meeting completion metadata.
+- `app/src/lib/seams/database/contract.ts` / `mock.ts` / adapter now include `completeMeeting` operation for meeting close persistence.
 - `app/src/lib/core/meeting.ts` now exports reusable crisis/heavy/breakthrough detectors.
 - `app/src/lib/core/prompt-templates.ts` now includes `buildExpandSharePrompt`.
 
@@ -85,6 +104,7 @@ All notable changes to this repository are documented in this file.
 - Live quality-cycle run met target for all six core characters (5/5 pass each in captured run).
 - Full integrated adapter + domain suite passes with 64 unit tests and clean `svelte-check`.
 - Post-integration validation passes with clean `svelte-check` and `75` passing unit tests (`npm run test:unit -- --run`).
+- After Milestone 5 closeout refactor, `npm run check` passes clean and unit suite passes with `77` tests.
 
 ## [2026-02-15]
 

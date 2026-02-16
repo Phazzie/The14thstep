@@ -86,6 +86,16 @@ function createDeps(overrides: Partial<MeetingWorkflowDeps> = {}): MeetingWorkfl
 				lastReferencedAt: '2026-02-16T00:01:00.000Z',
 				status: 'active' as const,
 				parentCallbackId: null
+			}),
+		completeMeeting: async (_input) =>
+			ok<MeetingRecord>({
+				id: 'meeting-1',
+				userId: 'user-1',
+				topic: 'staying in the room',
+				userMood: 'anxious',
+				listeningOnly: false,
+				startedAt: '2026-02-16T00:00:00.000Z',
+				endedAt: '2026-02-16T01:00:00.000Z'
 			})
 	};
 

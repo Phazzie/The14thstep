@@ -20,6 +20,7 @@ interface QueryResponse {
 interface MockResponses {
 	userMaybeSingle?: QueryResponse;
 	meetingSingle?: QueryResponse;
+	meetingUpdateSingle?: QueryResponse;
 	shareSingle?: QueryResponse;
 	heavyMemorySelect?: QueryResponse;
 }
@@ -42,6 +43,7 @@ function createHarness(responses: MockResponses = {}) {
 
 	const userMaybeSingle = responses.userMaybeSingle ?? { data: null, error: null, status: 200 };
 	const meetingSingle = responses.meetingSingle ?? { data: null, error: null, status: 200 };
+	const meetingUpdateSingle = responses.meetingUpdateSingle ?? { data: null, error: null, status: 200 };
 	const shareSingle = responses.shareSingle ?? { data: null, error: null, status: 200 };
 	const heavyMemorySelect = responses.heavyMemorySelect ?? { data: [], error: null, status: 200 };
 
@@ -66,7 +68,14 @@ function createHarness(responses: MockResponses = {}) {
 								single: async () => meetingSingle
 							})
 						};
-					}
+					},
+					update: (_payload: unknown) => ({
+						eq: () => ({
+							select: () => ({
+								single: async () => meetingUpdateSingle
+							})
+						})
+					})
 				};
 			}
 
@@ -247,6 +256,35 @@ describe('database supabase adapter', () => {
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe(SeamErrorCodes.UPSTREAM_ERROR);
+		}
+	});
+
+	it('completes meeting by writing summary and endedAt', async () => {
+		const { adapter } = createHarness({
+			meetingUpdateSingle: {
+				data: {
+					id: '2f5dcf63-cf80-4e09-8e3e-13f93da72cf3',
+					user_id: 'fab8bc65-1f5e-4ef1-8606-ab51921f9a07',
+					topic: 'Honesty',
+					user_mood: 'hopeful',
+					listening_only: false,
+					started_at: '2026-02-15T04:00:00.000Z',
+					ended_at: '2026-02-15T05:00:00.000Z'
+				},
+				error: null,
+				status: 200
+			}
+		});
+
+		const result = await adapter.completeMeeting({
+			meetingId: '2f5dcf63-cf80-4e09-8e3e-13f93da72cf3',
+			summary: 'Room stayed grounded and connected.',
+			notableMoments: { marcus: 'Stayed in his seat.' }
+		});
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value.endedAt).toBe('2026-02-15T05:00:00.000Z');
 		}
 	});
 });

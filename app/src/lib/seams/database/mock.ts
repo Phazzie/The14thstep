@@ -1,6 +1,7 @@
 import { SeamErrorCodes, err, ok, type SeamErrorCode } from '$lib/core/seam';
 import type {
 	CallbackRecord,
+	CompleteMeetingInput,
 	CreateCallbackInput,
 	DatabasePort,
 	MeetingRecord,
@@ -9,6 +10,7 @@ import type {
 } from './contract';
 import {
 	validateCallbackRecord,
+	validateCompleteMeetingInput,
 	validateCreateCallbackInput,
 	validateAppendShareInput,
 	validateCreateMeetingInput,
@@ -36,7 +38,8 @@ type DatabaseMethod =
 	| 'getMeetingShares'
 	| 'createCallback'
 	| 'getActiveCallbacks'
-	| 'markCallbackReferenced';
+	| 'markCallbackReferenced'
+	| 'completeMeeting';
 
 interface DatabaseMockOptions {
 	scenarios?: Partial<Record<DatabaseMethod, DatabaseScenario>>;
@@ -50,6 +53,7 @@ interface DatabaseMockOptions {
 		createCallback?: CallbackRecord;
 		getActiveCallbacks?: CallbackRecord[];
 		markCallbackReferenced?: CallbackRecord;
+		completeMeeting?: MeetingRecord;
 	};
 }
 
@@ -87,7 +91,8 @@ export function createDatabaseMock(options: DatabaseMockOptions = {}): DatabaseP
 		createCallback: (options.fixtures?.createCallback ?? createCallbackSample) as CallbackRecord,
 		getActiveCallbacks: (options.fixtures?.getActiveCallbacks ?? getActiveCallbacksSample) as CallbackRecord[],
 		markCallbackReferenced:
-			(options.fixtures?.markCallbackReferenced ?? createCallbackSample) as CallbackRecord
+			(options.fixtures?.markCallbackReferenced ?? createCallbackSample) as CallbackRecord,
+		completeMeeting: (options.fixtures?.completeMeeting ?? createMeetingSample) as MeetingRecord
 	};
 	const fault = parseFaultFixture();
 
@@ -212,6 +217,19 @@ export function createDatabaseMock(options: DatabaseMockOptions = {}): DatabaseP
 				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'Fixture violates CallbackRecord');
 			}
 			return ok(fixtures.markCallbackReferenced);
+		},
+
+		async completeMeeting(input: CompleteMeetingInput) {
+			if (!validateCompleteMeetingInput(input)) {
+				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid completeMeeting input');
+			}
+			if (scenarios.completeMeeting === 'fault') {
+				return err(fault.code, fault.message, fault.details);
+			}
+			if (!validateMeetingRecord(fixtures.completeMeeting)) {
+				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'Fixture violates MeetingRecord');
+			}
+			return ok(fixtures.completeMeeting);
 		}
 	};
 }

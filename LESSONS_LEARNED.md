@@ -9,6 +9,7 @@ This file captures practical lessons we want future work to reuse.
 - Fast handoffs depend on lightweight, append-only notes more than perfect prose.
 - For long milestones, ship one tested core slice at a time and mark remaining scope explicitly in the ExecPlan.
 - A dedicated `milestone-status` snapshot with explicit \"next 10 tasks\" per incomplete milestone reduces context-loss risk during compaction/handoffs.
+- Milestone closeout works better when acceptance criteria are translated into concrete UI/component artifacts and checked off in a dedicated closeout checklist before moving ahead.
 
 ### Technical
 - Probe thresholds should be configurable by environment; fixed latency budgets produce false failures.
@@ -29,6 +30,8 @@ This file captures practical lessons we want future work to reuse.
 - `verify` scaffolding is most reliable when each lane is separately runnable (`verify:contracts`, `verify:core`, etc.) and path filters are directory-based instead of shell glob patterns.
 - SvelteKit route directories should not contain `+`-prefixed test filenames; route-adjacent tests are safer under `src/lib/server/**` importing route handlers directly.
 - A minimal CI workflow that runs `check` + core/contract verify lanes gives immediate regression signal even before full Milestone 9 coverage is complete.
+- EventSource-driven SSE clients are easier to reason about when the route also supports a GET input path and derives recent context from persistence instead of requiring request-body context.
+- Close-phase persistence should remain behind the database seam (`completeMeeting`) to preserve seam-driven boundaries and avoid route-level SQL/client drift.
 
 ## 2026-02-15
 

@@ -3,6 +3,7 @@ import { SeamErrorCodes } from '$lib/core/seam';
 import {
 	DATABASE_ERROR_CODES,
 	validateCallbackRecord,
+	validateCompleteMeetingInput,
 	validateCreateCallbackInput,
 	validateAppendShareInput,
 	validateMeetingRecord,
@@ -32,6 +33,13 @@ describe('database seam contract', () => {
 		expect(validateShareRecord(getShareByIdSample)).toBe(true);
 		expect(validateCallbackRecord(createCallbackSample)).toBe(true);
 		expect(validateCreateCallbackInput(createCallbackSample)).toBe(true);
+		expect(
+			validateCompleteMeetingInput({
+				meetingId: '2f5dcf63-cf80-4e09-8e3e-13f93da72cf3',
+				summary: 'Room stayed grounded.',
+				notableMoments: { marcus: 'Stayed seated.' }
+			})
+		).toBe(true);
 		expect(
 			(getHeavyMemorySample as unknown[]).every((record) => validateShareRecord(record))
 		).toBe(true);

@@ -6,6 +6,7 @@ import {
 	type ShareRecord,
 	type UserProfile,
 	validateCallbackRecord,
+	validateCompleteMeetingInput,
 	validateCreateCallbackInput,
 	validateAppendShareInput,
 	validateCreateMeetingInput,
@@ -464,6 +465,31 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 			}
 
 			return ok(callback);
+		},
+
+		async completeMeeting(input) {
+			if (!validateCompleteMeetingInput(input)) {
+				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid completeMeeting input');
+			}
+
+			const response = (await supabase
+				.from('meetings')
+				.update({
+					ended_at: new Date().toISOString(),
+					summary: input.summary,
+					notable_moments: input.notableMoments ?? null
+				})
+				.eq('id', input.meetingId)
+				.select('id, user_id, topic, user_mood, listening_only, started_at, ended_at')
+				.single()) as QueryResponseLike;
+			if (response.error) return mapUpstreamError('completeMeeting', response);
+
+			const meeting = mapMeetingRecordRow(response.data);
+			if (!validateMeetingRecord(meeting)) {
+				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'completeMeeting response violates MeetingRecord');
+			}
+
+			return ok(meeting);
 		}
 	};
 }

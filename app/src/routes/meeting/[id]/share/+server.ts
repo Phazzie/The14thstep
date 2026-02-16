@@ -148,7 +148,7 @@ function normalizeRecentShares(
 	return ok(shares);
 }
 
-async function parseRequest(request: Request): Promise<SeamResult<ShareStreamRequest>> {
+async function parseBodyRequest(request: Request): Promise<SeamResult<ShareStreamRequest>> {
 	let body: unknown;
 	try {
 		body = await request.json();
@@ -195,6 +195,39 @@ async function parseRequest(request: Request): Promise<SeamResult<ShareStreamReq
 		userName: body.userName?.trim(),
 		userMood: body.userMood?.trim(),
 		recentShares: recentSharesResult.value
+	});
+}
+
+function parseQueryRequest(url: URL): SeamResult<ShareStreamRequest> {
+	const topic = url.searchParams.get('topic')?.trim() ?? '';
+	const sequenceOrderRaw = url.searchParams.get('sequenceOrder') ?? '';
+	const sequenceOrder = Number(sequenceOrderRaw);
+	const characterId = url.searchParams.get('characterId')?.trim() || undefined;
+	const crisisRaw = (url.searchParams.get('crisisMode') ?? '').toLowerCase();
+	const crisisMode = crisisRaw === '1' || crisisRaw === 'true';
+	const interactionTypeRaw = url.searchParams.get('interactionType')?.trim();
+	const userName = url.searchParams.get('userName')?.trim() || undefined;
+	const userMood = url.searchParams.get('userMood')?.trim() || undefined;
+
+	if (!topic) {
+		return err(SeamErrorCodes.INPUT_INVALID, 'topic is required');
+	}
+	if (!Number.isInteger(sequenceOrder) || sequenceOrder < 0) {
+		return err(SeamErrorCodes.INPUT_INVALID, 'sequenceOrder must be a non-negative integer');
+	}
+	if (interactionTypeRaw && !isShareInteractionType(interactionTypeRaw)) {
+		return err(SeamErrorCodes.INPUT_INVALID, 'Invalid interactionType');
+	}
+
+	return ok({
+		topic,
+		sequenceOrder,
+		characterId,
+		crisisMode,
+		interactionType: interactionTypeRaw as ShareInteractionType | undefined,
+		userName,
+		userMood,
+		recentShares: undefined
 	});
 }
 
@@ -262,91 +295,108 @@ async function generateValidatedShare(input: {
 	return err(SeamErrorCodes.CONTRACT_VIOLATION, 'Generated share failed quality validation after retries');
 }
 
-export const POST: RequestHandler = async ({ params, locals, request }) => {
-	const meetingId = params.id?.trim();
-	if (!meetingId) {
-		return json(err(SeamErrorCodes.INPUT_INVALID, 'Meeting id is required'), { status: 400 });
+async function resolveRecentShares(
+	meetingId: string,
+	input: ShareStreamRequest,
+	locals: App.Locals
+): Promise<SeamResult<Array<{ speaker: string; content: string; isUserShare: boolean }>>> {
+	if (input.recentShares && input.recentShares.length > 0) {
+		return ok(input.recentShares.map((share) => ({ ...share, isUserShare: share.isUserShare === true })));
 	}
 
-	const inputResult = await parseRequest(request);
-	if (!inputResult.ok) {
-		return json(inputResult, { status: toStatus(inputResult.error.code) });
+	const sharesResult = await locals.seams.database.getMeetingShares(meetingId);
+	if (!sharesResult.ok) {
+		return err(sharesResult.error.code, sharesResult.error.message, sharesResult.error.details);
 	}
 
-	const input = inputResult.value;
-	if (input.crisisMode) {
-		return json(err(SeamErrorCodes.INPUT_INVALID, 'Character shares are paused during crisis mode'), {
-			status: 409
-		});
-	}
+	const recent = sharesResult.value.slice(-8).map((share) => {
+		const speaker = share.isUserShare
+			? input.userName ?? 'User'
+			: CORE_CHARACTERS.find((character) => character.id === share.characterId)?.name ?? 'Character';
+		return {
+			speaker,
+			content: share.content,
+			isUserShare: share.isUserShare
+		};
+	});
 
+	return ok(recent);
+}
+
+function createShareStream(
+	meetingId: string,
+	input: ShareStreamRequest,
+	recentShares: Array<{ speaker: string; content: string; isUserShare: boolean }>,
+	locals: App.Locals
+): Response {
 	const selectedCharacter = pickCharacter(input.characterId, input.sequenceOrder);
-	const recentShares = input.recentShares ?? [];
 	const userName = input.userName ?? 'You';
 	const userMood = input.userMood ?? 'present';
 	const interactionType = input.interactionType ?? 'standard';
-	const memoryUserId = locals.userId ?? process.env.PROBE_USER_ID?.trim() ?? null;
-	let heavyMemoryLines: string[] | undefined;
-	let selectedCallbacks: Array<{
-		id: string;
-		callbackType: string;
-		scope: string;
-		potentialScore: number;
-		originalText: string;
-	}> = [];
-	if (memoryUserId) {
-		const memoryResult = await buildPromptContext({
-			userId: memoryUserId,
-			characterId: selectedCharacter.id,
-			meetingId,
-			database: locals.seams.database
-		});
-		if (memoryResult.ok) {
-			heavyMemoryLines = memoryResult.value.heavyMemoryLines.slice(0, 6);
-			const latestUserShare = [...recentShares].reverse().find((share) => share.isUserShare)?.content;
-			const originatedCallbacksCount = memoryResult.value.callbacks.filter(
-				(callback) => callback.characterId === selectedCharacter.id
-			).length;
-
-			selectedCallbacks = memoryResult.value.callbacks
-				.filter((callback) => {
-					const decision = shouldIncludeCallback({
-						callback,
-						currentCharacterId: selectedCharacter.id,
-						currentCharacterMeetingCount: selectedCharacter.meetingCount,
-						originatedCallbacksCount,
-						latestUserShareText: latestUserShare,
-						meetingsSinceLastReferenced: estimateMeetingsSinceLastReferenced(callback.lastReferencedAt)
-					});
-					// TODO(M7): incorporate lifecycle state transitions (stale/retired/legend) after sequential meeting updates.
-					return decision.include;
-				})
-				.slice(0, 3)
-				.map((callback) => ({
-					id: callback.id,
-					callbackType: callback.callbackType,
-					scope: callback.scope,
-					potentialScore: callback.potentialScore,
-					originalText: callback.originalText
-				}));
-		}
-	}
-
-	const prompt = buildCharacterSharePrompt(selectedCharacter, {
-		topic: input.topic,
-		userName,
-		userMood,
-		recentShares: recentShares.slice(-6).map((share) => ({
-			speaker: share.speaker,
-			content: share.content
-		})),
-		heavyMemoryLines,
-		callbackLines: selectedCallbacks.map(formatCallbackLine)
-	});
 
 	const stream = new ReadableStream<Uint8Array>({
 		start(controller) {
 			void (async () => {
+				const memoryUserId = locals.userId ?? process.env.PROBE_USER_ID?.trim() ?? null;
+				let heavyMemoryLines: string[] | undefined;
+				let selectedCallbacks: Array<{
+					id: string;
+					callbackType: string;
+					scope: string;
+					potentialScore: number;
+					originalText: string;
+				}> = [];
+
+				if (memoryUserId) {
+					const memoryResult = await buildPromptContext({
+						userId: memoryUserId,
+						characterId: selectedCharacter.id,
+						meetingId,
+						database: locals.seams.database
+					});
+					if (memoryResult.ok) {
+						heavyMemoryLines = memoryResult.value.heavyMemoryLines.slice(0, 6);
+						const latestUserShare = [...recentShares].reverse().find((share) => share.isUserShare)?.content;
+						const originatedCallbacksCount = memoryResult.value.callbacks.filter(
+							(callback) => callback.characterId === selectedCharacter.id
+						).length;
+
+						selectedCallbacks = memoryResult.value.callbacks
+							.filter((callback) => {
+								const decision = shouldIncludeCallback({
+									callback,
+									currentCharacterId: selectedCharacter.id,
+									currentCharacterMeetingCount: selectedCharacter.meetingCount,
+									originatedCallbacksCount,
+									latestUserShareText: latestUserShare,
+									meetingsSinceLastReferenced: estimateMeetingsSinceLastReferenced(callback.lastReferencedAt)
+								});
+								// TODO(M7): incorporate lifecycle state transitions (stale/retired/legend) after sequential meeting updates.
+								return decision.include;
+							})
+							.slice(0, 3)
+							.map((callback) => ({
+								id: callback.id,
+								callbackType: callback.callbackType,
+								scope: callback.scope,
+								potentialScore: callback.potentialScore,
+								originalText: callback.originalText
+							}));
+					}
+				}
+
+				const prompt = buildCharacterSharePrompt(selectedCharacter, {
+					topic: input.topic,
+					userName,
+					userMood,
+					recentShares: recentShares.slice(-6).map((share) => ({
+						speaker: share.speaker,
+						content: share.content
+					})),
+					heavyMemoryLines,
+					callbackLines: selectedCallbacks.map(formatCallbackLine)
+				});
+
 				controller.enqueue(
 					sseChunk('meta', {
 						ok: true,
@@ -387,7 +437,6 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 				}
 
 				const fullText = generated.value.shareText.trim();
-
 				const chunks = chunkByWords(fullText);
 				for (let index = 0; index < chunks.length; index += 1) {
 					controller.enqueue(
@@ -481,4 +530,48 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 			connection: 'keep-alive'
 		}
 	});
+}
+
+async function handleShareRequest(
+	meetingId: string,
+	inputResult: SeamResult<ShareStreamRequest>,
+	locals: App.Locals
+): Promise<Response> {
+	if (!inputResult.ok) {
+		return json(inputResult, { status: toStatus(inputResult.error.code) });
+	}
+
+	const input = inputResult.value;
+	if (input.crisisMode) {
+		return json(err(SeamErrorCodes.INPUT_INVALID, 'Character shares are paused during crisis mode'), {
+			status: 409
+		});
+	}
+
+	const recentSharesResult = await resolveRecentShares(meetingId, input, locals);
+	if (!recentSharesResult.ok) {
+		return json(recentSharesResult, { status: toStatus(recentSharesResult.error.code) });
+	}
+
+	return createShareStream(meetingId, input, recentSharesResult.value, locals);
+}
+
+export const POST: RequestHandler = async ({ params, locals, request }) => {
+	const meetingId = params.id?.trim();
+	if (!meetingId) {
+		return json(err(SeamErrorCodes.INPUT_INVALID, 'Meeting id is required'), { status: 400 });
+	}
+
+	const inputResult = await parseBodyRequest(request);
+	return handleShareRequest(meetingId, inputResult, locals);
+};
+
+export const GET: RequestHandler = async ({ params, locals, url }) => {
+	const meetingId = params.id?.trim();
+	if (!meetingId) {
+		return json(err(SeamErrorCodes.INPUT_INVALID, 'Meeting id is required'), { status: 400 });
+	}
+
+	const inputResult = parseQueryRequest(url);
+	return handleShareRequest(meetingId, inputResult, locals);
 };

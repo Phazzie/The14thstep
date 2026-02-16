@@ -65,6 +65,12 @@ export interface CreateCallbackInput {
 	parentCallbackId?: string | null;
 }
 
+export interface CompleteMeetingInput {
+	meetingId: string;
+	summary: string;
+	notableMoments?: Record<string, string>;
+}
+
 export interface DatabasePort {
 	getUserById(userId: string): Promise<SeamResult<UserProfile>>;
 	createMeeting(
@@ -80,6 +86,7 @@ export interface DatabasePort {
 		meetingId: string;
 	}): Promise<SeamResult<CallbackRecord[]>>;
 	markCallbackReferenced(callbackId: string): Promise<SeamResult<CallbackRecord>>;
+	completeMeeting(input: CompleteMeetingInput): Promise<SeamResult<MeetingRecord>>;
 }
 
 export const DATABASE_ERROR_CODES: readonly SeamErrorCode[] = [
@@ -243,4 +250,12 @@ export function validateCreateCallbackInput(value: unknown): value is CreateCall
 		potentialScore <= 10 &&
 		(value.parentCallbackId === undefined || isNullableString(value.parentCallbackId))
 	);
+}
+
+export function validateCompleteMeetingInput(value: unknown): value is CompleteMeetingInput {
+	if (!isObject(value)) return false;
+	if (!isNonEmptyString(value.meetingId) || !isNonEmptyString(value.summary)) return false;
+	if (value.notableMoments === undefined) return true;
+	if (!isObject(value.notableMoments)) return false;
+	return Object.values(value.notableMoments).every((item) => typeof item === 'string');
 }

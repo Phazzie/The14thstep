@@ -1,3 +1,4 @@
+import { CORE_CHARACTERS } from '$lib/core/characters';
 import { closeMeeting } from '$lib/core/meeting';
 import { scanForCallbacks } from '$lib/core/callback-scanner';
 import { SeamErrorCodes, err, ok, type SeamErrorCode, type SeamResult } from '$lib/core/seam';
@@ -7,6 +8,40 @@ import type { RequestHandler } from './$types';
 interface CloseRequest {
 	topic: string;
 	lastShares: Array<{ speakerName: string; content: string }>;
+}
+
+async function buildCharacterMemorySummaries(input: {
+	meetingId: string;
+	topic: string;
+	lastShares: Array<{ speakerName: string; content: string }>;
+	grokAi: App.Locals['seams']['grokAi'];
+}): Promise<Record<string, string>> {
+	const summaries: Record<string, string> = {};
+	const transcript = input.lastShares
+		.slice(-10)
+		.map((share) => `${share.speakerName}: ${share.content}`)
+		.join('\n');
+
+	for (const character of CORE_CHARACTERS.slice(0, 6)) {
+		const prompt = [
+			`Write a one-paragraph memory note for ${character.name} after this meeting.`,
+			`Topic: ${input.topic}`,
+			'Keep it concrete and human. No therapy-speak.',
+			`Transcript excerpt:\n${transcript}`
+		].join('\n\n');
+
+		const result = await input.grokAi.generateShare({
+			meetingId: input.meetingId,
+			characterId: `memory-${character.id}`,
+			prompt,
+			contextMessages: [{ role: 'assistant', content: transcript }]
+		});
+		if (result.ok) {
+			summaries[character.id] = result.value.shareText.trim();
+		}
+	}
+
+	return summaries;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -99,6 +134,21 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 		return json(result, { status: toStatus(result.error.code) });
 	}
 
+	const characterMemorySummaries = await buildCharacterMemorySummaries({
+		meetingId,
+		topic: input.topic,
+		lastShares: input.lastShares,
+		grokAi: locals.seams.grokAi
+	});
+	const completeMeetingResult = await locals.seams.database.completeMeeting({
+		meetingId,
+		summary: result.value.summary,
+		notableMoments: characterMemorySummaries
+	});
+	if (!completeMeetingResult.ok) {
+		return json(completeMeetingResult, { status: toStatus(completeMeetingResult.error.code) });
+	}
+
 	let callbackScan: { detected: number; saved: number; skipped: number; failed: number } | null = null;
 	let callbackScanError: string | null = null;
 
@@ -138,6 +188,8 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 	return json(
 		ok({
 			...result.value,
+			characterMemorySummaries,
+			completedMeeting: completeMeetingResult.value,
 			callbackScan,
 			callbackScanError
 		}),

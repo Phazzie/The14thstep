@@ -20,16 +20,20 @@ export const actions: Actions = {
 	join: async ({ request, locals }) => {
 		const formData = await request.formData();
 
-		const topic = asTrimmedString(formData.get('topic'));
+		const userName = asTrimmedString(formData.get('userName'));
+		const cleanTime = asTrimmedString(formData.get('cleanTime'));
 		const mood = asTrimmedString(formData.get('mood'));
+		const mind = asTrimmedString(formData.get('mind'));
 		const submittedUserId = asTrimmedString(formData.get('userId'));
 		const listeningOnly = formData.get('listeningOnly') === 'on';
 		const fallbackUserId = submittedUserId || process.env.PROBE_USER_ID?.trim() || '';
 		const userId = locals.userId ?? fallbackUserId;
 
 		const values = {
-			topic,
+			userName,
+			cleanTime,
 			mood,
+			mind,
 			userId: submittedUserId,
 			listeningOnly
 		};
@@ -37,8 +41,8 @@ export const actions: Actions = {
 		if (!userId) {
 			return fail(400, { message: 'A user ID is required to start a meeting.', values });
 		}
-		if (!topic || !mood) {
-			return fail(400, { message: 'Topic and mood are required.', values });
+		if (!userName || !cleanTime || !mind || !mood) {
+			return fail(400, { message: 'Name, clean time, mood, and mind are required.', values });
 		}
 
 		const result = await createMeeting(
@@ -48,7 +52,7 @@ export const actions: Actions = {
 			},
 			{
 				userId,
-				topic,
+				topic: mind,
 				userMood: mood,
 				listeningOnly
 			}
@@ -56,10 +60,20 @@ export const actions: Actions = {
 
 		if (!result.ok) {
 			const status = statusFromSeamCode(result.error.code);
-			const message = status === 400 ? 'Topic and mood are required.' : 'Unable to start the meeting right now.';
+			const message =
+				status === 400
+					? 'Name, clean time, mood, and mind are required.'
+					: 'Unable to start the meeting right now.';
 			return fail(status, { message, values });
 		}
 
-		throw redirect(303, `/meeting/${result.value.id}`);
+		const query = new URLSearchParams({
+			name: userName,
+			cleanTime,
+			mood,
+			mind,
+			listen: listeningOnly ? '1' : '0'
+		});
+		throw redirect(303, `/meeting/${result.value.id}?${query.toString()}`);
 	}
 };

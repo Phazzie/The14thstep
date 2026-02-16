@@ -1,4 +1,9 @@
 <script lang="ts">
+	import MeetingCircle from '$lib/components/MeetingCircle.svelte';
+	import MeetingReflection from '$lib/components/MeetingReflection.svelte';
+	import ShareMessage from '$lib/components/ShareMessage.svelte';
+	import SystemMessage from '$lib/components/SystemMessage.svelte';
+	import UserInput from '$lib/components/UserInput.svelte';
 	import type { PageData } from './$types';
 
 	interface SeamError {
@@ -24,53 +29,68 @@
 		speakerName: string;
 	}
 
-interface CloseSummaryValue {
-	meetingId: string;
-	summary: string;
-}
+	interface CloseSummaryValue {
+		meetingId: string;
+		summary: string;
+	}
 
-interface UserShareValue {
-	share: ShareRecord;
-	crisis: boolean;
-	heavy: boolean;
-}
+	interface UserShareValue {
+		share: ShareRecord;
+		crisis: boolean;
+		heavy: boolean;
+	}
 
-interface ExpandShareValue {
-	shareId: string;
-	expandedText: string;
-}
+	interface ExpandShareValue {
+		shareId: string;
+		expandedText: string;
+	}
 
-interface CrisisResponseValue {
-	shares: ShareRecord[];
-	resources: string[];
-}
+	interface CrisisResponseValue {
+		shares: ShareRecord[];
+		resources: string[];
+	}
 
-let { data }: { data: PageData } = $props();
-const defaultTopic = $derived(data.defaultTopic);
-const defaultCharacterId = $derived(data.characters[0]?.id ?? 'marcus');
-let topic = $state('');
-let userName = $state('You');
-let userMood = $state('present');
-let selectedCharacterId = $state('');
-let userShareText = $state('');
-let transcript = $state<TranscriptEntry[]>([]);
-let expandedShares = $state<Record<string, string>>({});
-let streamingDraft = $state('');
-let summaryText = $state('');
-let statusLine = $state('');
-let errorMessage = $state('');
-let crisisMode = $state(false);
-let heavyMode = $state(false);
-let sharing = $state(false);
-let postingShare = $state(false);
-let closing = $state(false);
-let expandingShareId = $state<string | null>(null);
-let crisisResponding = $state(false);
+	type MeetingPhase = 'sharing' | 'closing' | 'reflection';
 
-$effect(() => {
-	if (!topic) topic = defaultTopic;
-	if (!selectedCharacterId) selectedCharacterId = defaultCharacterId;
-});
+	let { data }: { data: PageData } = $props();
+	const defaultTopic = $derived(data.defaultTopic);
+	const initialUserName = $derived(data.initialUserName);
+	const initialMood = $derived(data.initialMood);
+	let topic = $state('');
+	let userName = $state('');
+	let userMood = $state('present');
+	let selectedCharacterId = $state('');
+	let userShareText = $state('');
+	let transcript = $state<TranscriptEntry[]>([]);
+	let expandedShares = $state<Record<string, string>>({});
+	let streamingDraft = $state('');
+	let summaryText = $state('');
+	let statusLine = $state('');
+	let errorMessage = $state('');
+	let crisisMode = $state(false);
+	let heavyMode = $state(false);
+	let sharing = $state(false);
+	let postingShare = $state(false);
+	let closing = $state(false);
+	let expandingShareId = $state<string | null>(null);
+	let crisisResponding = $state(false);
+	let activeCharacterId = $state<string | null>(null);
+	let meetingPhase = $state<MeetingPhase>('sharing');
+	let transcriptContainer: HTMLDivElement | null = null;
+
+	$effect(() => {
+		if (!topic) topic = defaultTopic;
+		if (!selectedCharacterId) selectedCharacterId = data.characters[0]?.id ?? 'marcus';
+		if (!userName) userName = initialUserName;
+		if (userMood === 'present') userMood = initialMood;
+	});
+
+	$effect(() => {
+		transcript.length;
+		if (transcriptContainer) {
+			transcriptContainer.scrollTop = transcriptContainer.scrollHeight;
+		}
+	});
 
 	function isRecord(value: unknown): value is Record<string, unknown> {
 		return typeof value === 'object' && value !== null;
@@ -78,9 +98,7 @@ $effect(() => {
 
 	function parseSeamResult<T>(value: unknown): SeamResult<T> | null {
 		if (!isRecord(value) || typeof value.ok !== 'boolean') return null;
-		if (value.ok) {
-			return { ok: true, value: value.value as T };
-		}
+		if (value.ok) return { ok: true, value: value.value as T };
 		if (!isRecord(value.error) || typeof value.error.message !== 'string' || typeof value.error.code !== 'string') {
 			return null;
 		}
@@ -109,38 +127,15 @@ $effect(() => {
 			const copy = [...transcript];
 			copy[existingIndex] = entry;
 			transcript = copy.sort((left, right) => left.sequenceOrder - right.sequenceOrder);
-			return;
+		} else {
+			transcript = [...transcript, entry].sort((left, right) => left.sequenceOrder - right.sequenceOrder);
 		}
 
-		transcript = [...transcript, entry].sort((left, right) => left.sequenceOrder - right.sequenceOrder);
+		if (!entry.isUserShare && entry.characterId) activeCharacterId = entry.characterId;
 	}
 
-	function parseSseBlock(block: string): { eventName: string; payload: unknown } | null {
-		const lines = block.split('\n').map((line) => line.trim());
-		let eventName = 'message';
-		const payloadLines: string[] = [];
-
-		for (const line of lines) {
-			if (line.startsWith('event:')) {
-				eventName = line.slice(6).trim();
-			} else if (line.startsWith('data:')) {
-				payloadLines.push(line.slice(5).trim());
-			}
-		}
-
-		if (payloadLines.length === 0) return null;
-
-		const payloadText = payloadLines.join('\n');
-		try {
-			return { eventName, payload: JSON.parse(payloadText) };
-		} catch {
-			return { eventName, payload: payloadText };
-		}
-	}
-
-	async function submitUserShare() {
-		const content = userShareText.trim();
-		if (!content || postingShare) return;
+	async function submitUserShare(content: string = userShareText.trim()) {
+		if (!content || postingShare || data.listeningOnly) return;
 
 		errorMessage = '';
 		statusLine = '';
@@ -188,6 +183,11 @@ $effect(() => {
 		}
 	}
 
+	async function submitPass() {
+		if (data.listeningOnly) return;
+		await submitUserShare("I'll pass for now.");
+	}
+
 	async function requestExpandShare(shareId: string) {
 		const selected = transcript.find((entry) => entry.id === shareId);
 		if (!selected || selected.isUserShare || expandingShareId) return;
@@ -232,91 +232,58 @@ $effect(() => {
 		}
 	}
 
-	async function requestCharacterShare() {
-		if (sharing || crisisMode) return;
+	function requestCharacterShare() {
+		if (sharing || crisisMode || meetingPhase !== 'sharing') return;
 
 		errorMessage = '';
 		statusLine = '';
 		streamingDraft = '';
 		sharing = true;
 
-		try {
-			const response = await fetch(`/meeting/${data.meetingId}/share`, {
-				method: 'POST',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({
-					topic,
-					characterId: selectedCharacterId,
-					sequenceOrder: transcript.length,
-					crisisMode,
-					interactionType: 'respond_to',
-					userName,
-					userMood,
-					recentShares: transcript.slice(-6).map((entry) => ({
-						speaker: entry.speakerName,
-						content: entry.content,
-						isUserShare: entry.isUserShare
-					}))
-				})
-			});
+		const search = new URLSearchParams({
+			topic,
+			characterId: selectedCharacterId,
+			sequenceOrder: String(transcript.length),
+			crisisMode: crisisMode ? '1' : '0',
+			interactionType: 'respond_to',
+			userName,
+			userMood
+		});
 
-			if (!response.ok && response.headers.get('content-type')?.includes('application/json')) {
-				const payload = parseSeamResult<unknown>(await response.json());
-				errorMessage = payload && !payload.ok ? payload.error.message : `Share request failed (${response.status})`;
-				return;
+		const eventSource = new EventSource(`/meeting/${data.meetingId}/share?${search.toString()}`);
+
+		eventSource.addEventListener('chunk', (event) => {
+			const parsed = parseSeamResult<{ chunk?: string }>(JSON.parse((event as MessageEvent<string>).data));
+			if (parsed?.ok && typeof parsed.value.chunk === 'string') {
+				streamingDraft = streamingDraft ? `${streamingDraft} ${parsed.value.chunk}` : parsed.value.chunk;
 			}
-			if (!response.body) {
-				errorMessage = 'Share stream did not include a response body.';
-				return;
+		});
+
+		eventSource.addEventListener('persisted', (event) => {
+			const parsed = parseSeamResult<{ share?: ShareRecord }>(JSON.parse((event as MessageEvent<string>).data));
+			if (parsed?.ok && isRecord(parsed.value.share)) {
+				upsertShare(parsed.value.share as ShareRecord);
+				statusLine = 'Character share generated and saved.';
+				streamingDraft = '';
 			}
+		});
 
-			const reader = response.body.getReader();
-			const decoder = new TextDecoder();
-			let buffer = '';
-
-			while (true) {
-				const next = await reader.read();
-				if (next.done) break;
-
-				buffer += decoder.decode(next.value, { stream: true });
-				const blocks = buffer.split('\n\n');
-				buffer = blocks.pop() ?? '';
-
-				for (const block of blocks) {
-					const parsed = parseSseBlock(block);
-					if (!parsed) continue;
-
-					if (parsed.eventName === 'chunk' && isRecord(parsed.payload)) {
-						const result = parseSeamResult<{ chunk?: string }>(parsed.payload);
-						if (result?.ok && typeof result.value.chunk === 'string') {
-							streamingDraft = streamingDraft
-								? `${streamingDraft} ${result.value.chunk}`
-								: result.value.chunk;
-						}
-						continue;
-					}
-
-					if (parsed.eventName === 'persisted' && isRecord(parsed.payload)) {
-						const result = parseSeamResult<{ share?: ShareRecord }>(parsed.payload);
-						if (result?.ok && isRecord(result.value.share)) {
-							upsertShare(result.value.share as ShareRecord);
-							statusLine = 'Character share generated and saved.';
-							streamingDraft = '';
-						}
-						continue;
-					}
-
-					if (parsed.eventName === 'error' && isRecord(parsed.payload)) {
-						const result = parseSeamResult<unknown>(parsed.payload);
-						errorMessage = result && !result.ok ? result.error.message : 'Share stream failed.';
-					}
-				}
+		eventSource.addEventListener('error', (event) => {
+			let parsed: SeamResult<unknown> | null = null;
+			try {
+				parsed = parseSeamResult(JSON.parse((event as MessageEvent<string>).data));
+			} catch {
+				parsed = null;
 			}
-		} catch (cause) {
-			errorMessage = cause instanceof Error ? cause.message : String(cause);
-		} finally {
+			errorMessage = parsed && !parsed.ok ? parsed.error.message : 'Share stream failed.';
+			eventSource.close();
 			sharing = false;
-		}
+		});
+
+		eventSource.addEventListener('done', () => {
+			eventSource.close();
+			sharing = false;
+		});
 	}
 
 	async function requestCrisisSupport(userText: string) {
@@ -324,7 +291,6 @@ $effect(() => {
 
 		errorMessage = '';
 		crisisResponding = true;
-		// TODO(M8): add setup-phase crisis entry path so meetings can start in crisis mode when initial context is high-risk.
 		statusLine = '... room goes quiet ...';
 
 		try {
@@ -360,11 +326,12 @@ $effect(() => {
 	}
 
 	async function requestCloseSummary() {
-		if (closing) return;
+		if (closing || meetingPhase !== 'sharing') return;
 
 		errorMessage = '';
 		statusLine = '';
 		closing = true;
+		meetingPhase = 'closing';
 
 		try {
 			const response = await fetch(`/meeting/${data.meetingId}/close`, {
@@ -382,302 +349,125 @@ $effect(() => {
 
 			if (!payload) {
 				errorMessage = 'Unexpected close response format.';
+				meetingPhase = 'sharing';
 				return;
 			}
 			if (!payload.ok) {
 				errorMessage = payload.error.message;
+				meetingPhase = 'sharing';
 				return;
 			}
 
 			summaryText = payload.value.summary;
+			meetingPhase = 'reflection';
 			statusLine = 'Close summary ready.';
 		} catch (cause) {
 			errorMessage = cause instanceof Error ? cause.message : String(cause);
+			meetingPhase = 'sharing';
 		} finally {
 			closing = false;
 		}
 	}
 </script>
 
-<main class="meeting-shell">
-	<header class="meeting-header">
-		<h1>Meeting Flow</h1>
-		<p>Meeting ID: <code>{data.meetingId}</code></p>
-	</header>
+<main class="mx-auto grid max-w-6xl gap-4 p-4 lg:grid-cols-[2fr_1fr]">
+	<section class="space-y-4 rounded-xl border border-gray-700 bg-gray-900 p-4">
+		<header class="space-y-2">
+			<h1 class="text-2xl font-bold text-amber-200">Meeting Room</h1>
+			<p class="text-sm text-gray-300">Meeting ID: <code>{data.meetingId}</code></p>
+			<p class="text-sm text-gray-300">{userName} · {data.initialCleanTime ?? 'clean time not set'}</p>
+		</header>
 
-	<section class="control-grid">
-		<label>
-			Topic
-			<input bind:value={topic} placeholder="Meeting topic" />
-		</label>
-		<label>
-			Your name
-			<input bind:value={userName} placeholder="You" />
-		</label>
-		<label>
-			Mood
-			<input bind:value={userMood} placeholder="present" />
-		</label>
-		<label>
-			Character
-			<select bind:value={selectedCharacterId}>
-				{#each data.characters as character}
-					<option value={character.id}>{character.name} ({character.cleanTime})</option>
-				{/each}
-			</select>
-		</label>
-	</section>
+		<MeetingCircle characters={data.characters} {activeCharacterId} {crisisMode} />
 
-	<section class="button-row">
-		<button onclick={requestCharacterShare} disabled={sharing || postingShare || closing || crisisMode}>
-			{crisisMode ? 'Character Shares Paused (Crisis Mode)' : sharing ? 'Generating share...' : 'Generate Character Share (SSE)'}
-		</button>
-		<button onclick={requestCloseSummary} disabled={closing || sharing}>
-			{closing ? 'Closing...' : 'Request Close Summary'}
-		</button>
-	</section>
-
-	<section class="share-box">
-		<label for="user-share">Your share</label>
-		<textarea
-			id="user-share"
-			rows="4"
-			bind:value={userShareText}
-			placeholder="Type your share to post to the room..."
-		></textarea>
-		<button onclick={submitUserShare} disabled={postingShare || sharing || crisisResponding || !userShareText.trim()}>
-			{postingShare ? 'Saving...' : 'Submit User Share'}
-		</button>
-	</section>
-
-	{#if errorMessage}
-		<p class="error">{errorMessage}</p>
-	{/if}
-	{#if statusLine}
-		<p class="status">{statusLine}</p>
-	{/if}
-	{#if crisisMode}
-		<section class="crisis">
-			<h2>If you're in crisis</h2>
-			<p>988 - Suicide & Crisis Lifeline</p>
-			<p>1-800-662-4357 - SAMHSA National Helpline</p>
-			<p>You can stay here with us.</p>
+		<section class="grid gap-2 sm:grid-cols-3">
+			<label class="text-sm text-gray-200">
+				Topic
+				<input class="mt-1 w-full rounded-md border border-gray-700 bg-gray-800 p-2" bind:value={topic} />
+			</label>
+			<label class="text-sm text-gray-200">
+				Your Name
+				<input class="mt-1 w-full rounded-md border border-gray-700 bg-gray-800 p-2" bind:value={userName} />
+			</label>
+			<label class="text-sm text-gray-200">
+				Mood
+				<input class="mt-1 w-full rounded-md border border-gray-700 bg-gray-800 p-2" bind:value={userMood} />
+			</label>
 		</section>
-	{/if}
-	{#if streamingDraft}
-		<section class="streaming">
-			<h2>Streaming Draft</h2>
-			<p>{streamingDraft}</p>
-		</section>
-	{/if}
 
-	<section class="panel-grid">
-		<section class="panel">
-			<h2>Transcript</h2>
+		<div class="flex flex-wrap gap-2">
+			<button
+				type="button"
+				onclick={requestCharacterShare}
+				disabled={sharing || postingShare || closing || crisisMode || meetingPhase !== 'sharing'}
+				class="min-h-11 rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+			>
+				{crisisMode
+					? 'Character Shares Paused (Crisis Mode)'
+					: sharing
+						? 'Generating Character Share...'
+						: 'Generate Character Share'}
+			</button>
+			<button
+				type="button"
+				onclick={requestCloseSummary}
+				disabled={closing || sharing || meetingPhase !== 'sharing'}
+				class="min-h-11 rounded-md bg-amber-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+			>
+				{closing ? 'Closing Meeting...' : 'Close Meeting'}
+			</button>
+		</div>
+
+		{#if errorMessage}
+			<SystemMessage message={errorMessage} kind="error" />
+		{/if}
+		{#if statusLine}
+			<SystemMessage message={statusLine} kind="info" />
+		{/if}
+		{#if streamingDraft}
+			<SystemMessage message={`Streaming: ${streamingDraft}`} kind="success" />
+		{/if}
+
+		<div bind:this={transcriptContainer} class="max-h-[28rem] space-y-3 overflow-y-auto rounded-xl border border-gray-700 bg-gray-950 p-3">
 			{#if transcript.length === 0}
-				<p class="empty">No shares yet.</p>
+				<SystemMessage message="No shares yet." kind="info" />
 			{:else}
-				<ol>
+				<ol class="space-y-3">
 					{#each transcript as entry}
-						<li>
-							<p><strong>{entry.speakerName}</strong></p>
-							<p>{entry.content}</p>
-							{#if !entry.isUserShare}
-								<button
-									type="button"
-									class="expand-btn"
-									onclick={() => requestExpandShare(entry.id)}
-									disabled={expandingShareId !== null}
-								>
-									{expandingShareId === entry.id ? 'Expanding...' : 'Expand'}
-								</button>
-							{/if}
-							{#if expandedShares[entry.id]}
-								<p class="expanded">{expandedShares[entry.id]}</p>
-							{/if}
-							<p class="meta">Significance: {entry.significanceScore} | #{entry.sequenceOrder}</p>
-						</li>
+						<ShareMessage
+							{entry}
+							expandedText={expandedShares[entry.id]}
+							onExpand={requestExpandShare}
+							expanding={expandingShareId === entry.id}
+						/>
 					{/each}
 				</ol>
 			{/if}
-		</section>
+		</div>
+	</section>
 
-		<section class="panel">
-			<h2>Close Summary</h2>
-			{#if summaryText}
-				<p>{summaryText}</p>
-			{:else}
-				<p class="empty">No summary yet.</p>
-			{/if}
-		</section>
+	<section class="space-y-4 rounded-xl border border-gray-700 bg-gray-900 p-4">
+		{#if crisisMode}
+			<section class="rounded-xl border border-rose-600 bg-rose-950/30 p-4">
+				<h2 class="text-base font-semibold text-rose-200">If you're in crisis</h2>
+				<p class="text-sm text-rose-100">988 - Suicide & Crisis Lifeline</p>
+				<p class="text-sm text-rose-100">1-800-662-4357 - SAMHSA National Helpline</p>
+				<p class="text-sm text-rose-100">You can stay here with us.</p>
+			</section>
+		{/if}
+
+		{#if meetingPhase === 'reflection' && summaryText}
+			<MeetingReflection summary={summaryText} onClose={() => (meetingPhase = 'sharing')} />
+		{:else}
+			<UserInput
+				value={userShareText}
+				onValueChange={(next) => (userShareText = next)}
+				onSubmit={() => submitUserShare()}
+				onPass={submitPass}
+				disabled={postingShare || sharing || crisisResponding || meetingPhase !== 'sharing'}
+				{crisisMode}
+				listeningOnly={data.listeningOnly}
+			/>
+		{/if}
 	</section>
 </main>
-
-<style>
-	:global(body) {
-		margin: 0;
-		font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-		background: #f6f7f9;
-		color: #111827;
-	}
-
-	.meeting-shell {
-		max-width: 980px;
-		margin: 0 auto;
-		padding: 1rem;
-		display: grid;
-		gap: 1rem;
-	}
-
-	.meeting-header {
-		background: #ffffff;
-		border: 1px solid #d1d5db;
-		border-radius: 0.75rem;
-		padding: 1rem;
-	}
-
-	.meeting-header h1 {
-		margin: 0 0 0.35rem 0;
-		font-size: 1.4rem;
-	}
-
-	.meeting-header p {
-		margin: 0;
-		color: #4b5563;
-	}
-
-	.control-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-		gap: 0.75rem;
-	}
-
-	.control-grid label,
-	.share-box label {
-		display: grid;
-		gap: 0.35rem;
-		font-weight: 600;
-		font-size: 0.95rem;
-	}
-
-	input,
-	select,
-	textarea,
-	button {
-		font: inherit;
-	}
-
-	input,
-	select,
-	textarea {
-		border: 1px solid #cbd5e1;
-		background: #ffffff;
-		border-radius: 0.55rem;
-		padding: 0.55rem 0.65rem;
-	}
-
-	textarea {
-		resize: vertical;
-	}
-
-	.button-row,
-	.share-box {
-		display: grid;
-		gap: 0.65rem;
-	}
-
-	button {
-		background: #1d4ed8;
-		color: #ffffff;
-		border: none;
-		border-radius: 0.6rem;
-		padding: 0.6rem 0.8rem;
-		cursor: pointer;
-	}
-
-	button:disabled {
-		background: #94a3b8;
-		cursor: not-allowed;
-	}
-
-	.share-box,
-	.streaming,
-	.panel,
-	.crisis {
-		background: #ffffff;
-		border: 1px solid #d1d5db;
-		border-radius: 0.75rem;
-		padding: 1rem;
-	}
-
-	.crisis {
-		border-color: #b91c1c;
-		background: #fff1f2;
-	}
-
-	.error {
-		margin: 0;
-		color: #b91c1c;
-		font-weight: 600;
-	}
-
-	.status {
-		margin: 0;
-		color: #0369a1;
-		font-weight: 600;
-	}
-
-	.panel-grid {
-		display: grid;
-		grid-template-columns: 1fr;
-		gap: 1rem;
-	}
-
-	.panel h2,
-	.streaming h2 {
-		margin: 0 0 0.6rem 0;
-		font-size: 1.05rem;
-	}
-
-	.panel ol {
-		margin: 0;
-		padding-left: 1.1rem;
-		display: grid;
-		gap: 0.7rem;
-	}
-
-	.panel li p {
-		margin: 0;
-	}
-
-	.meta,
-	.empty {
-		color: #6b7280;
-		font-size: 0.9rem;
-	}
-
-	.expand-btn {
-		background: #0f766e;
-		margin-top: 0.45rem;
-		padding: 0.4rem 0.65rem;
-	}
-
-	.expanded {
-		margin-top: 0.55rem;
-		padding: 0.6rem;
-		border-radius: 0.5rem;
-		background: #eef2ff;
-		border: 1px solid #c7d2fe;
-	}
-
-	@media (min-width: 860px) {
-		.button-row {
-			grid-template-columns: repeat(2, minmax(220px, max-content));
-			align-items: center;
-		}
-
-		.panel-grid {
-			grid-template-columns: 2fr 1fr;
-		}
-	}
-</style>
