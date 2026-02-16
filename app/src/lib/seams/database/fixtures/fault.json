@@ -1,0 +1,8 @@
+{
+  "code": "UPSTREAM_UNAVAILABLE",
+  "message": "Supabase query timed out",
+  "details": {
+    "provider": "supabase",
+    "timeoutMs": 2000
+  }
+}

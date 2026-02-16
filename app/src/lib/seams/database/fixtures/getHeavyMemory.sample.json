@@ -1,0 +1,22 @@
+[
+  {
+    "id": "f3f9bf9b-0ca5-4f16-8640-66f613e4cc99",
+    "meetingId": "2f5dcf63-cf80-4e09-8e3e-13f93da72cf3",
+    "characterId": "heather",
+    "isUserShare": false,
+    "content": "Listen, I wanted to disappear this week, but I called somebody before I made it worse.",
+    "significanceScore": 8,
+    "sequenceOrder": 5,
+    "createdAt": "2026-02-15T04:04:45.000Z"
+  },
+  {
+    "id": "f4efe497-e94a-4644-8752-4709e84f657b",
+    "meetingId": "67f2c96b-3bb1-40bf-b6ec-2ead1ab860b5",
+    "characterId": null,
+    "isUserShare": true,
+    "content": "I told my mom the truth for the first time and she still answered the phone.",
+    "significanceScore": 9,
+    "sequenceOrder": 8,
+    "createdAt": "2026-02-08T03:14:12.000Z"
+  }
+]

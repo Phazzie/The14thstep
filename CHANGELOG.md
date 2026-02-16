@@ -7,9 +7,17 @@ All notable changes to this repository are documented in this file.
 ### Added
 - `CHANGELOG.md` for milestone-level change tracking across agent handoffs.
 - `LESSONS_LEARNED.md` for operational and technical learnings.
+- Nested agent guides: `app/AGENTS.md` and `plans/AGENTS.md`.
+- Seam fixtures, mocks, and contract tests for `grok-ai`, `database`, `auth`, `uuid`, and `clock` under `app/src/lib/seams/**`.
 
 ### Changed
 - `AGENTS.md` now explicitly requires agents to keep `CHANGELOG.md` and `LESSONS_LEARNED.md` current.
+- Root `AGENTS.md` slimmed to global guidance, with a Seam-Driven Development summary pointer to `app/AGENTS.md`.
+- Seam contract files now export runtime validation helpers used by tests and mocks.
+
+### Verified
+- `npm run test:unit -- --run` passes with seam contract tests included.
+- `npm run check` passes with zero diagnostics.
 
 ## [2026-02-15]
 

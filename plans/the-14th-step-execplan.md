@@ -37,8 +37,9 @@ Optional but useful for Supabase CLI operations:
 
 - [x] (2026-02-15 23:40Z) Created Milestone 0 scaffolding artifacts: `seam-registry.json`, `decision-log.md`, seam contract files under `app/src/lib/seams/**`, shared result envelope in `app/src/lib/core/seam.ts`, and probe scripts in `app/probes/**`.
 - [x] (2026-02-15 23:40Z) Added and validated local SSE probe path: endpoint `app/src/routes/api/probes/sse/+server.ts`, UI `app/src/routes/probes/sse/+page.svelte`, and CLI probe `npm run probe:sse` returning PASS.
+- [x] (2026-02-16 03:23Z) Completed Milestone 1 seam skeleton implementation by adding fixture sets, fixture-backed mocks, runtime contract validators, and green contract tests for `grok-ai`, `database`, `auth`, `uuid`, and `clock` under `app/src/lib/seams/**`.
 - [ ] Milestone 0: Repository bootstrap and reality probes complete (completed: local probe + scaffolding; remaining: live `probe:grok-voice` and live `probe:supabase-memory` with credentials).
-- [ ] Milestone 1: Hexagonal skeleton with all seam contracts, mocks, and contract tests green
+- [x] Milestone 1: Hexagonal skeleton with all seam contracts, mocks, and contract tests green
 - [ ] Milestone 2: Domain core (pure meeting workflow logic) tested with zero I/O
 - [ ] Milestone 3: Prompt engineering â€” Grok produces character-voice shares that pass AI-driven quality validation
 - [ ] Milestone 4: Real adapters wired (Supabase database, Supabase auth, xAI grok-ai seam)
@@ -59,6 +60,10 @@ Optional but useful for Supabase CLI operations:
   Evidence: `npm run lint` and targeted `npx eslint ...` produced no rule output and did not complete within timeout windows.
 - Observation: Both deployment CLIs can run from `npx`, so global installation is not required.
   Evidence: `npx --yes vercel --version` returned `50.17.1`; `npx --yes supabase --version` returned `2.76.8`.
+- Observation: Isolated worktrees require their own dependency install even when another sibling worktree already has `node_modules`.
+  Evidence: In `/mnt/c/Users/latro/Downloads/t/recoverymeeting-codex/app`, `npm run test:unit -- --run` failed with `vitest: not found` until `npm install` completed.
+- Observation: Strict TypeScript checks on runtime validators require explicit narrowing of values read from `Record<string, unknown>`.
+  Evidence: `npm run check` reported `'value.significanceScore' is of type 'unknown'` and `'tokenValue' is possibly 'null'`; adding local typed variables and type guards resolved all errors.
 
 ## Decision Log
 
@@ -98,9 +103,13 @@ Optional but useful for Supabase CLI operations:
   Rationale: Reduces setup friction and keeps execution reproducible in fresh environments.
   Date/Author: 2026-02-15 (Codex)
 
+- Decision: Export runtime validation helpers from seam contracts and reuse them in mocks and contract tests.
+  Rationale: This keeps contract shape rules centralized in one seam-owned location and gives adapters a shared validation path for Milestone 4.
+  Date/Author: 2026-02-16 (Codex)
+
 ## Outcomes & Retrospective
 
-Milestone 0 is partially complete. We now have a running local probe route for streaming, scripted probe entry points for xAI and Supabase, and a baseline seam contract skeleton anchored by a shared result envelope. Remaining Milestone 0 work is credential-gated: execute live Grok voice validation and live Supabase memory-latency validation against real infrastructure.
+Milestone 0 remains partially complete because live probe execution is credential/infrastructure gated, but local probe scaffolding is stable. Milestone 1 is now complete: each defined seam has fixture files, fixture-backed mocks, runtime contract validators, and passing contract tests. The next implementation target is Milestone 2 (pure domain meeting workflow logic with zero I/O), while keeping live probe execution queued for credential-ready windows.
 
 ## Context and Orientation
 
@@ -955,3 +964,5 @@ Revision note (2026-02-15, setup alignment): Added AGENTS.md + PLANS.md reposito
 Revision note (2026-02-15, Codex): Updated Progress, Surprises & Discoveries, Decision Log, and Outcomes & Retrospective to capture Milestone 0 scaffolding completion status, local SSE probe evidence, environment blockers (credentials, ESLint stall), and implementation location decisions.
 
 Revision note (2026-02-15, Codex env/deploy update): Added explicit environment prerequisites, CLI strategy (`npx vercel`, `npx supabase`), and corresponding discoveries/decisions so deployment can run end-to-end without global installs.
+
+Revision note (2026-02-16, Codex milestone-1): Recorded completion of Milestone 1 by adding runtime validators, fixture-backed seam mocks, and passing contract tests for all current seams; updated discoveries and outcomes with isolated-worktree install behavior and strict TypeScript validator constraints.

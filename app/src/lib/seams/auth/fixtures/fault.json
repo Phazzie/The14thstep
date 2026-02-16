@@ -1,0 +1,7 @@
+{
+  "code": "UNAUTHORIZED",
+  "message": "Session token is invalid or expired",
+  "details": {
+    "provider": "supabase-auth"
+  }
+}

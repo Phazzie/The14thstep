@@ -13,6 +13,8 @@ This file captures practical lessons we want future work to reuse.
 - Validate xAI parsing against real payload shapes early, then lock the parser contract in tests.
 - SvelteKit/Vite cold starts can be slow; warm the server before timing-sensitive probes.
 - `npx`-based CLI usage (`vercel`, `supabase`) reduces setup friction and keeps agent runs reproducible.
+- Each git worktree needs its own dependency install; do not assume sibling worktree `node_modules` are available.
+- For strict TypeScript contracts, always narrow values extracted from `Record<string, unknown>` before numeric comparisons.
 
 ## 2026-02-15
 
