@@ -25,6 +25,13 @@ All notable changes to this repository are documented in this file.
   - `app/src/lib/seams/grok-ai/fixtures/probe.sample.json`
   - `app/src/lib/seams/grok-ai/fixtures/probe.fault.json`
   - `app/src/lib/seams/grok-ai/fixtures/voice-quality-report.json`
+- Milestone 4 server adapter implementations:
+  - `app/src/lib/server/seams/grok-ai/adapter.ts`
+  - `app/src/lib/server/seams/database/adapter.ts`
+  - `app/src/lib/server/seams/auth/adapter.ts`
+  - `app/src/lib/server/supabase.ts`
+  - `app/src/hooks.server.ts`
+  - Adapter tests under `app/src/lib/server/seams/**/adapter.spec.ts`
 
 ### Changed
 - `AGENTS.md` now explicitly requires agents to keep `CHANGELOG.md` and `LESSONS_LEARNED.md` current.
@@ -33,12 +40,14 @@ All notable changes to this repository are documented in this file.
 - Probe scripts in `app/package.json` now load `.env.local` automatically using `--env-file-if-exists`.
 - `seam-registry.json` now points Grok live probe metadata to seam-local probe/quality-cycle scripts.
 - `app/README.md` now documents Milestone 3 contract/quality probe commands and output paths.
+- `app/src/app.d.ts` now types `locals.seams` for `auth`, `database`, and `grokAi`.
 
 ### Verified
 - `npm run test:unit -- --run` passes with seam contract tests included.
 - `npm run check` passes with zero diagnostics.
 - Total unit suite now passes with 51 tests including expanded domain-core coverage.
 - Live quality-cycle run met target for all six core characters (5/5 pass each in captured run).
+- Full integrated adapter + domain suite passes with 64 unit tests and clean `svelte-check`.
 
 ## [2026-02-15]
 

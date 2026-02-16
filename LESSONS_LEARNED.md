@@ -19,6 +19,8 @@ This file captures practical lessons we want future work to reuse.
 - Encode significance-scoring precedence in tests; mixed-signal shares otherwise create ambiguous expectations.
 - Keep deterministic contract fixtures separate from live probe captures (`sample.json` vs `probe.sample.json`) so test baselines are not overwritten.
 - Use script-level env loading (`node --env-file-if-exists=.env.local`) for probe commands in isolated worktrees.
+- Parallel subagents work best when each owns non-overlapping file sets and one integrator owns final wiring/tests/docs.
+- Verify Linux Node toolchain path explicitly (`/home/latro/.nvm/.../bin`) to avoid accidental Windows npm execution drift.
 
 ## 2026-02-15
 

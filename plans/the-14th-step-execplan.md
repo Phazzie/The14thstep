@@ -42,11 +42,12 @@ Optional but useful for Supabase CLI operations:
 - [x] (2026-02-16 04:19Z) Completed Milestone 2 core modules with tests: `character-selector.ts`, `prompt-templates.ts`, `memory-builder.ts`, and `callback-scanner.ts` with full unit coverage in `app/src/lib/core/*.spec.ts`.
 - [x] (2026-02-16 04:19Z) Completed Milestone 3 live prompt-engineering probes: `probe.ts` generated live fixtures, quality cycle generated per-character pass rates, and all six core characters met/exceeded the 0.7 target (recorded 1.0 in this run).
 - [x] (2026-02-16 04:19Z) Completed remaining Milestone 0 live probes in isolated workspace using local env loading: `probe:grok-voice` PASS (9/10) and `probe:supabase-memory` PASS after threshold tuning via `SUPABASE_MEMORY_PROBE_MAX_MS=1200`.
+- [x] (2026-02-16 05:34Z) Completed Milestone 4 adapter wiring by implementing real adapters and tests in `app/src/lib/server/seams/**`, adding Supabase client helper `app/src/lib/server/supabase.ts`, and wiring `auth/database/grokAi` seam bundle through `app/src/hooks.server.ts` and `app/src/app.d.ts`.
 - [x] Milestone 0: Repository bootstrap and reality probes complete
 - [x] Milestone 1: Hexagonal skeleton with all seam contracts, mocks, and contract tests green
 - [x] Milestone 2: Domain core (pure meeting workflow logic) tested with zero I/O
 - [x] Milestone 3: Prompt engineering â€” Grok produces character-voice shares that pass AI-driven quality validation
-- [ ] Milestone 4: Real adapters wired (Supabase database, Supabase auth, xAI grok-ai seam)
+- [x] Milestone 4: Real adapters wired (Supabase database, Supabase auth, xAI grok-ai seam)
 - [ ] Milestone 5: UI and meeting flow â€” full meeting runs on localhost with streaming shares
 - [ ] Milestone 6: Dual-track memory system (heavy memory + callback detection) persisted and surfaced in prompts
 - [ ] Milestone 7: Callback engine with conditional probability matrix producing organic recurring moments
@@ -76,6 +77,10 @@ Optional but useful for Supabase CLI operations:
   Evidence: `npm run probe:grok-voice` and `npm run probe:supabase-memory` initially failed with missing env vars; adding `node --env-file-if-exists=.env.local` to scripts resolved it.
 - Observation: Quality validation prompt currently produces strong pass rates for all six core characters under live xAI calls.
   Evidence: `voice-quality-report.json` recorded `5/5` passes for Marcus, Heather, Meechie, Gemini, Gypsy, and Chrystal (passRate `1.0` each).
+- Observation: Parallel subagent execution accelerated Milestone 4 delivery with low merge friction when ownership boundaries were explicit.
+  Evidence: Three parallel subagents delivered Grok, database, and auth/wiring slices independently; only one integration-level TypeScript test fix was required post-merge.
+- Observation: This shell can drift to Windows `npm` execution, which breaks Linux `node_modules/.bin` scripts.
+  Evidence: `npm run check` failed with `'svelte-kit' is not recognized...` until PATH was switched to `/home/latro/.nvm/versions/node/v24.13.0/bin`.
 
 ## Decision Log
 
@@ -131,9 +136,13 @@ Optional but useful for Supabase CLI operations:
   Rationale: Makes probe commands runnable in fresh/isolated worktrees without manual `export` steps while keeping secret values outside committed files.
   Date/Author: 2026-02-16 (Codex)
 
+- Decision: Use the parallel subagent pattern for adapter-heavy milestones, then run a centralized integration and verification pass.
+  Rationale: Adapter work is naturally separable by seam, and centralized integration keeps cross-file correctness and governance consistency.
+  Date/Author: 2026-02-16 (Codex)
+
 ## Outcomes & Retrospective
 
-Milestones 0 through 3 are now complete in this branch. The project has live-validated probe tooling, full seam contract/mocks/tests, and a substantially expanded pure domain core (meeting lifecycle, scoring, character selection, prompt templates, memory context building, and callback scanning) with passing unit coverage. Live quality validation against xAI met/exceeded target pass rates for all six core characters in the captured cycle. Remaining work begins at Milestone 4 (real adapters and route-level wiring), with Milestones 5+ still pending.
+Milestones 0 through 4 are now complete in this branch. The project has live-validated probe tooling, full seam contract/mocks/tests, expanded pure domain core modules, and real server adapters with seam-bundle wiring through SvelteKit hooks. Validation passed with `svelte-check` clean and `64` unit tests passing. Remaining work begins at Milestone 5 (UI and meeting flow) with Milestones 6+ pending.
 
 ## Context and Orientation
 
@@ -994,3 +1003,5 @@ Revision note (2026-02-16, Codex milestone-1): Recorded completion of Milestone 
 Revision note (2026-02-16, Codex milestone-2 start): Recorded initial Milestone 2 implementation for `meeting.ts` lifecycle and significance scoring with dedicated tests, and clarified the remaining Milestone 2 modules still pending.
 
 Revision note (2026-02-16, Codex milestone-2/3 complete): Marked Milestones 2 and 3 complete after adding remaining domain-core modules/tests and running live xAI probe + quality-cycle scripts; also documented fixture-separation and env-loading decisions from live execution.
+
+Revision note (2026-02-16, Codex milestone-4 complete): Recorded completion of Milestone 4 after parallel subagent implementation of real adapters (grok-ai/database/auth), integrated seam-bundle hooks wiring, and green full check/unit verification.

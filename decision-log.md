@@ -16,3 +16,4 @@
 - Added live Grok probe tooling at `app/src/lib/seams/grok-ai/probe.ts` and `quality-cycle.ts`, and captured live pass-rate evidence in seam fixtures.
 - Separated deterministic contract fixtures from live probe captures (`probe.sample.json`, `probe.fault.json`) to avoid test-fixture drift.
 - Updated probe commands to load `.env.local` automatically via `node --env-file-if-exists=.env.local`.
+- Completed Milestone 4 using a parallel subagent pattern, then integrated centrally with full check/unit verification.
