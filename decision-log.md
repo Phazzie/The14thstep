@@ -23,3 +23,4 @@
 - Added a dedicated crisis endpoint (`meeting/[id]/crisis/+server.ts`) and client-side crisis-mode gating so normal character shares pause once crisis is detected.
 - Added a milestone status snapshot file (`plans/milestone-status.md`) to make incomplete-milestone execution resumable with explicit next-task queues.
 - Introduced a practical Milestone 9 `verify` scaffold in `app/package.json` and `app/scripts/*` to standardize local pre-handoff checks while full CI pipeline work is pending.
+- Added a minimal GitHub Actions `verify` workflow to run `check`, `verify:contracts`, and `verify:core` on push/PR so regressions surface before deeper Milestone 9 automation lands.

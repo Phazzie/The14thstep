@@ -48,6 +48,7 @@ Optional but useful for Supabase CLI operations:
 - [x] (2026-02-16 09:40Z) Implemented Milestone 7 callback probability core (`callback-engine.ts`) with rule-matrix tests and integrated callback selection + reference marking in `share/+server.ts`; lifecycle evolution/retirement rules remain as follow-up.
 - [x] (2026-02-16 09:48Z) Advanced Milestone 8 crisis flow by adding dedicated crisis-support endpoint (`meeting/[id]/crisis/+server.ts`) and client automation that pauses normal character shares during crisis mode and injects Marcus/Heather supportive responses.
 - [x] (2026-02-16 10:42Z) Added handoff-oriented execution accelerators: incomplete-milestone status tracker (`plans/milestone-status.md`), Milestone 9 `verify` scaffold scripts in `app/package.json` + `app/scripts/*`, and targeted `TODO(M7/M8/M9)` markers at unfinished route/orchestration points.
+- [x] (2026-02-16 11:16Z) Added low-context quick wins: compact copy/paste handoff block (`plans/context-compact-handoff.md`), minimal CI verify workflow (`.github/workflows/verify.yml`), and a crisis-mode share-block regression test (`app/src/lib/server/routes/meeting-share.spec.ts`).
 - [x] Milestone 0: Repository bootstrap and reality probes complete
 - [x] Milestone 1: Hexagonal skeleton with all seam contracts, mocks, and contract tests green
 - [x] Milestone 2: Domain core (pure meeting workflow logic) tested with zero I/O

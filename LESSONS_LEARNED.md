@@ -27,6 +27,8 @@ This file captures practical lessons we want future work to reuse.
 - Callback engines are safest as pure, test-first modules; route wiring then becomes straightforward and low-risk.
 - Crisis-mode behavior is easiest to keep safe when normal generation paths are explicitly gated in both client and server routes.
 - `verify` scaffolding is most reliable when each lane is separately runnable (`verify:contracts`, `verify:core`, etc.) and path filters are directory-based instead of shell glob patterns.
+- SvelteKit route directories should not contain `+`-prefixed test filenames; route-adjacent tests are safer under `src/lib/server/**` importing route handlers directly.
+- A minimal CI workflow that runs `check` + core/contract verify lanes gives immediate regression signal even before full Milestone 9 coverage is complete.
 
 ## 2026-02-15
 

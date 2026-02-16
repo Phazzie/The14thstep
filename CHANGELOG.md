@@ -48,6 +48,12 @@ All notable changes to this repository are documented in this file.
 - Verify scaffolding scripts:
   - `app/scripts/verify-fixtures.mjs`
   - `app/scripts/verify-composition.mjs`
+- Compact handoff block for context compaction:
+  - `plans/context-compact-handoff.md`
+- Minimal CI verify workflow:
+  - `.github/workflows/verify.yml`
+- Crisis-mode regression test:
+  - `app/src/lib/server/routes/meeting-share.spec.ts`
   - `app/src/lib/seams/database/fixtures/createCallback.sample.json`
   - `app/src/lib/seams/database/fixtures/getActiveCallbacks.sample.json`
 
