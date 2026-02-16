@@ -127,6 +127,7 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 
 		if (scanResult.ok) {
 			callbackScan = scanResult.value;
+			// TODO(M7): apply lifecycle updates here (active->stale->retired->legend) after callback scan/save cycle.
 		} else {
 			callbackScanError = scanResult.error.message;
 		}

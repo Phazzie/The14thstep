@@ -43,6 +43,11 @@ All notable changes to this repository are documented in this file.
   - `app/src/lib/core/callback-engine.spec.ts`
 - Database seam callback fixtures:
   - `app/src/lib/seams/database/fixtures/getShareById.sample.json`
+- Milestone status tracker for incomplete milestones:
+  - `plans/milestone-status.md`
+- Verify scaffolding scripts:
+  - `app/scripts/verify-fixtures.mjs`
+  - `app/scripts/verify-composition.mjs`
   - `app/src/lib/seams/database/fixtures/createCallback.sample.json`
   - `app/src/lib/seams/database/fixtures/getActiveCallbacks.sample.json`
 
@@ -62,6 +67,8 @@ All notable changes to this repository are documented in this file.
 - `app/src/routes/meeting/[id]/user-share/+server.ts` now returns `crisis` and `heavy` flags with saved user-share payloads.
 - `app/src/routes/meeting/[id]/+page.svelte` now auto-triggers crisis-support responses and pauses normal character-share generation during crisis mode.
 - `app/src/routes/meeting/[id]/share/+server.ts` now rejects normal character-share generation when crisis mode is active.
+- `app/package.json` now includes `verify` scaffolding commands (`verify:fixtures`, `verify:contracts`, `verify:core`, `verify:composition`).
+- Added `TODO(M7/M8/M9)` anchors in active route and verify scaffold files to pinpoint unfinished milestone logic.
 - `app/src/lib/core/meeting.ts` now exports reusable crisis/heavy/breakthrough detectors.
 - `app/src/lib/core/prompt-templates.ts` now includes `buildExpandSharePrompt`.
 

@@ -324,6 +324,7 @@ $effect(() => {
 
 		errorMessage = '';
 		crisisResponding = true;
+		// TODO(M8): add setup-phase crisis entry path so meetings can start in crisis mode when initial context is high-risk.
 		statusLine = '... room goes quiet ...';
 
 		try {

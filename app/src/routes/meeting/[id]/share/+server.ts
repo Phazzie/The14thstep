@@ -318,6 +318,7 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 						latestUserShareText: latestUserShare,
 						meetingsSinceLastReferenced: estimateMeetingsSinceLastReferenced(callback.lastReferencedAt)
 					});
+					// TODO(M7): incorporate lifecycle state transitions (stale/retired/legend) after sequential meeting updates.
 					return decision.include;
 				})
 				.slice(0, 3)
@@ -431,6 +432,7 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 				}
 
 				for (const callback of selectedCallbacks) {
+					// TODO(M7): evolve callbacks (parent/child linkage) when generated share meaningfully mutates callback content.
 					await locals.seams.database.markCallbackReferenced(callback.id);
 				}
 

@@ -80,6 +80,7 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 	}
 
 	const input = inputResult.value;
+	// TODO(M8): enforce timed crisis sequence policy (quiet pause + deterministic ordering) via persisted meeting state.
 	const marcus = CORE_CHARACTERS.find((character) => character.id === 'marcus');
 	const heather = CORE_CHARACTERS.find((character) => character.id === 'heather');
 	if (!marcus || !heather) {
@@ -144,6 +145,7 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 	return json(
 		ok({
 			shares: [marcusShare.value, heatherShare.value],
+			// TODO(M8): move resource rendering to a sticky/persistent panel contract instead of raw string array payload.
 			resources: [
 				'988 - Suicide & Crisis Lifeline',
 				'1-800-662-4357 - SAMHSA National Helpline',

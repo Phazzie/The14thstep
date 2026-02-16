@@ -21,3 +21,5 @@
 - Integrated callback-aware memory prompts in `meeting/[id]/share/+server.ts` via `buildPromptContext` and a new pure `callback-engine.ts` probability matrix.
 - Added close-route callback scanning/persistence and a new expand-share endpoint (`meeting/[id]/expand/+server.ts`) to complete Milestone 5/6 functional flow and advance Milestone 7.
 - Added a dedicated crisis endpoint (`meeting/[id]/crisis/+server.ts`) and client-side crisis-mode gating so normal character shares pause once crisis is detected.
+- Added a milestone status snapshot file (`plans/milestone-status.md`) to make incomplete-milestone execution resumable with explicit next-task queues.
+- Introduced a practical Milestone 9 `verify` scaffold in `app/package.json` and `app/scripts/*` to standardize local pre-handoff checks while full CI pipeline work is pending.

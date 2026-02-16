@@ -8,6 +8,7 @@ This file captures practical lessons we want future work to reuse.
 - Keep four artifacts in sync during execution: `plans/the-14th-step-execplan.md`, `decision-log.md`, `CHANGELOG.md`, and this file.
 - Fast handoffs depend on lightweight, append-only notes more than perfect prose.
 - For long milestones, ship one tested core slice at a time and mark remaining scope explicitly in the ExecPlan.
+- A dedicated `milestone-status` snapshot with explicit \"next 10 tasks\" per incomplete milestone reduces context-loss risk during compaction/handoffs.
 
 ### Technical
 - Probe thresholds should be configurable by environment; fixed latency budgets produce false failures.
@@ -25,6 +26,7 @@ This file captures practical lessons we want future work to reuse.
 - Prompt-quality retry loops can be implemented with the same generation seam by treating validator calls as first-class seam interactions.
 - Callback engines are safest as pure, test-first modules; route wiring then becomes straightforward and low-risk.
 - Crisis-mode behavior is easiest to keep safe when normal generation paths are explicitly gated in both client and server routes.
+- `verify` scaffolding is most reliable when each lane is separately runnable (`verify:contracts`, `verify:core`, etc.) and path filters are directory-based instead of shell glob patterns.
 
 ## 2026-02-15
 

@@ -17,6 +17,11 @@
 		"probe:grok-contract": "node --env-file-if-exists=.env.local --import tsx src/lib/seams/grok-ai/probe.ts",
 		"probe:grok-quality": "node --env-file-if-exists=.env.local --import tsx src/lib/seams/grok-ai/quality-cycle.ts",
 		"probe:supabase-memory": "node --env-file-if-exists=.env.local probes/supabaseMemoryProbe.mjs",
+		"verify": "npm run lint && npm run check && npm run verify:fixtures && npm run verify:contracts && npm run verify:core && npm run verify:composition",
+		"verify:fixtures": "node scripts/verify-fixtures.mjs",
+		"verify:contracts": "vitest --run src/lib/seams",
+		"verify:core": "vitest --run src/lib/core",
+		"verify:composition": "node scripts/verify-composition.mjs",
 		"test:e2e": "playwright test",
 		"test": "npm run test:unit -- --run && npm run test:e2e",
 		"test:unit": "vitest"
