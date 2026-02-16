@@ -9,6 +9,8 @@ All notable changes to this repository are documented in this file.
 - `LESSONS_LEARNED.md` for operational and technical learnings.
 - Nested agent guides: `app/AGENTS.md` and `plans/AGENTS.md`.
 - Seam fixtures, mocks, and contract tests for `grok-ai`, `database`, `auth`, `uuid`, and `clock` under `app/src/lib/seams/**`.
+- Domain meeting workflow module `app/src/lib/core/meeting.ts` with lifecycle functions and pure significance scoring.
+- Domain unit tests in `app/src/lib/core/meeting.spec.ts`.
 
 ### Changed
 - `AGENTS.md` now explicitly requires agents to keep `CHANGELOG.md` and `LESSONS_LEARNED.md` current.
@@ -18,6 +20,7 @@ All notable changes to this repository are documented in this file.
 ### Verified
 - `npm run test:unit -- --run` passes with seam contract tests included.
 - `npm run check` passes with zero diagnostics.
+- Total unit suite now passes with 36 tests including new domain-core coverage.
 
 ## [2026-02-15]
 

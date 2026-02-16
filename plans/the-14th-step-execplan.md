@@ -38,9 +38,10 @@ Optional but useful for Supabase CLI operations:
 - [x] (2026-02-15 23:40Z) Created Milestone 0 scaffolding artifacts: `seam-registry.json`, `decision-log.md`, seam contract files under `app/src/lib/seams/**`, shared result envelope in `app/src/lib/core/seam.ts`, and probe scripts in `app/probes/**`.
 - [x] (2026-02-15 23:40Z) Added and validated local SSE probe path: endpoint `app/src/routes/api/probes/sse/+server.ts`, UI `app/src/routes/probes/sse/+page.svelte`, and CLI probe `npm run probe:sse` returning PASS.
 - [x] (2026-02-16 03:23Z) Completed Milestone 1 seam skeleton implementation by adding fixture sets, fixture-backed mocks, runtime contract validators, and green contract tests for `grok-ai`, `database`, `auth`, `uuid`, and `clock` under `app/src/lib/seams/**`.
+- [x] (2026-02-16 03:28Z) Started Milestone 2 by implementing `app/src/lib/core/meeting.ts` lifecycle functions (`createMeeting`, `addShare`, `closeMeeting`) and pure `scoreSignificance`, with `app/src/lib/core/meeting.spec.ts` passing in unit tests.
 - [ ] Milestone 0: Repository bootstrap and reality probes complete (completed: local probe + scaffolding; remaining: live `probe:grok-voice` and live `probe:supabase-memory` with credentials).
 - [x] Milestone 1: Hexagonal skeleton with all seam contracts, mocks, and contract tests green
-- [ ] Milestone 2: Domain core (pure meeting workflow logic) tested with zero I/O
+- [ ] Milestone 2: Domain core (pure meeting workflow logic) tested with zero I/O (completed: `meeting.ts` lifecycle/scoring + tests; remaining: `character-selector.ts`, `prompt-templates.ts`, `memory-builder.ts`, `callback-scanner.ts`, and domain-core test coverage expansion)
 - [ ] Milestone 3: Prompt engineering â€” Grok produces character-voice shares that pass AI-driven quality validation
 - [ ] Milestone 4: Real adapters wired (Supabase database, Supabase auth, xAI grok-ai seam)
 - [ ] Milestone 5: UI and meeting flow â€” full meeting runs on localhost with streaming shares
@@ -64,6 +65,8 @@ Optional but useful for Supabase CLI operations:
   Evidence: In `/mnt/c/Users/latro/Downloads/t/recoverymeeting-codex/app`, `npm run test:unit -- --run` failed with `vitest: not found` until `npm install` completed.
 - Observation: Strict TypeScript checks on runtime validators require explicit narrowing of values read from `Record<string, unknown>`.
   Evidence: `npm run check` reported `'value.significanceScore' is of type 'unknown'` and `'tokenValue' is possibly 'null'`; adding local typed variables and type guards resolved all errors.
+- Observation: Scoring precedence materially changes test outcomes when a single share contains multiple signal types.
+  Evidence: In `meeting.spec.ts`, a user share containing both "told the truth" and "first time" must score 7 (connection/breakthrough) rather than 5 (first-time share), so precedence is now explicit and covered by tests.
 
 ## Decision Log
 
@@ -107,9 +110,13 @@ Optional but useful for Supabase CLI operations:
   Rationale: This keeps contract shape rules centralized in one seam-owned location and gives adapters a shared validation path for Milestone 4.
   Date/Author: 2026-02-16 (Codex)
 
+- Decision: Implement Milestone 2 incrementally by shipping `meeting.ts` lifecycle/scoring first before broader core modules.
+  Rationale: This delivers a verified pure workflow slice quickly while preserving momentum and test confidence, then leaves selector/templates/memory/callback modules as explicit next work.
+  Date/Author: 2026-02-16 (Codex)
+
 ## Outcomes & Retrospective
 
-Milestone 0 remains partially complete because live probe execution is credential/infrastructure gated, but local probe scaffolding is stable. Milestone 1 is now complete: each defined seam has fixture files, fixture-backed mocks, runtime contract validators, and passing contract tests. The next implementation target is Milestone 2 (pure domain meeting workflow logic with zero I/O), while keeping live probe execution queued for credential-ready windows.
+Milestone 0 remains partially complete because live probe execution is credential/infrastructure gated, but local probe scaffolding is stable. Milestone 1 is complete with fixture-backed seam contracts and passing contract tests. Milestone 2 is now in progress: `meeting.ts` lifecycle orchestration and significance scoring are implemented as pure core logic with passing tests; remaining Milestone 2 scope is character selection, prompt templates, memory builder, callback scanner, and broader composition coverage.
 
 ## Context and Orientation
 
@@ -966,3 +973,5 @@ Revision note (2026-02-15, Codex): Updated Progress, Surprises & Discoveries, De
 Revision note (2026-02-15, Codex env/deploy update): Added explicit environment prerequisites, CLI strategy (`npx vercel`, `npx supabase`), and corresponding discoveries/decisions so deployment can run end-to-end without global installs.
 
 Revision note (2026-02-16, Codex milestone-1): Recorded completion of Milestone 1 by adding runtime validators, fixture-backed seam mocks, and passing contract tests for all current seams; updated discoveries and outcomes with isolated-worktree install behavior and strict TypeScript validator constraints.
+
+Revision note (2026-02-16, Codex milestone-2 start): Recorded initial Milestone 2 implementation for `meeting.ts` lifecycle and significance scoring with dedicated tests, and clarified the remaining Milestone 2 modules still pending.

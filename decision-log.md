@@ -11,3 +11,4 @@
 - Created nested agent guidance (`app/AGENTS.md`, `plans/AGENTS.md`) and kept root `AGENTS.md` minimal with pointers.
 - Added dedicated governance artifacts `CHANGELOG.md` and `LESSONS_LEARNED.md` and made them mandatory in agent instructions.
 - Standardized seam contracts to export runtime validators and reused them in fixture-backed mocks and contract tests for Milestone 1.
+- Implemented Milestone 2 incrementally by shipping `app/src/lib/core/meeting.ts` (create/add/close workflow + pure significance scoring) before broader core modules.
