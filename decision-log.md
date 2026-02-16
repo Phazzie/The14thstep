@@ -17,3 +17,6 @@
 - Separated deterministic contract fixtures from live probe captures (`probe.sample.json`, `probe.fault.json`) to avoid test-fixture drift.
 - Updated probe commands to load `.env.local` automatically via `node --env-file-if-exists=.env.local`.
 - Completed Milestone 4 using a parallel subagent pattern, then integrated centrally with full check/unit verification.
+- Expanded the `database` seam contract/adapter to include callback and share-lookup methods (`getShareById`, `getMeetingShares`, `createCallback`, `getActiveCallbacks`, `markCallbackReferenced`) to unblock Milestone 6 integration.
+- Integrated callback-aware memory prompts in `meeting/[id]/share/+server.ts` via `buildPromptContext` and a new pure `callback-engine.ts` probability matrix.
+- Added close-route callback scanning/persistence and a new expand-share endpoint (`meeting/[id]/expand/+server.ts`) to complete Milestone 5/6 functional flow and advance Milestone 7.

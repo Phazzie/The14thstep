@@ -1,9 +1,12 @@
 import { SeamErrorCodes, err, ok, type SeamResult } from '$lib/core/seam';
 import {
+	type CallbackRecord,
 	type DatabasePort,
 	type MeetingRecord,
 	type ShareRecord,
 	type UserProfile,
+	validateCallbackRecord,
+	validateCreateCallbackInput,
 	validateAppendShareInput,
 	validateCreateMeetingInput,
 	validateMeetingRecord,
@@ -164,6 +167,23 @@ function mapShareRecordRow(row: unknown): ShareRecord {
 	};
 }
 
+function mapCallbackRecordRow(row: unknown): CallbackRecord {
+	const record = isObject(row) ? row : {};
+	return {
+		id: asString(record.id) ?? '',
+		originShareId: asString(record.origin_share_id) ?? '',
+		characterId: asString(record.character_id) ?? '',
+		originalText: asString(record.original_text) ?? '',
+		callbackType: asString(record.callback_type) as CallbackRecord['callbackType'],
+		scope: asString(record.scope) as CallbackRecord['scope'],
+		potentialScore: asNumber(record.potential_score) ?? Number.NaN,
+		timesReferenced: asNumber(record.times_referenced) ?? Number.NaN,
+		lastReferencedAt: asNullableString(record.last_referenced_at) ?? null,
+		status: asString(record.status) as CallbackRecord['status'],
+		parentCallbackId: asNullableString(record.parent_callback_id) ?? null
+	};
+}
+
 export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): DatabasePort {
 	const supabase = options.supabase ?? createSupabaseServiceRoleClient();
 
@@ -278,6 +298,172 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 			}
 
 			return ok(shares);
+		},
+
+		async getShareById(shareId) {
+			if (!isNonEmptyString(shareId)) {
+				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid shareId');
+			}
+
+			const response = (await supabase
+				.from('shares')
+				.select(
+					'id, meeting_id, character_id, is_user_share, content, significance_score, sequence_order, created_at'
+				)
+				.eq('id', shareId)
+				.maybeSingle()) as QueryResponseLike;
+
+			if (response.error) return mapUpstreamError('getShareById', response);
+			if (response.data === null) {
+				return err(SeamErrorCodes.NOT_FOUND, 'getShareById record not found', {
+					method: 'getShareById',
+					provider: 'supabase'
+				});
+			}
+
+			const share = mapShareRecordRow(response.data);
+			if (!validateShareRecord(share)) {
+				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'getShareById response violates ShareRecord');
+			}
+
+			return ok(share);
+		},
+
+		async getMeetingShares(meetingId) {
+			if (!isNonEmptyString(meetingId)) {
+				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid meetingId');
+			}
+
+			const response = (await supabase
+				.from('shares')
+				.select(
+					'id, meeting_id, character_id, is_user_share, content, significance_score, sequence_order, created_at'
+				)
+				.eq('meeting_id', meetingId)
+				.order('sequence_order', { ascending: true })
+				.order('created_at', { ascending: true })) as QueryResponseLike<unknown[]>;
+
+			if (response.error) return mapUpstreamError('getMeetingShares', response);
+			if (!Array.isArray(response.data)) {
+				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'getMeetingShares response is not ShareRecord[]');
+			}
+
+			const shares = response.data.map((row) => mapShareRecordRow(row));
+			if (!shares.every((share) => validateShareRecord(share))) {
+				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'getMeetingShares response violates ShareRecord[]');
+			}
+
+			return ok(shares);
+		},
+
+		async createCallback(input) {
+			if (!validateCreateCallbackInput(input)) {
+				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid createCallback input');
+			}
+
+			const response = (await supabase
+				.from('callbacks')
+				.insert({
+					origin_share_id: input.originShareId,
+					character_id: input.characterId,
+					original_text: input.originalText,
+					callback_type: input.callbackType,
+					scope: input.scope,
+					potential_score: input.potentialScore,
+					parent_callback_id: input.parentCallbackId ?? null
+				})
+				.select(
+					'id, origin_share_id, character_id, original_text, callback_type, scope, potential_score, times_referenced, last_referenced_at, status, parent_callback_id'
+				)
+				.single()) as QueryResponseLike;
+
+			if (response.error) return mapUpstreamError('createCallback', response);
+
+			const callback = mapCallbackRecordRow(response.data);
+			if (!validateCallbackRecord(callback)) {
+				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'createCallback response violates CallbackRecord');
+			}
+
+			return ok(callback);
+		},
+
+		async getActiveCallbacks(input) {
+			if (!isNonEmptyString(input.characterId) || !isNonEmptyString(input.meetingId)) {
+				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid getActiveCallbacks input');
+			}
+
+			const response = (await supabase
+				.from('callbacks')
+				.select(
+					'id, origin_share_id, character_id, original_text, callback_type, scope, potential_score, times_referenced, last_referenced_at, status, parent_callback_id'
+				)
+				.in('status', ['active', 'legend'])
+				.or(`character_id.eq.${input.characterId},scope.eq.room`)
+				.order('potential_score', { ascending: false })
+				.order('times_referenced', { ascending: false })
+				.limit(30)) as QueryResponseLike<unknown[]>;
+
+			if (response.error) return mapUpstreamError('getActiveCallbacks', response);
+			if (!Array.isArray(response.data)) {
+				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'getActiveCallbacks response is not CallbackRecord[]');
+			}
+
+			const callbacks = response.data.map((row) => mapCallbackRecordRow(row));
+			if (!callbacks.every((callback) => validateCallbackRecord(callback))) {
+				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'getActiveCallbacks response violates CallbackRecord[]');
+			}
+
+			return ok(callbacks);
+		},
+
+		async markCallbackReferenced(callbackId) {
+			if (!isNonEmptyString(callbackId)) {
+				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid callbackId');
+			}
+
+			const currentResponse = (await supabase
+				.from('callbacks')
+				.select(
+					'id, origin_share_id, character_id, original_text, callback_type, scope, potential_score, times_referenced, last_referenced_at, status, parent_callback_id'
+				)
+				.eq('id', callbackId)
+				.maybeSingle()) as QueryResponseLike;
+			if (currentResponse.error) return mapUpstreamError('markCallbackReferenced', currentResponse);
+			if (currentResponse.data === null) {
+				return err(SeamErrorCodes.NOT_FOUND, 'markCallbackReferenced record not found', {
+					method: 'markCallbackReferenced',
+					provider: 'supabase'
+				});
+			}
+
+			const current = mapCallbackRecordRow(currentResponse.data);
+			if (!validateCallbackRecord(current)) {
+				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'markCallbackReferenced source violates CallbackRecord');
+			}
+
+			const nextTimesReferenced = current.timesReferenced + 1;
+			const updateResponse = (await supabase
+				.from('callbacks')
+				.update({
+					times_referenced: nextTimesReferenced,
+					last_referenced_at: new Date().toISOString()
+				})
+				.eq('id', callbackId)
+				.select(
+					'id, origin_share_id, character_id, original_text, callback_type, scope, potential_score, times_referenced, last_referenced_at, status, parent_callback_id'
+				)
+				.single()) as QueryResponseLike;
+			if (updateResponse.error) return mapUpstreamError('markCallbackReferenced', updateResponse);
+
+			const callback = mapCallbackRecordRow(updateResponse.data);
+			if (!validateCallbackRecord(callback)) {
+				return err(
+					SeamErrorCodes.CONTRACT_VIOLATION,
+					'markCallbackReferenced response violates CallbackRecord'
+				);
+			}
+
+			return ok(callback);
 		}
 	};
 }

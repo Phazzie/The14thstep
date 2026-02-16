@@ -79,18 +79,29 @@ function includesAny(text: string, phrases: readonly string[]): boolean {
 	return phrases.some((phrase) => text.includes(phrase));
 }
 
+export function detectCrisisContent(content: string): boolean {
+	return includesAny(normalize(content), CRISIS_KEYWORDS);
+}
+
+export function detectHeavyDisclosureContent(content: string): boolean {
+	return includesAny(normalize(content), HEAVY_DISCLOSURE_KEYWORDS);
+}
+
+export function detectConnectionBreakthroughContent(content: string): boolean {
+	return includesAny(normalize(content), CONNECTION_BREAKTHROUGH_KEYWORDS);
+}
+
 export function scoreSignificance(input: {
 	content: string;
 	interactionType: ShareInteractionType;
 	isUserShare: boolean;
 	isFirstUserShare?: boolean;
 }): number {
-	const normalized = normalize(input.content);
-	const wordCount = normalized.split(/\s+/).filter(Boolean).length;
+	const wordCount = normalize(input.content).split(/\s+/).filter(Boolean).length;
 
-	if (includesAny(normalized, CRISIS_KEYWORDS)) return 10;
-	if (includesAny(normalized, HEAVY_DISCLOSURE_KEYWORDS)) return 8;
-	if (includesAny(normalized, CONNECTION_BREAKTHROUGH_KEYWORDS)) return 7;
+	if (detectCrisisContent(input.content)) return 10;
+	if (detectHeavyDisclosureContent(input.content)) return 8;
+	if (detectConnectionBreakthroughContent(input.content)) return 7;
 	if (input.interactionType === 'respond_to' || input.interactionType === 'disagree') return 6;
 	if (input.isUserShare && input.isFirstUserShare) return 5;
 	if (input.interactionType === 'crosstalk' && wordCount <= 8) return 1;

@@ -19,6 +19,21 @@ function createUnavailableDatabaseAdapter(message: string): DatabasePort {
 		},
 		async getHeavyMemory() {
 			return err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, message);
+		},
+		async getShareById() {
+			return err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, message);
+		},
+		async getMeetingShares() {
+			return err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, message);
+		},
+		async createCallback() {
+			return err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, message);
+		},
+		async getActiveCallbacks() {
+			return err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, message);
+		},
+		async markCallbackReferenced() {
+			return err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, message);
 		}
 	};
 }

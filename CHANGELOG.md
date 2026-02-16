@@ -32,6 +32,18 @@ All notable changes to this repository are documented in this file.
   - `app/src/lib/server/supabase.ts`
   - `app/src/hooks.server.ts`
   - Adapter tests under `app/src/lib/server/seams/**/adapter.spec.ts`
+- Milestone 5 meeting-flow endpoints and UI wiring:
+  - `app/src/routes/+page.server.ts`
+  - `app/src/routes/meeting/[id]/+page.svelte`
+  - `app/src/routes/meeting/[id]/+page.server.ts`
+  - `app/src/routes/meeting/[id]/expand/+server.ts`
+- Milestone 7 callback-engine core and tests:
+  - `app/src/lib/core/callback-engine.ts`
+  - `app/src/lib/core/callback-engine.spec.ts`
+- Database seam callback fixtures:
+  - `app/src/lib/seams/database/fixtures/getShareById.sample.json`
+  - `app/src/lib/seams/database/fixtures/createCallback.sample.json`
+  - `app/src/lib/seams/database/fixtures/getActiveCallbacks.sample.json`
 
 ### Changed
 - `AGENTS.md` now explicitly requires agents to keep `CHANGELOG.md` and `LESSONS_LEARNED.md` current.
@@ -41,6 +53,14 @@ All notable changes to this repository are documented in this file.
 - `seam-registry.json` now points Grok live probe metadata to seam-local probe/quality-cycle scripts.
 - `app/README.md` now documents Milestone 3 contract/quality probe commands and output paths.
 - `app/src/app.d.ts` now types `locals.seams` for `auth`, `database`, and `grokAi`.
+- `app/src/lib/seams/database/contract.ts` now includes callback/share lifecycle methods and validators.
+- `app/src/lib/seams/database/mock.ts` and `contract.test.ts` now cover callback and share-lookup behaviors.
+- `app/src/lib/server/seams/database/adapter.ts` now implements callback persistence/retrieval and meeting-share lookup operations.
+- `app/src/routes/meeting/[id]/share/+server.ts` now uses memory-builder context, callback-engine selection, quality-validation retries, and callback reference marking.
+- `app/src/routes/meeting/[id]/close/+server.ts` now scans completed shares for callbacks and persists scanner results.
+- `app/src/routes/meeting/[id]/user-share/+server.ts` now returns `crisis` and `heavy` flags with saved user-share payloads.
+- `app/src/lib/core/meeting.ts` now exports reusable crisis/heavy/breakthrough detectors.
+- `app/src/lib/core/prompt-templates.ts` now includes `buildExpandSharePrompt`.
 
 ### Verified
 - `npm run test:unit -- --run` passes with seam contract tests included.
@@ -48,6 +68,7 @@ All notable changes to this repository are documented in this file.
 - Total unit suite now passes with 51 tests including expanded domain-core coverage.
 - Live quality-cycle run met target for all six core characters (5/5 pass each in captured run).
 - Full integrated adapter + domain suite passes with 64 unit tests and clean `svelte-check`.
+- Post-integration validation passes with clean `svelte-check` and `75` passing unit tests (`npm run test:unit -- --run`).
 
 ## [2026-02-15]
 

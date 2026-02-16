@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { CORE_CHARACTERS } from './characters';
 import {
 	buildCharacterSharePrompt,
+	buildExpandSharePrompt,
 	buildHardQuestionPrompt,
 	buildHeatherCrisisPrompt,
 	buildMarcusCrisisPrompt,
@@ -31,6 +32,18 @@ describe('prompt templates', () => {
 		const prompt = buildHardQuestionPrompt('trap', ['I keep blaming everyone else.']);
 		expect(prompt).toContain('hard but fair question');
 		expect(prompt).toContain('trap');
+	});
+
+	it('builds expand prompts for longer character follow-up', () => {
+		const prompt = buildExpandSharePrompt(marcus, {
+			topic: 'Staying',
+			originalShare: 'I almost bounced and stayed.',
+			recentShares: [{ speaker: 'User', content: 'I keep running.' }]
+		});
+
+		expect(prompt).toContain('8-10 sentences');
+		expect(prompt).toContain('Original share');
+		expect(prompt).toContain('I almost bounced and stayed');
 	});
 
 	it('builds crisis prompts for Marcus and Heather', () => {

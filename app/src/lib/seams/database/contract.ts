@@ -30,6 +30,41 @@ export interface ShareRecord {
 	createdAt: string;
 }
 
+export type CallbackType =
+	| 'self_deprecation'
+	| 'quirk_habit'
+	| 'catchphrase'
+	| 'absurd_detail'
+	| 'physical_behavioral'
+	| 'room_meta';
+
+export type CallbackScope = 'character' | 'room';
+export type CallbackStatus = 'active' | 'stale' | 'retired' | 'legend';
+
+export interface CallbackRecord {
+	id: string;
+	originShareId: string;
+	characterId: string;
+	originalText: string;
+	callbackType: CallbackType;
+	scope: CallbackScope;
+	potentialScore: number;
+	timesReferenced: number;
+	lastReferencedAt: string | null;
+	status: CallbackStatus;
+	parentCallbackId: string | null;
+}
+
+export interface CreateCallbackInput {
+	originShareId: string;
+	characterId: string;
+	originalText: string;
+	callbackType: CallbackType;
+	scope: CallbackScope;
+	potentialScore: number;
+	parentCallbackId?: string | null;
+}
+
 export interface DatabasePort {
 	getUserById(userId: string): Promise<SeamResult<UserProfile>>;
 	createMeeting(
@@ -37,6 +72,14 @@ export interface DatabasePort {
 	): Promise<SeamResult<MeetingRecord>>;
 	appendShare(input: Omit<ShareRecord, 'id' | 'createdAt'>): Promise<SeamResult<ShareRecord>>;
 	getHeavyMemory(userId: string): Promise<SeamResult<ShareRecord[]>>;
+	getShareById(shareId: string): Promise<SeamResult<ShareRecord>>;
+	getMeetingShares(meetingId: string): Promise<SeamResult<ShareRecord[]>>;
+	createCallback(input: CreateCallbackInput): Promise<SeamResult<CallbackRecord>>;
+	getActiveCallbacks(input: {
+		characterId: string;
+		meetingId: string;
+	}): Promise<SeamResult<CallbackRecord[]>>;
+	markCallbackReferenced(callbackId: string): Promise<SeamResult<CallbackRecord>>;
 }
 
 export const DATABASE_ERROR_CODES: readonly SeamErrorCode[] = [
@@ -58,6 +101,25 @@ function isNonEmptyString(value: unknown): value is string {
 
 function isNullableString(value: unknown): value is string | null {
 	return value === null || typeof value === 'string';
+}
+
+function isCallbackType(value: unknown): value is CallbackType {
+	return (
+		value === 'self_deprecation' ||
+		value === 'quirk_habit' ||
+		value === 'catchphrase' ||
+		value === 'absurd_detail' ||
+		value === 'physical_behavioral' ||
+		value === 'room_meta'
+	);
+}
+
+function isCallbackScope(value: unknown): value is CallbackScope {
+	return value === 'character' || value === 'room';
+}
+
+function isCallbackStatus(value: unknown): value is CallbackStatus {
+	return value === 'active' || value === 'stale' || value === 'retired' || value === 'legend';
 }
 
 export function validateUserProfile(value: unknown): value is UserProfile {
@@ -139,5 +201,46 @@ export function validateAppendShareInput(
 		Number.isInteger(sequenceOrder) &&
 		typeof sequenceOrder === 'number' &&
 		sequenceOrder >= 0
+	);
+}
+
+export function validateCallbackRecord(value: unknown): value is CallbackRecord {
+	if (!isObject(value)) return false;
+	const potentialScore = value.potentialScore;
+	const timesReferenced = value.timesReferenced;
+	return (
+		isNonEmptyString(value.id) &&
+		isNonEmptyString(value.originShareId) &&
+		isNonEmptyString(value.characterId) &&
+		isNonEmptyString(value.originalText) &&
+		isCallbackType(value.callbackType) &&
+		isCallbackScope(value.scope) &&
+		Number.isInteger(potentialScore) &&
+		typeof potentialScore === 'number' &&
+		potentialScore >= 1 &&
+		potentialScore <= 10 &&
+		Number.isInteger(timesReferenced) &&
+		typeof timesReferenced === 'number' &&
+		timesReferenced >= 0 &&
+		isNullableString(value.lastReferencedAt) &&
+		isCallbackStatus(value.status) &&
+		isNullableString(value.parentCallbackId)
+	);
+}
+
+export function validateCreateCallbackInput(value: unknown): value is CreateCallbackInput {
+	if (!isObject(value)) return false;
+	const potentialScore = value.potentialScore;
+	return (
+		isNonEmptyString(value.originShareId) &&
+		isNonEmptyString(value.characterId) &&
+		isNonEmptyString(value.originalText) &&
+		isCallbackType(value.callbackType) &&
+		isCallbackScope(value.scope) &&
+		Number.isInteger(potentialScore) &&
+		typeof potentialScore === 'number' &&
+		potentialScore >= 1 &&
+		potentialScore <= 10 &&
+		(value.parentCallbackId === undefined || isNullableString(value.parentCallbackId))
 	);
 }

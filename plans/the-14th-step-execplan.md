@@ -43,13 +43,16 @@ Optional but useful for Supabase CLI operations:
 - [x] (2026-02-16 04:19Z) Completed Milestone 3 live prompt-engineering probes: `probe.ts` generated live fixtures, quality cycle generated per-character pass rates, and all six core characters met/exceeded the 0.7 target (recorded 1.0 in this run).
 - [x] (2026-02-16 04:19Z) Completed remaining Milestone 0 live probes in isolated workspace using local env loading: `probe:grok-voice` PASS (9/10) and `probe:supabase-memory` PASS after threshold tuning via `SUPABASE_MEMORY_PROBE_MAX_MS=1200`.
 - [x] (2026-02-16 05:34Z) Completed Milestone 4 adapter wiring by implementing real adapters and tests in `app/src/lib/server/seams/**`, adding Supabase client helper `app/src/lib/server/supabase.ts`, and wiring `auth/database/grokAi` seam bundle through `app/src/hooks.server.ts` and `app/src/app.d.ts`.
+- [x] (2026-02-16 09:35Z) Completed Milestone 5 functional meeting flow baseline: setup form action (`+page.server.ts`), live meeting route/UI (`meeting/[id]/+page.svelte`), SSE share generation endpoint (`share/+server.ts`), user-share endpoint flags (`crisis`/`heavy`), close endpoint wiring, and new expand-share endpoint (`meeting/[id]/expand/+server.ts`).
+- [x] (2026-02-16 09:38Z) Completed Milestone 6 dual-track memory integration in server flow by extending the database seam with callback/share retrieval methods, wiring `buildPromptContext` into character-share generation, and triggering callback scanning/persistence during close.
+- [x] (2026-02-16 09:40Z) Implemented Milestone 7 callback probability core (`callback-engine.ts`) with rule-matrix tests and integrated callback selection + reference marking in `share/+server.ts`; lifecycle evolution/retirement rules remain as follow-up.
 - [x] Milestone 0: Repository bootstrap and reality probes complete
 - [x] Milestone 1: Hexagonal skeleton with all seam contracts, mocks, and contract tests green
 - [x] Milestone 2: Domain core (pure meeting workflow logic) tested with zero I/O
 - [x] Milestone 3: Prompt engineering â€” Grok produces character-voice shares that pass AI-driven quality validation
 - [x] Milestone 4: Real adapters wired (Supabase database, Supabase auth, xAI grok-ai seam)
-- [ ] Milestone 5: UI and meeting flow â€” full meeting runs on localhost with streaming shares
-- [ ] Milestone 6: Dual-track memory system (heavy memory + callback detection) persisted and surfaced in prompts
+- [x] Milestone 5: UI and meeting flow â€” full meeting runs on localhost with streaming shares
+- [x] Milestone 6: Dual-track memory system (heavy memory + callback detection) persisted and surfaced in prompts
 - [ ] Milestone 7: Callback engine with conditional probability matrix producing organic recurring moments
 - [ ] Milestone 8: Crisis response system â€” detection, intervention, UI state change, resource display
 - [ ] Milestone 9: CI pipeline, composition tests, fixture freshness, governance artifacts
@@ -81,6 +84,10 @@ Optional but useful for Supabase CLI operations:
   Evidence: Three parallel subagents delivered Grok, database, and auth/wiring slices independently; only one integration-level TypeScript test fix was required post-merge.
 - Observation: This shell can drift to Windows `npm` execution, which breaks Linux `node_modules/.bin` scripts.
   Evidence: `npm run check` failed with `'svelte-kit' is not recognized...` until PATH was switched to `/home/latro/.nvm/versions/node/v24.13.0/bin`.
+- Observation: Milestone 6 callback persistence required expanding the database seam contract before route integration could proceed.
+  Evidence: `buildPromptContext` and `scanForCallbacks` integration was blocked until `database` contract/adapter exposed `getShareById`, `getMeetingShares`, `createCallback`, `getActiveCallbacks`, and `markCallbackReferenced`.
+- Observation: Quality-validation retries can be added directly to server share generation without introducing a new seam.
+  Evidence: `share/+server.ts` now performs generation -> validation -> retry loops using the existing `grok-ai.generateShare` seam and remained type-safe (`svelte-check` clean).
 
 ## Decision Log
 
@@ -140,9 +147,17 @@ Optional but useful for Supabase CLI operations:
   Rationale: Adapter work is naturally separable by seam, and centralized integration keeps cross-file correctness and governance consistency.
   Date/Author: 2026-02-16 (Codex)
 
+- Decision: Extend the existing `database` seam (instead of adding a new callback seam) to include callback lifecycle and share lookup operations.
+  Rationale: Callback operations are persistence concerns over the same Supabase schema and fit naturally in the current database port, minimizing seam sprawl and integration overhead.
+  Date/Author: 2026-02-16 (Codex)
+
+- Decision: Gate callback prompt injection through a pure callback-engine probability matrix before prompt rendering.
+  Rationale: Keeps callback inclusion deterministic/testable at the core layer while preserving natural variation in generated meeting dialogue.
+  Date/Author: 2026-02-16 (Codex)
+
 ## Outcomes & Retrospective
 
-Milestones 0 through 4 are now complete in this branch. The project has live-validated probe tooling, full seam contract/mocks/tests, expanded pure domain core modules, and real server adapters with seam-bundle wiring through SvelteKit hooks. Validation passed with `svelte-check` clean and `64` unit tests passing. Remaining work begins at Milestone 5 (UI and meeting flow) with Milestones 6+ pending.
+Milestones 0 through 6 are now complete in this branch, with Milestone 7 partially implemented. The app now runs an end-to-end localhost meeting flow with setup, SSE character shares, user shares, share expansion, close-summary generation, callback scanning persistence, and memory/callback-aware prompt building. Callback probability selection is implemented in a pure engine with tests and is wired into live share generation; remaining Milestone 7 scope is callback lifecycle evolution/retirement depth and broader sequential-meeting verification.
 
 ## Context and Orientation
 

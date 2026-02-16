@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { SeamErrorCodes } from '$lib/core/seam';
 import {
 	DATABASE_ERROR_CODES,
+	validateCallbackRecord,
+	validateCreateCallbackInput,
 	validateAppendShareInput,
 	validateMeetingRecord,
 	validateShareRecord,
@@ -9,9 +11,12 @@ import {
 } from './contract';
 import { createDatabaseMock } from './mock';
 import appendShareSample from './fixtures/appendShare.sample.json';
+import createCallbackSample from './fixtures/createCallback.sample.json';
 import createMeetingSample from './fixtures/createMeeting.sample.json';
 import faultFixture from './fixtures/fault.json';
+import getActiveCallbacksSample from './fixtures/getActiveCallbacks.sample.json';
 import getHeavyMemorySample from './fixtures/getHeavyMemory.sample.json';
+import getShareByIdSample from './fixtures/getShareById.sample.json';
 import getUserByIdSample from './fixtures/getUserById.sample.json';
 
 describe('database seam contract', () => {
@@ -24,8 +29,14 @@ describe('database seam contract', () => {
 		expect(validateUserProfile(getUserByIdSample)).toBe(true);
 		expect(validateMeetingRecord(createMeetingSample)).toBe(true);
 		expect(validateShareRecord(appendShareSample)).toBe(true);
+		expect(validateShareRecord(getShareByIdSample)).toBe(true);
+		expect(validateCallbackRecord(createCallbackSample)).toBe(true);
+		expect(validateCreateCallbackInput(createCallbackSample)).toBe(true);
 		expect(
 			(getHeavyMemorySample as unknown[]).every((record) => validateShareRecord(record))
+		).toBe(true);
+		expect(
+			(getActiveCallbacksSample as unknown[]).every((record) => validateCallbackRecord(record))
 		).toBe(true);
 	});
 
@@ -66,6 +77,35 @@ describe('database seam contract', () => {
 		expect(heavyMemory.ok).toBe(true);
 		if (heavyMemory.ok) {
 			expect(heavyMemory.value).toEqual(getHeavyMemorySample);
+		}
+
+		const shareById = await mock.getShareById('6eaf7ef6-d1d8-4b12-bf99-135f2aef0568');
+		expect(shareById.ok).toBe(true);
+		if (shareById.ok) {
+			expect(shareById.value).toEqual(getShareByIdSample);
+		}
+
+		const callbacks = await mock.getActiveCallbacks({
+			characterId: 'marcus',
+			meetingId: '2f5dcf63-cf80-4e09-8e3e-13f93da72cf3'
+		});
+		expect(callbacks.ok).toBe(true);
+		if (callbacks.ok) {
+			expect(callbacks.value).toEqual(getActiveCallbacksSample);
+		}
+
+		const createdCallback = await mock.createCallback({
+			originShareId: '6eaf7ef6-d1d8-4b12-bf99-135f2aef0568',
+			characterId: 'marcus',
+			originalText: 'I almost bounced and stayed in my chair.',
+			callbackType: 'self_deprecation',
+			scope: 'character',
+			potentialScore: 8,
+			parentCallbackId: null
+		});
+		expect(createdCallback.ok).toBe(true);
+		if (createdCallback.ok) {
+			expect(createdCallback.value).toEqual(createCallbackSample);
 		}
 	});
 

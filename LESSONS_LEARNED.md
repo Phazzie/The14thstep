@@ -21,6 +21,9 @@ This file captures practical lessons we want future work to reuse.
 - Use script-level env loading (`node --env-file-if-exists=.env.local`) for probe commands in isolated worktrees.
 - Parallel subagents work best when each owns non-overlapping file sets and one integrator owns final wiring/tests/docs.
 - Verify Linux Node toolchain path explicitly (`/home/latro/.nvm/.../bin`) to avoid accidental Windows npm execution drift.
+- Advancing a seam-driven milestone often requires expanding seam contracts first; route-level integration is much faster once adapter methods exist.
+- Prompt-quality retry loops can be implemented with the same generation seam by treating validator calls as first-class seam interactions.
+- Callback engines are safest as pure, test-first modules; route wiring then becomes straightforward and low-risk.
 
 ## 2026-02-15
 

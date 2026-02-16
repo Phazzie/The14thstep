@@ -1,0 +1,28 @@
+[
+  {
+    "id": "17b9f6ab-0f63-4b06-90d8-06bcdb54922d",
+    "originShareId": "6eaf7ef6-d1d8-4b12-bf99-135f2aef0568",
+    "characterId": "marcus",
+    "originalText": "I almost bounced and stayed in my chair.",
+    "callbackType": "self_deprecation",
+    "scope": "character",
+    "potentialScore": 8,
+    "timesReferenced": 2,
+    "lastReferencedAt": "2026-02-14T02:20:00.000Z",
+    "status": "active",
+    "parentCallbackId": null
+  },
+  {
+    "id": "309f3df9-94ff-4e4a-9948-f1a26f2f9443",
+    "originShareId": "15f9d588-6af3-4c7f-b4b9-f7f6ca5b1a9b",
+    "characterId": "heather",
+    "originalText": "Heather calls it her parking-lot gospel.",
+    "callbackType": "catchphrase",
+    "scope": "room",
+    "potentialScore": 7,
+    "timesReferenced": 5,
+    "lastReferencedAt": "2026-02-12T03:05:00.000Z",
+    "status": "legend",
+    "parentCallbackId": null
+  }
+]

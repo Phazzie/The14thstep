@@ -1,6 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 import { SeamErrorCodes, err, ok } from './seam';
-import { addShare, closeMeeting, createMeeting, scoreSignificance, type MeetingWorkflowDeps } from './meeting';
+import {
+	addShare,
+	closeMeeting,
+	createMeeting,
+	detectConnectionBreakthroughContent,
+	detectCrisisContent,
+	detectHeavyDisclosureContent,
+	scoreSignificance,
+	type MeetingWorkflowDeps
+} from './meeting';
 import type { DatabasePort, MeetingRecord, ShareRecord, UserProfile } from '$lib/seams/database/contract';
 import type { GrokAiPort } from '$lib/seams/grok-ai/contract';
 
@@ -36,7 +45,48 @@ function createDeps(overrides: Partial<MeetingWorkflowDeps> = {}): MeetingWorkfl
 				sequenceOrder: input.sequenceOrder,
 				createdAt: '2026-02-16T00:01:00.000Z'
 			}),
-		getHeavyMemory: async (_userId: string) => ok<ShareRecord[]>([])
+		getHeavyMemory: async (_userId: string) => ok<ShareRecord[]>([]),
+		getShareById: async (_shareId: string) =>
+			ok<ShareRecord>({
+				id: 'share-lookup',
+				meetingId: 'meeting-1',
+				characterId: 'marcus',
+				isUserShare: false,
+				content: 'Share lookup',
+				significanceScore: 6,
+				sequenceOrder: 1,
+				createdAt: '2026-02-16T00:01:00.000Z'
+			}),
+		getMeetingShares: async (_meetingId: string) => ok<ShareRecord[]>([]),
+		createCallback: async (_input) =>
+			ok({
+				id: 'callback-1',
+				originShareId: 'share-1',
+				characterId: 'marcus',
+				originalText: 'Now I stay.',
+				callbackType: 'self_deprecation' as const,
+				scope: 'character' as const,
+				potentialScore: 7,
+				timesReferenced: 0,
+				lastReferencedAt: null,
+				status: 'active' as const,
+				parentCallbackId: null
+			}),
+		getActiveCallbacks: async (_input) => ok([]),
+		markCallbackReferenced: async (_callbackId) =>
+			ok({
+				id: 'callback-1',
+				originShareId: 'share-1',
+				characterId: 'marcus',
+				originalText: 'Now I stay.',
+				callbackType: 'self_deprecation' as const,
+				scope: 'character' as const,
+				potentialScore: 7,
+				timesReferenced: 1,
+				lastReferencedAt: '2026-02-16T00:01:00.000Z',
+				status: 'active' as const,
+				parentCallbackId: null
+			})
 	};
 
 	const grokAi: GrokAiPort = {
@@ -51,6 +101,13 @@ function createDeps(overrides: Partial<MeetingWorkflowDeps> = {}): MeetingWorkfl
 }
 
 describe('scoreSignificance', () => {
+	it('detects crisis/heavy/breakthrough keywords', () => {
+		expect(detectCrisisContent('I want to die tonight')).toBe(true);
+		expect(detectHeavyDisclosureContent('I lost custody this year')).toBe(true);
+		expect(detectConnectionBreakthroughContent('I asked for help and stayed')).toBe(true);
+		expect(detectCrisisContent('I had a rough day')).toBe(false);
+	});
+
 	it('returns 10 for crisis language', () => {
 		const score = scoreSignificance({
 			content: 'I want to die and I cannot go on',

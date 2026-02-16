@@ -133,6 +133,19 @@ export function buildSummaryGenerationPrompt(topic: string, transcript: string):
 	].join('\n\n');
 }
 
+export function buildExpandSharePrompt(
+	character: CharacterProfile,
+	input: { topic: string; originalShare: string; recentShares: Array<{ speaker: string; content: string }> }
+): string {
+	return [
+		`Expand ${character.name}'s share into 8-10 sentences while preserving voice.`,
+		`Topic: ${input.topic}`,
+		`Original share:\n${input.originalShare}`,
+		`Recent room context:\n${renderShares(input.recentShares)}`,
+		'Stay grounded and specific. No therapy-speak. Keep it spoken, not essay-like.'
+	].join('\n\n');
+}
+
 export function buildQualityValidationPrompt(
 	character: CharacterProfile,
 	candidateShare: string,
