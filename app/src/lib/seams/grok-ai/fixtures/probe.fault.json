@@ -1,0 +1,10 @@
+{
+  "probedAt": "2026-02-16T04:24:48.306Z",
+  "environment": "live",
+  "status": 400,
+  "error": "Model not found: ",
+  "raw": {
+    "code": "Client specified an invalid argument",
+    "error": "Model not found: "
+  }
+}

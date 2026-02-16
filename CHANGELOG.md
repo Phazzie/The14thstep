@@ -11,16 +11,34 @@ All notable changes to this repository are documented in this file.
 - Seam fixtures, mocks, and contract tests for `grok-ai`, `database`, `auth`, `uuid`, and `clock` under `app/src/lib/seams/**`.
 - Domain meeting workflow module `app/src/lib/core/meeting.ts` with lifecycle functions and pure significance scoring.
 - Domain unit tests in `app/src/lib/core/meeting.spec.ts`.
+- Domain core modules and tests:
+  - `app/src/lib/core/character-selector.ts`
+  - `app/src/lib/core/prompt-templates.ts`
+  - `app/src/lib/core/memory-builder.ts`
+  - `app/src/lib/core/callback-scanner.ts`
+  - `app/src/lib/core/types.ts`
+  - `app/src/lib/core/characters.ts`
+  - `app/src/lib/core/therapy-blocklist.ts`
+- Live xAI seam tooling and artifacts:
+  - `app/src/lib/seams/grok-ai/probe.ts`
+  - `app/src/lib/seams/grok-ai/quality-cycle.ts`
+  - `app/src/lib/seams/grok-ai/fixtures/probe.sample.json`
+  - `app/src/lib/seams/grok-ai/fixtures/probe.fault.json`
+  - `app/src/lib/seams/grok-ai/fixtures/voice-quality-report.json`
 
 ### Changed
 - `AGENTS.md` now explicitly requires agents to keep `CHANGELOG.md` and `LESSONS_LEARNED.md` current.
 - Root `AGENTS.md` slimmed to global guidance, with a Seam-Driven Development summary pointer to `app/AGENTS.md`.
 - Seam contract files now export runtime validation helpers used by tests and mocks.
+- Probe scripts in `app/package.json` now load `.env.local` automatically using `--env-file-if-exists`.
+- `seam-registry.json` now points Grok live probe metadata to seam-local probe/quality-cycle scripts.
+- `app/README.md` now documents Milestone 3 contract/quality probe commands and output paths.
 
 ### Verified
 - `npm run test:unit -- --run` passes with seam contract tests included.
 - `npm run check` passes with zero diagnostics.
-- Total unit suite now passes with 36 tests including new domain-core coverage.
+- Total unit suite now passes with 51 tests including expanded domain-core coverage.
+- Live quality-cycle run met target for all six core characters (5/5 pass each in captured run).
 
 ## [2026-02-15]
 

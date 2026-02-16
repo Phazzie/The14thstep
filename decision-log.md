@@ -12,3 +12,7 @@
 - Added dedicated governance artifacts `CHANGELOG.md` and `LESSONS_LEARNED.md` and made them mandatory in agent instructions.
 - Standardized seam contracts to export runtime validators and reused them in fixture-backed mocks and contract tests for Milestone 1.
 - Implemented Milestone 2 incrementally by shipping `app/src/lib/core/meeting.ts` (create/add/close workflow + pure significance scoring) before broader core modules.
+- Completed remaining Milestone 2 core modules with tests: `character-selector`, `prompt-templates`, `memory-builder`, and `callback-scanner`.
+- Added live Grok probe tooling at `app/src/lib/seams/grok-ai/probe.ts` and `quality-cycle.ts`, and captured live pass-rate evidence in seam fixtures.
+- Separated deterministic contract fixtures from live probe captures (`probe.sample.json`, `probe.fault.json`) to avoid test-fixture drift.
+- Updated probe commands to load `.env.local` automatically via `node --env-file-if-exists=.env.local`.

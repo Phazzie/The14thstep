@@ -60,6 +60,8 @@ Run from `app/`:
 - Type and Svelte checks: `npm run check`
 - SSE probe: `npm run probe:sse`
 - Grok voice probe: `npm run probe:grok-voice`
+- Grok contract probe: `npm run probe:grok-contract`
+- Grok quality cycle: `npm run probe:grok-quality`
 - Supabase memory probe: `npm run probe:supabase-memory`
 
 ## Environment rules

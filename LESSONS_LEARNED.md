@@ -17,6 +17,8 @@ This file captures practical lessons we want future work to reuse.
 - Each git worktree needs its own dependency install; do not assume sibling worktree `node_modules` are available.
 - For strict TypeScript contracts, always narrow values extracted from `Record<string, unknown>` before numeric comparisons.
 - Encode significance-scoring precedence in tests; mixed-signal shares otherwise create ambiguous expectations.
+- Keep deterministic contract fixtures separate from live probe captures (`sample.json` vs `probe.sample.json`) so test baselines are not overwritten.
+- Use script-level env loading (`node --env-file-if-exists=.env.local`) for probe commands in isolated worktrees.
 
 ## 2026-02-15
 

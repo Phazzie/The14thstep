@@ -6,7 +6,8 @@
 			"id": "grok-ai",
 			"purpose": "Generate character shares and meeting reflection content via xAI Responses API.",
 			"contract": "app/src/lib/seams/grok-ai/contract.ts",
-			"probe": "app/probes/grokVoiceProbe.mjs"
+			"probe": "app/src/lib/seams/grok-ai/probe.ts",
+			"qualityCycle": "app/src/lib/seams/grok-ai/quality-cycle.ts"
 		},
 		{
 			"id": "database",
@@ -37,4 +38,3 @@
 		}
 	]
 }
-

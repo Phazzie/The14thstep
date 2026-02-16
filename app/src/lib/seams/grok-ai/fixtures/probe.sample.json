@@ -1,0 +1,90 @@
+{
+  "probedAt": "2026-02-16T04:24:48.129Z",
+  "environment": "live",
+  "topic": "Staying clean when everything falls apart",
+  "status": 200,
+  "text": "See, when the mill shut down and my girl quit answering the door, I stared at these same factory walls wondering if the bottle was the only friend left standing. Nights the shakes hit like hammers, I'd cradle this chipped cup, sip the bitter burn slow, and stack empty packs till dawn cracked the sky. Clean sticks when you treat wreckage like inventory—one busted piece at a time.",
+  "usage": {
+    "input_tokens": 297,
+    "input_tokens_details": {
+      "cached_tokens": 147
+    },
+    "output_tokens": 569,
+    "output_tokens_details": {
+      "reasoning_tokens": 492
+    },
+    "total_tokens": 866,
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 0,
+    "cost_in_usd_ticks": 3218500
+  },
+  "raw": {
+    "created_at": 1771215884,
+    "completed_at": 1771215888,
+    "id": "157b4496-adae-ae63-83d3-5f1f1f7f8045",
+    "max_output_tokens": null,
+    "model": "grok-4-1-fast-reasoning",
+    "object": "response",
+    "output": [
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "See, when the mill shut down and my girl quit answering the door, I stared at these same factory walls wondering if the bottle was the only friend left standing. Nights the shakes hit like hammers, I'd cradle this chipped cup, sip the bitter burn slow, and stack empty packs till dawn cracked the sky. Clean sticks when you treat wreckage like inventory—one busted piece at a time.",
+            "logprobs": [],
+            "annotations": []
+          }
+        ],
+        "id": "msg_157b4496-adae-ae63-83d3-5f1f1f7f8045",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": true,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": "medium",
+      "summary": "detailed"
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "auto",
+    "tools": [],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": 297,
+      "input_tokens_details": {
+        "cached_tokens": 147
+      },
+      "output_tokens": 569,
+      "output_tokens_details": {
+        "reasoning_tokens": 492
+      },
+      "total_tokens": 866,
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 0,
+      "cost_in_usd_ticks": 3218500
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": false,
+    "metadata": {},
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  }
+}
