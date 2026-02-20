@@ -1,0 +1,6 @@
+{
+  "probedAt": "2026-02-19T13:20:00.000Z",
+  "environment": "local",
+  "probe": "supabase-memory",
+  "notes": "Baseline timestamp for fixture freshness verification."
+}

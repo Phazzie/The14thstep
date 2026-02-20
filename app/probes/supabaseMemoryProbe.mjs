@@ -1,11 +1,22 @@
 #!/usr/bin/env node
 
+import { mkdir, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.SUPABASE_URL?.trim();
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 const probeUserId = process.env.PROBE_USER_ID?.trim();
 const maxMs = Number.parseInt(process.env.SUPABASE_MEMORY_PROBE_MAX_MS || '800', 10);
+const fixturePath = path.join(
+	process.cwd(),
+	'src',
+	'lib',
+	'seams',
+	'database',
+	'fixtures',
+	'probe.sample.json'
+);
 
 async function main() {
 	if (!supabaseUrl) throw new Error('SUPABASE_URL is required');
@@ -78,6 +89,28 @@ async function main() {
 	if (elapsedMs > maxMs) {
 		throw new Error(`Query bundle exceeded target latency (${maxMs}ms): ${elapsedMs}ms`);
 	}
+
+	await mkdir(path.dirname(fixturePath), { recursive: true });
+	await writeFile(
+		fixturePath,
+		JSON.stringify(
+			{
+				probedAt: new Date().toISOString(),
+				environment: 'live',
+				probe: 'supabase-memory',
+				status: 'PASS',
+				thresholdMs: maxMs,
+				elapsedMs,
+				heavyRows: (heavyRes.data ?? []).length,
+				userHeavyRows: (userHeavyRes.data ?? []).length,
+				recentSharesRows: (recentSharesRes.data ?? []).length,
+				mergedRows: combined.length
+			},
+			null,
+			2
+		)
+	);
+	console.log(`[supabase-memory-probe] wrote fixture: ${fixturePath}`);
 
 	console.log('[supabase-memory-probe] PASS');
 }

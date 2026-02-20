@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 
+import { mkdir, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+
 const baseUrl = process.env.PROBE_BASE_URL || process.env.PROBE_BASE || 'http://127.0.0.1:5173';
 const url = `${baseUrl.replace(/\/$/, '')}/api/probes/sse`;
+const fixturePath = path.join(process.cwd(), 'probes', 'fixtures', 'sse-probe.sample.json');
 
 function parseSseEvents(rawText) {
 	const events = [];
@@ -54,6 +58,25 @@ async function main() {
 			`Probe completed too quickly (${elapsedMs}ms). Expected roughly 5 chunks over ~2500ms.`
 		);
 	}
+
+	await mkdir(path.dirname(fixturePath), { recursive: true });
+	await writeFile(
+		fixturePath,
+		JSON.stringify(
+			{
+				probedAt: new Date().toISOString(),
+				environment: 'local',
+				probe: 'sse',
+				status: 'PASS',
+				elapsedMs,
+				eventCount: events.length,
+				chunkCount: chunkEvents.length
+			},
+			null,
+			2
+		)
+	);
+	console.log(`[sse-probe] wrote fixture: ${fixturePath}`);
 
 	console.log('[sse-probe] PASS');
 }
