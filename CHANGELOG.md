@@ -2,6 +2,74 @@
 
 All notable changes to this repository are documented in this file.
 
+## [2026-02-19]
+
+### Added
+- Milestone 7 callback lifecycle core and verification:
+  - `app/src/lib/core/callback-lifecycle.ts`
+  - `app/src/lib/core/callback-lifecycle.spec.ts`
+  - `app/src/lib/core/callback-lifecycle-workflow.ts`
+  - `app/src/lib/core/callback-lifecycle-workflow.spec.ts`
+  - `app/src/lib/core/callback-lifecycle.integration.spec.ts`
+- Milestone 8 crisis core and route tests:
+  - `app/src/lib/core/crisis-engine.ts`
+  - `app/src/lib/core/crisis-engine.spec.ts`
+  - `app/src/lib/server/routes/meeting-crisis.spec.ts`
+  - `app/src/lib/server/routes/meeting-page-load.spec.ts`
+- Milestone 9 composition and e2e coverage:
+  - `app/tests/composition/meeting-flow.spec.ts`
+  - `app/tests/composition/seam-failure.spec.ts`
+  - `app/tests/e2e/meeting-flow.spec.ts`
+- Fixture freshness marker files:
+  - `app/src/lib/seams/database/fixtures/probe.sample.json`
+  - `app/src/lib/seams/auth/fixtures/probe.sample.json`
+  - `app/probes/fixtures/sse-probe.sample.json`
+
+### Changed
+- `app/src/lib/seams/database/contract.ts`, `mock.ts`, and `contract.test.ts` now include `updateCallback` and `getMeetingCountAfterDate` seam methods/validation.
+- `app/src/lib/server/seams/database/adapter.ts` and `adapter.spec.ts` now implement and verify callback updates + post-date meeting counts.
+- `app/src/routes/meeting/[id]/share/+server.ts` now:
+  - applies callback lifecycle updates when callbacks are referenced,
+  - creates evolved child callbacks when lifecycle marks evolution,
+  - enforces persisted crisis-mode blocking server-side.
+- `app/src/routes/meeting/[id]/close/+server.ts` now runs lifecycle aging transitions after callback scanning.
+- `app/src/routes/meeting/[id]/+page.server.ts` now returns setup-trigger and persisted crisis flags to support crisis recovery on reload.
+- `app/src/routes/meeting/[id]/+page.svelte` now initializes crisis mode from server state and keeps crisis resources sticky in-session.
+- `app/src/routes/meeting/[id]/crisis/+server.ts` now includes deterministic pause sequencing and structured crisis-resource payloads.
+- `app/src/lib/core/meeting.ts` now delegates crisis detection to `crisis-engine`.
+- `app/src/lib/core/callback-engine.ts` and `callback-engine.spec.ts` now include retired-callback behavior in the probability matrix.
+- `app/src/hooks.server.ts` and `app/src/lib/core/meeting.spec.ts` now satisfy the expanded database seam contract.
+- `seam-registry.json` now defines I/O seam freshness metadata (`io`, `freshnessDays`, `freshnessFixtures`) used by verification scripts.
+- `app/scripts/verify-fixtures.mjs` now enforces real freshness checks and fails stale or missing fixture metadata.
+- `app/scripts/verify-composition.mjs` now requires composition spec presence and runs the composition Vitest lane.
+- `app/package.json` now runs a full verify chain including fixtures/contracts/core/composition/e2e and adds `lint:verify` for deterministic eslint gating.
+- `app/vite.config.ts` server project now includes `tests/composition/**/*` specs.
+- `app/playwright.config.ts` now runs e2e tests from `tests/e2e` with preview server orchestration.
+- `.github/workflows/verify.yml` now installs Playwright Chromium, runs full `npm run verify`, and uploads Playwright artifacts on failures.
+- `app/probes/sseProbe.mjs` and `app/probes/supabaseMemoryProbe.mjs` now emit freshness marker fixture outputs on successful probe runs.
+- Vercel production environment now uses a valid `XAI_API_KEY` matching the working local key, followed by a fresh production deployment and alias promotion to `https://the14thstep.vercel.app`.
+- Supabase production bootstrap data now includes a `public.users` profile row for `PROBE_USER_ID` so setup/meeting creation can satisfy `meetings.user_id` foreign-key requirements.
+
+### Verified
+- `npm run check` passes with zero diagnostics.
+- Focused M7/M8 suite passes:
+  - `npx vitest run src/lib/core/callback-lifecycle.spec.ts src/lib/core/callback-lifecycle-workflow.spec.ts src/lib/core/callback-lifecycle.integration.spec.ts src/lib/core/crisis-engine.spec.ts src/lib/server/routes/meeting-share.spec.ts src/lib/server/routes/meeting-crisis.spec.ts src/lib/server/routes/meeting-page-load.spec.ts`
+- Full unit suite passes:
+  - `npm run test:unit -- --run` with 25 test files and 104 passing tests.
+- Full Milestone 9 verify lane passes end-to-end:
+  - `npm run verify` (eslint, svelte-check, fixture freshness, seam contracts, core tests, composition tests, Playwright e2e).
+- Updated unit count after composition lane additions:
+  - `npm run test:unit -- --run` with 27 test files and 108 passing tests.
+- Deployment attempt evidence captured (Milestone 10 blocked):
+  - `npx vercel pull --yes --environment=production` cannot proceed without `VERCEL_TOKEN`.
+  - Local shell runtime drift to Node `v25.5.0` requires forced engine override for Vercel CLI and is not accepted as production-ready deploy evidence.
+- Production deployment + smoke evidence (Milestone 10 execution unblocked):
+  - `GET https://the14thstep.vercel.app/` returns `200`.
+  - `GET https://the14thstep.vercel.app/probes/sse` returns `200`.
+  - `POST https://the14thstep.vercel.app/?/join` returns redirect payload with `status: 303` to `/meeting/{id}`.
+  - `GET /meeting/{id}/share?...` streams SSE `meta` + `chunk` events with `content-type: text/event-stream`.
+  - `POST /meeting/{id}/close` returns `200` with summary/completion payload.
+
 ## [2026-02-16]
 
 ### Added

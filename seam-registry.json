@@ -1,40 +1,59 @@
 {
-	"version": 1,
-	"project": "the-14th-step",
-	"seams": [
-		{
-			"id": "grok-ai",
-			"purpose": "Generate character shares and meeting reflection content via xAI Responses API.",
-			"contract": "app/src/lib/seams/grok-ai/contract.ts",
-			"probe": "app/src/lib/seams/grok-ai/probe.ts",
-			"qualityCycle": "app/src/lib/seams/grok-ai/quality-cycle.ts"
-		},
-		{
-			"id": "database",
-			"purpose": "Persist and retrieve users, meetings, shares, and callbacks from Supabase PostgreSQL.",
-			"contract": "app/src/lib/seams/database/contract.ts",
-			"probe": "app/probes/supabaseMemoryProbe.mjs"
-		},
-		{
-			"id": "auth",
-			"purpose": "Authenticate users and resolve the active session identity.",
-			"contract": "app/src/lib/seams/auth/contract.ts"
-		},
-		{
-			"id": "uuid",
-			"purpose": "Generate stable IDs without binding core logic to crypto APIs.",
-			"contract": "app/src/lib/seams/uuid/contract.ts"
-		},
-		{
-			"id": "clock",
-			"purpose": "Provide deterministic current time and timestamps for tests.",
-			"contract": "app/src/lib/seams/clock/contract.ts"
-		},
-		{
-			"id": "sse-streaming",
-			"purpose": "Validate chunked Server-Sent Event delivery for meeting-share streaming behavior.",
-			"endpoint": "app/src/routes/api/probes/sse/+server.ts",
-			"probe": "app/probes/sseProbe.mjs"
-		}
-	]
+  "version": 1,
+  "project": "the-14th-step",
+  "seams": [
+    {
+      "id": "grok-ai",
+      "io": true,
+      "freshnessDays": 30,
+      "freshnessFixtures": [
+        "app/src/lib/seams/grok-ai/fixtures/probe.sample.json",
+        "app/src/lib/seams/grok-ai/fixtures/probe.fault.json"
+      ],
+      "purpose": "Generate character shares and meeting reflection content via xAI Responses API.",
+      "contract": "app/src/lib/seams/grok-ai/contract.ts",
+      "probe": "app/src/lib/seams/grok-ai/probe.ts",
+      "qualityCycle": "app/src/lib/seams/grok-ai/quality-cycle.ts"
+    },
+    {
+      "id": "database",
+      "io": true,
+      "freshnessDays": 30,
+      "freshnessFixtures": [
+        "app/src/lib/seams/database/fixtures/probe.sample.json"
+      ],
+      "purpose": "Persist and retrieve users, meetings, shares, and callbacks from Supabase PostgreSQL.",
+      "contract": "app/src/lib/seams/database/contract.ts",
+      "probe": "app/probes/supabaseMemoryProbe.mjs"
+    },
+    {
+      "id": "auth",
+      "io": true,
+      "freshnessDays": 30,
+      "freshnessFixtures": [
+        "app/src/lib/seams/auth/fixtures/probe.sample.json"
+      ],
+      "purpose": "Authenticate users and resolve the active session identity.",
+      "contract": "app/src/lib/seams/auth/contract.ts"
+    },
+    {
+      "id": "uuid",
+      "purpose": "Generate stable IDs without binding core logic to crypto APIs.",
+      "contract": "app/src/lib/seams/uuid/contract.ts"
+    },
+    {
+      "id": "clock",
+      "purpose": "Provide deterministic current time and timestamps for tests.",
+      "contract": "app/src/lib/seams/clock/contract.ts"
+    },
+    {
+      "id": "sse-streaming",
+      "io": true,
+      "freshnessDays": 30,
+      "freshnessFixtures": ["app/probes/fixtures/sse-probe.sample.json"],
+      "purpose": "Validate chunked Server-Sent Event delivery for meeting-share streaming behavior.",
+      "endpoint": "app/src/routes/api/probes/sse/+server.ts",
+      "probe": "app/probes/sseProbe.mjs"
+    }
+  ]
 }

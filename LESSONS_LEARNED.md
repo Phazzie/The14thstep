@@ -2,6 +2,24 @@
 
 This file captures practical lessons we want future work to reuse.
 
+## 2026-02-19
+
+### Process
+- For safety-sensitive features, lock policy to the ExecPlan during implementation and treat tone/product refinements as a separate explicit milestone to avoid accidental requirement drift.
+- Milestone closure is more reliable when core logic, route integration, and route-level tests land together in one pass instead of splitting them across handoffs.
+
+### Technical
+- In mixed Windows/WSL workspaces, a copied project can appear healthy but still miss runnable local CLI shims (`svelte-kit`, `vitest`); rerun `npm install` in the active workspace before judging build health.
+- Persisted crisis-state checks on the server are necessary even when the client tracks crisis mode; client-only flags are not sufficient across refreshes/re-entry.
+- Callback lifecycle logic is easiest to verify when separated into a pure lifecycle core plus an orchestration workflow that resolves persistence-specific facts (for example, post-date meeting counts).
+- Registry-backed fixture freshness (`io` + `freshnessDays` + explicit fixture paths) keeps verification deterministic and avoids hidden assumptions in ad-hoc scripts.
+- Composition tests are more reliable when implemented as pure seam-bundle workflow tests; direct imports of route modules from non-`src` test paths can be brittle in TypeScript/SvelteKit path resolution.
+- Vercel deployment checks in mixed Windows/WSL shells are fragile if `node` and `npx` resolve to different runtimes; validate toolchain (`which node`, `which npx`, version parity) before milestone deploy attempts.
+- `@sveltejs/adapter-vercel` can fail on mounted filesystems that disallow symlinks; preserve local build health with `adapter-auto` and run deploy packaging in CI/native environments with proper symlink support.
+- When `public.users.id` references `auth.users.id`, deployment smoke can pass for routing but fail at runtime on meeting creation unless both identity rows are present; treat this as bootstrap data, not app-code regression.
+- Fingerprint-checking secrets (for example SHA-256 hash comparisons) is a reliable way to confirm env parity across local and Vercel without printing secrets.
+- Vercel runtime logs may only show request metadata by default; pair them with direct seam-level reproduction (for example Supabase insert probes) to quickly isolate real root causes.
+
 ## 2026-02-16
 
 ### Process

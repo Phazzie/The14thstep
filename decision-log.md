@@ -28,3 +28,16 @@
 - Added a dedicated `database.completeMeeting` seam operation to persist close-state metadata through the adapter boundary instead of writing close updates directly inside route handlers.
 - Enforced Milestone 6 retrieval logic in the pure memory-builder core (rather than adapter-only filtering) so memory rules remain deterministic and testable with fixture/mocked seam inputs.
 - Retained `getHeavyMemory` seam name but shifted semantics to return ordered user meeting-share history; rule selection now occurs in `memory-builder` to support last-3-meetings continuity and prompt composition.
+
+## 2026-02-19
+
+- Completed Milestone 7 by adding callback lifecycle core/workflow modules and wiring lifecycle persistence in both share-time and close-time meeting flows.
+- Completed Milestone 8 per ExecPlan safety policy by adding crisis-engine core logic, setup/load crisis detection, deterministic Marcus-then-Heather crisis sequencing, and server-side crisis enforcement in normal share generation paths.
+- Deferred product-tone refinements for crisis-mode humor/callback behavior; current baseline remains strict no-callback/no-crosstalk while in crisis mode until a dedicated policy revision milestone.
+- Completed Milestone 9 by replacing verify scaffolds with enforceable freshness/composition/e2e lanes and wiring CI to run full `npm run verify`.
+- Kept `verify` lint gate on `eslint` (`lint:verify`) while leaving full Prettier checks in `npm run lint` to avoid forcing unrelated repository-wide formatting churn during milestone verification.
+- Deferred Milestone 10 live deploy execution in this environment due missing `VERCEL_TOKEN`/`VERCEL_ORG_ID`/`VERCEL_PROJECT_ID`, plus runtime drift to unsupported Node 25 for Vercel CLI.
+- Reverted local adapter experiment back to `@sveltejs/adapter-auto` after `@sveltejs/adapter-vercel` builds failed on mounted-filesystem symlink permissions (`EPERM`), preserving a green local build path while deploy is moved to CI/native environment.
+- Resumed Milestone 10 deploy using a non-git temp deploy directory (`/tmp/the14thstep-deploy`) to avoid team git-author gating while preserving linked Vercel project settings.
+- Treated production setup failures as data bootstrap defects first: `auth.users` probe identity existed, but `public.users` lacked the matching profile row required by `meetings.user_id` foreign key.
+- Repaired production env drift by fingerprint-comparing `XAI_API_KEY` between local and Vercel production, then rotating the Vercel key and redeploying before re-running smoke checks.
