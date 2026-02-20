@@ -71,15 +71,21 @@ export function resolveCallbackProbability(input: CallbackEngineInput): {
 			specificity: 60,
 			matches: userOverlap
 		},
-		{
-			rule: 'status_stale',
-			probability: 0.05,
-			specificity: 50,
-			matches: input.callback.status === 'stale'
-		},
-		{
-			rule: 'status_legend',
-			probability: 0.3,
+			{
+				rule: 'status_stale',
+				probability: 0.05,
+				specificity: 50,
+				matches: input.callback.status === 'stale'
+			},
+			{
+				rule: 'status_retired',
+				probability: 0.02,
+				specificity: 50,
+				matches: input.callback.status === 'retired'
+			},
+			{
+				rule: 'status_legend',
+				probability: 0.3,
 			specificity: 50,
 			matches: input.callback.status === 'legend'
 		},

@@ -21,7 +21,7 @@
 <section>
 	<h2 class="text-base font-semibold text-gray-100">Meeting Circle</h2>
 	<ul class="mt-3 flex flex-wrap gap-3">
-		{#each characters as character}
+		{#each characters as character (character.id)}
 			<li
 				class={`min-h-11 min-w-11 rounded-xl border px-3 py-2 text-sm ${
 					activeCharacterId === character.id

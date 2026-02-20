@@ -54,6 +54,18 @@ describe('callback engine', () => {
 		expect(resolved.probability).toBe(0.05);
 	});
 
+	it('applies retired suppression at 2%', () => {
+		const resolved = resolveCallbackProbability({
+			callback: { ...baseCallback, status: 'retired' },
+			currentCharacterId: 'marcus',
+			currentCharacterMeetingCount: 10,
+			originatedCallbacksCount: 4
+		});
+
+		expect(resolved.rule).toBe('status_retired');
+		expect(resolved.probability).toBe(0.02);
+	});
+
 	it('applies 65% for callbacks unused for 5+ meetings', () => {
 		const resolved = resolveCallbackProbability({
 			callback: baseCallback,

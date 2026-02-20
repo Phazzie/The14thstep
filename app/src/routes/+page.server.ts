@@ -1,7 +1,8 @@
 import { createMeeting } from '$lib/core/meeting';
 import { SeamErrorCodes } from '$lib/core/seam';
+import { createClient } from '@supabase/supabase-js';
 import { fail, redirect } from '@sveltejs/kit';
-import type { Actions } from './$types';
+import type { Actions, PageServerLoad } from './$types';
 
 function asTrimmedString(value: FormDataEntryValue | null): string {
 	return typeof value === 'string' ? value.trim() : '';
@@ -16,7 +17,82 @@ function statusFromSeamCode(code: string): number {
 	return 500;
 }
 
+function resolveAnonKey(env: NodeJS.ProcessEnv): string {
+	return (
+		env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() ??
+		env.SUPABASE_ANON_KEY?.trim() ??
+		env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ??
+		''
+	);
+}
+
+export const load: PageServerLoad = async ({ locals }) => {
+	return {
+		userId: locals.userId
+	};
+};
+
 export const actions: Actions = {
+	signIn: async ({ request, cookies }) => {
+		const formData = await request.formData();
+		const email = asTrimmedString(formData.get('email'));
+		const password = asTrimmedString(formData.get('password'));
+
+		if (!email || !password) {
+			return fail(400, { authMessage: 'Email and password are required.' });
+		}
+
+		const supabaseUrl = process.env.SUPABASE_URL?.trim() ?? '';
+		const anonKey = resolveAnonKey(process.env);
+		if (!supabaseUrl || !anonKey) {
+			return fail(500, { authMessage: 'Auth is not configured on this environment.' });
+		}
+
+		const authClient = createClient(supabaseUrl, anonKey, {
+			auth: {
+				autoRefreshToken: false,
+				persistSession: false
+			}
+		});
+
+		const signInResult = await authClient.auth.signInWithPassword({
+			email,
+			password
+		});
+		if (signInResult.error || !signInResult.data.session) {
+			return fail(401, { authMessage: 'Sign in failed. Check your email and password.' });
+		}
+
+		const secure = process.env.NODE_ENV === 'production';
+		cookies.set('sb-access-token', signInResult.data.session.access_token, {
+			path: '/',
+			httpOnly: true,
+			sameSite: 'lax',
+			secure
+		});
+		if (signInResult.data.session.refresh_token) {
+			cookies.set('sb-refresh-token', signInResult.data.session.refresh_token, {
+				path: '/',
+				httpOnly: true,
+				sameSite: 'lax',
+				secure
+			});
+		}
+
+		throw redirect(303, '/');
+	},
+
+	signOut: async ({ cookies, locals }) => {
+		const accessToken = cookies.get('sb-access-token');
+		if (accessToken) {
+			await locals.seams.auth.signOut(accessToken);
+		}
+
+		cookies.delete('sb-access-token', { path: '/' });
+		cookies.delete('sb-refresh-token', { path: '/' });
+		throw redirect(303, '/');
+	},
+
 	join: async ({ request, locals }) => {
 		const formData = await request.formData();
 
