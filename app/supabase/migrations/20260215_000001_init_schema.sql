@@ -36,7 +36,8 @@ create table if not exists public.users (
 
 create table if not exists public.meetings (
 	id uuid primary key default gen_random_uuid(),
-	user_id uuid not null references public.users (id) on delete cascade,
+	user_id uuid references public.users (id) on delete cascade,
+	guest_session_id uuid,
 	meeting_type text not null default 'general',
 	topic text not null,
 	user_mood text not null,
@@ -46,7 +47,11 @@ create table if not exists public.meetings (
 	ended_at timestamptz,
 	summary text,
 	notable_moments jsonb,
-	in_world_date date not null default (now() at time zone 'utc')::date
+	in_world_date date not null default (now() at time zone 'utc')::date,
+	constraint meetings_identity_xor check (
+		(user_id is not null and guest_session_id is null)
+		or (user_id is null and guest_session_id is not null)
+	)
 );
 
 create table if not exists public.meeting_participants (
@@ -97,3 +102,6 @@ create index if not exists idx_callbacks_scope_status on public.callbacks (scope
 create index if not exists idx_meeting_participants_meeting_id on public.meeting_participants (meeting_id);
 create index if not exists idx_meeting_participants_character_id on public.meeting_participants (character_id);
 
+
+create index if not exists idx_meetings_user_id on public.meetings (user_id);
+create index if not exists idx_meetings_guest_session_id on public.meetings (guest_session_id);

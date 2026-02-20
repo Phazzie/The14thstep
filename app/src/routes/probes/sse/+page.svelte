@@ -53,7 +53,7 @@
 {/if}
 
 <ol>
-	{#each lines as line}
+	{#each lines as line, index (`${index}-${line}`)}
 		<li><code>{line}</code></li>
 	{/each}
 </ol>

@@ -9,9 +9,19 @@ export interface UserProfile {
 	lastMeetingAt: string | null;
 }
 
+export type MeetingIdentity =
+	| {
+			kind: 'account';
+			userId: string;
+	  }
+	| {
+			kind: 'guest';
+			guestSessionId: string;
+	  };
+
 export interface MeetingRecord {
 	id: string;
-	userId: string;
+	identity: MeetingIdentity;
 	topic: string;
 	userMood: string;
 	listeningOnly: boolean;

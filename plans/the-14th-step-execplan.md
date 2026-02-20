@@ -37,12 +37,14 @@ Optional but useful for Supabase CLI operations:
 
 - [x] (2026-02-15 23:40Z) Created Milestone 0 scaffolding artifacts: `seam-registry.json`, `decision-log.md`, seam contract files under `app/src/lib/seams/**`, shared result envelope in `app/src/lib/core/seam.ts`, and probe scripts in `app/probes/**`.
 - [x] (2026-02-15 23:40Z) Added and validated local SSE probe path: endpoint `app/src/routes/api/probes/sse/+server.ts`, UI `app/src/routes/probes/sse/+page.svelte`, and CLI probe `npm run probe:sse` returning PASS.
+- [x] (2026-02-20 09:30Z) Implemented first user-facing recovery-room entry flow with a no-account guest path, trust-oriented copy, and account-path messaging in `app/src/routes/+page.svelte` plus supporting API routes for guest session + meeting start.
+- [x] (2026-02-20 09:40Z) Updated seam contracts and schema plan for dual identity meetings (`account` or `guest`) via `app/src/lib/seams/auth/contract.ts`, `app/src/lib/seams/database/contract.ts`, and `app/supabase/migrations/20260215_000001_init_schema.sql`.
 - [ ] Milestone 0: Repository bootstrap and reality probes complete (completed: local probe + scaffolding; remaining: live `probe:grok-voice` and live `probe:supabase-memory` with credentials).
 - [ ] Milestone 1: Hexagonal skeleton with all seam contracts, mocks, and contract tests green
 - [ ] Milestone 2: Domain core (pure meeting workflow logic) tested with zero I/O
 - [ ] Milestone 3: Prompt engineering â€” Grok produces character-voice shares that pass AI-driven quality validation
 - [ ] Milestone 4: Real adapters wired (Supabase database, Supabase auth, xAI grok-ai seam)
-- [ ] Milestone 5: UI and meeting flow â€” full meeting runs on localhost with streaming shares
+- [ ] Milestone 5: UI and meeting flow â€” full meeting runs on localhost with streaming shares (completed: guest one-off entry flow + meeting start UX; remaining: full streaming multi-character meeting runtime).
 - [ ] Milestone 6: Dual-track memory system (heavy memory + callback detection) persisted and surfaced in prompts
 - [ ] Milestone 7: Callback engine with conditional probability matrix producing organic recurring moments
 - [ ] Milestone 8: Crisis response system â€” detection, intervention, UI state change, resource display
@@ -59,6 +61,8 @@ Optional but useful for Supabase CLI operations:
   Evidence: `npm run lint` and targeted `npx eslint ...` produced no rule output and did not complete within timeout windows.
 - Observation: Both deployment CLIs can run from `npx`, so global installation is not required.
   Evidence: `npx --yes vercel --version` returned `50.17.1`; `npx --yes supabase --version` returned `2.76.8`.
+- Observation: The current app had no realistic user entry path; users hit identity dead-ends because contracts and schema assumed authenticated-only meetings.
+  Evidence: `app/src/routes/+page.svelte` previously contained only placeholder copy; seams only exposed `userId`-centric meeting identity.
 
 ## Decision Log
 
@@ -98,7 +102,17 @@ Optional but useful for Supabase CLI operations:
   Rationale: Reduces setup friction and keeps execution reproducible in fresh environments.
   Date/Author: 2026-02-15 (Codex)
 
+- Decision: Implement a guest-first meeting start path immediately and treat account signup as additive value (saved history), not a gate.
+  Rationale: The primary product promise is immediate access to support; requiring auth before first meeting violates that promise and blocks the target user persona.
+  Date/Author: 2026-02-20 (Codex)
+
+- Decision: Backend misconfiguration responses must be generic in UI/API while diagnostics remain server-side.
+  Rationale: Exposing env-key names to end users erodes trust and creates security noise without helping recovery outcomes.
+  Date/Author: 2026-02-20 (Codex)
+
 ## Outcomes & Retrospective
+
+Milestone 5 has meaningful early progress: users can now start a one-off meeting without creating an account, and the UI copy now explains inputs and choices in plain language. Auth/database seam contracts now model both account and guest identities so follow-on adapter work can proceed without redesign. Remaining work for Milestone 5 is the full streamed, multi-character meeting runtime plus real Supabase adapter wiring.
 
 Milestone 0 is partially complete. We now have a running local probe route for streaming, scripted probe entry points for xAI and Supabase, and a baseline seam contract skeleton anchored by a shared result envelope. Remaining Milestone 0 work is credential-gated: execute live Grok voice validation and live Supabase memory-latency validation against real infrastructure.
 
@@ -955,3 +969,5 @@ Revision note (2026-02-15, setup alignment): Added AGENTS.md + PLANS.md reposito
 Revision note (2026-02-15, Codex): Updated Progress, Surprises & Discoveries, Decision Log, and Outcomes & Retrospective to capture Milestone 0 scaffolding completion status, local SSE probe evidence, environment blockers (credentials, ESLint stall), and implementation location decisions.
 
 Revision note (2026-02-15, Codex env/deploy update): Added explicit environment prerequisites, CLI strategy (`npx vercel`, `npx supabase`), and corresponding discoveries/decisions so deployment can run end-to-end without global installs.
+
+Revision note (2026-02-20, guest-first UX + identity model): Added implementation-level progress for one-off guest meeting entry, introduced dual identity seam/schema direction (account + guest), recorded trust/error-handling decisions, and updated Milestone 5 status to reflect completed entry-flow work and remaining streaming runtime scope.
