@@ -7,7 +7,7 @@ Execution order was explicitly requested as:
 4. Milestone 8
 
 Status sync note: this checklist was reconciled against:
-- `plans/milestone-status.md` (2026-02-19 snapshot)
+- `plans/milestone-status.md` (2026-02-20 snapshot)
 - `plans/the-14th-step-execplan.md` progress log
 - `CHANGELOG.md` Milestone 7/8/9/10 evidence entries
 
@@ -41,14 +41,14 @@ Status sync note: this checklist was reconciled against:
 
 - [x] 10.1 Validate Vercel linkage settings and add required local deploy scripts if missing.
 - [x] 10.2 Produce exact required production env var matrix doc (name, source, sensitivity).
-- [ ] 10.3 Confirm Supabase schema readiness/migration status for production.
+- [x] 10.3 Confirm Supabase schema readiness/migration status for production.
 - [x] 10.4 Run preview deploy and capture logs/URL/evidence.
 - [x] 10.5 Run production deploy and capture logs/URL/evidence.
-- [ ] 10.6 Execute post-deploy smoke: auth/session.
+- [x] 10.6 Execute post-deploy smoke: auth/session.
 - [x] 10.7 Execute post-deploy smoke: meeting creation + SSE share generation.
-- [ ] 10.8 Execute post-deploy smoke: crisis-mode path.
+- [x] 10.8 Execute post-deploy smoke: crisis-mode path.
 - [x] 10.9 Record deploy evidence in plan/changelog/turnover docs.
-- [ ] 10.10 Add rollback and break-glass notes in deployment docs.
+- [x] 10.10 Add rollback and break-glass notes in deployment docs.
 
 ## Milestone 8 (Crisis Response System) - Step-by-step
 
@@ -65,6 +65,6 @@ Status sync note: this checklist was reconciled against:
 
 ## Completion Gate
 
-- [ ] All steps above completed and committed.
+- [x] All steps above completed and committed.
 - [x] `npm run verify`, `npm run check`, and `npm run test:unit -- --run` pass locally.
 - [x] Docs and milestone tracker updated with factual completion evidence.

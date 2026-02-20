@@ -304,7 +304,14 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 		const mapsResult = await getCharacterMaps(method);
 		if (!mapsResult.ok) return mapsResult;
 
-		const mapped = mapsResult.value.dbIdByDomainId.get(characterId);
+		let mapped = mapsResult.value.dbIdByDomainId.get(characterId);
+		if (!mapped && CORE_CHARACTER_NAME_BY_ID.has(characterId)) {
+			// Character rows can be seeded or repaired after process start. Refresh once before failing.
+			characterMapsPromise = null;
+			const refreshedMapsResult = await getCharacterMaps(method);
+			if (!refreshedMapsResult.ok) return refreshedMapsResult;
+			mapped = refreshedMapsResult.value.dbIdByDomainId.get(characterId);
+		}
 		if (mapped) return ok(mapped);
 
 		const coreName = CORE_CHARACTER_NAME_BY_ID.get(characterId);
@@ -558,10 +565,11 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 			const response = (await supabase
 				.from('callbacks')
 				.select(
-					'id, origin_share_id, character_id, original_text, callback_type, scope, potential_score, times_referenced, last_referenced_at, status, parent_callback_id'
+					'id, origin_share_id, character_id, original_text, callback_type, scope, potential_score, times_referenced, last_referenced_at, status, parent_callback_id, shares!inner(meeting_id)'
 				)
 				.in('status', ['active', 'stale', 'retired', 'legend'])
 				.or(`character_id.eq.${resolvedCharacterId.value},scope.eq.room`)
+				.eq('shares.meeting_id', input.meetingId)
 				.order('potential_score', { ascending: false })
 				.order('times_referenced', { ascending: false })
 				.limit(30)) as QueryResponseLike<unknown[]>;

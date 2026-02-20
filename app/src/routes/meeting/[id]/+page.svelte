@@ -313,7 +313,14 @@
 			} catch {
 				parsed = null;
 			}
-			errorMessage = parsed && !parsed.ok ? parsed.error.message : 'Share stream failed.';
+			const parsedMessage = parsed && !parsed.ok ? parsed.error.message : 'Share stream failed.';
+			if (parsedMessage.toLowerCase().includes('crisis mode')) {
+				crisisMode = true;
+				errorMessage = '';
+				statusLine = 'Crisis mode is active. Character shares are paused.';
+			} else {
+				errorMessage = parsedMessage;
+			}
 			eventSource.close();
 			sharing = false;
 		});

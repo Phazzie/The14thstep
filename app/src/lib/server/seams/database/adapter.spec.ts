@@ -40,14 +40,23 @@ function createCallbackLookupChain(response: QueryResponse) {
 }
 
 function createCallbacksSelectChain(response: QueryResponse) {
+	const secondOrderChain = {
+		limit: async () => response
+	};
+
+	const firstOrderChain = {
+		order: () => secondOrderChain
+	};
+
+	const eqChain = {
+		order: () => firstOrderChain
+	};
+
 	return {
 		in: () => ({
 			or: () => ({
-				order: () => ({
-					order: () => ({
-						limit: async () => response
-					})
-				})
+				eq: () => eqChain,
+				order: () => firstOrderChain
 			})
 		})
 	};
@@ -457,6 +466,43 @@ describe('database supabase adapter', () => {
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(result.value).toBe(18);
+		}
+	});
+
+	it('loads active callbacks scoped to the meeting and maps character ids', async () => {
+		const marcusDbId = '00000000-0000-4000-8000-000000000001';
+		const { adapter } = createHarness({
+			heavyMemorySelect: {
+				data: [
+					{
+						id: '17b9f6ab-0f63-4b06-90d8-06bcdb54922d',
+						origin_share_id: '6eaf7ef6-d1d8-4b12-bf99-135f2aef0568',
+						character_id: marcusDbId,
+						original_text: 'I almost bounced and stayed in my chair.',
+						callback_type: 'self_deprecation',
+						scope: 'room',
+						potential_score: 8,
+						times_referenced: 2,
+						last_referenced_at: '2026-02-18T10:00:00.000Z',
+						status: 'active',
+						parent_callback_id: null,
+						shares: { meeting_id: 'meeting-1' }
+					}
+				],
+				error: null,
+				status: 200
+			}
+		});
+
+		const result = await adapter.getActiveCallbacks({
+			characterId: 'marcus',
+			meetingId: 'meeting-1'
+		});
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value).toHaveLength(1);
+			expect(result.value[0]?.characterId).toBe('marcus');
 		}
 	});
 

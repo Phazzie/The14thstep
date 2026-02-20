@@ -41,3 +41,11 @@
 - Resumed Milestone 10 deploy using a non-git temp deploy directory (`/tmp/the14thstep-deploy`) to avoid team git-author gating while preserving linked Vercel project settings.
 - Treated production setup failures as data bootstrap defects first: `auth.users` probe identity existed, but `public.users` lacked the matching profile row required by `meetings.user_id` foreign key.
 - Repaired production env drift by fingerprint-comparing `XAI_API_KEY` between local and Vercel production, then rotating the Vercel key and redeploying before re-running smoke checks.
+
+## 2026-02-20
+
+- Closed Milestone 10 only after evidence-gated production verification across auth/session, auth-bound join persistence, crisis-path behavior, callback lifecycle persistence, and schema readiness checks.
+- Standardized compact-handoff storage in-repo (`plans/context-compact-handoff.md`, `HANDOFF_TO_OTHER_CODEX.md`) so context compaction does not lose production troubleshooting history.
+- Treated character slug-to-UUID mapping readiness as an operational requirement: production checks must confirm six core `public.characters` rows exist before declaring deploy health.
+- Hardened trust boundaries by using persisted meeting shares (not client-provided transcript snippets) for share-context and close-summary generation paths.
+- Scoped callback retrieval to the current meeting via `callbacks.origin_share_id -> shares.meeting_id` to prevent cross-meeting callback leakage.

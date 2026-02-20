@@ -8,7 +8,11 @@ import type { RequestHandler } from './$types';
 
 interface CloseRequest {
 	topic: string;
-	lastShares: Array<{ speakerName: string; content: string }>;
+}
+
+function speakerNameForShare(characterId: string | null): string {
+	if (characterId === null) return 'User';
+	return CORE_CHARACTERS.find((character) => character.id === characterId)?.name ?? 'Character';
 }
 
 async function buildCharacterMemorySummaries(input: {
@@ -85,25 +89,9 @@ async function parseRequest(request: Request): Promise<SeamResult<CloseRequest>>
 	if (!isObject(body) || !isNonEmptyString(body.topic)) {
 		return err(SeamErrorCodes.INPUT_INVALID, 'topic is required');
 	}
-	if (body.lastShares !== undefined && !Array.isArray(body.lastShares)) {
-		return err(SeamErrorCodes.INPUT_INVALID, 'lastShares must be an array when provided');
-	}
-
-	const shares: Array<{ speakerName: string; content: string }> = [];
-	for (const item of (body.lastShares ?? []).slice(-12)) {
-		if (!isObject(item) || !isNonEmptyString(item.speakerName) || !isNonEmptyString(item.content)) {
-			return err(SeamErrorCodes.INPUT_INVALID, 'Each last share must include speakerName and content');
-		}
-
-		shares.push({
-			speakerName: item.speakerName.trim(),
-			content: item.content.trim()
-		});
-	}
 
 	return ok({
-		topic: body.topic.trim(),
-		lastShares: shares
+		topic: body.topic.trim()
 	});
 }
 
@@ -119,6 +107,15 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 	}
 
 	const input = inputResult.value;
+	const sharesResult = await locals.seams.database.getMeetingShares(meetingId);
+	if (!sharesResult.ok) {
+		return json(sharesResult, { status: toStatus(sharesResult.error.code) });
+	}
+	const persistedLastShares = sharesResult.value.slice(-12).map((share) => ({
+		speakerName: speakerNameForShare(share.characterId),
+		content: share.content
+	}));
+
 	const result = await closeMeeting(
 		{
 			database: locals.seams.database,
@@ -127,7 +124,7 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 		{
 			meetingId,
 			topic: input.topic,
-			lastShares: input.lastShares
+			lastShares: persistedLastShares
 		}
 	);
 
@@ -138,7 +135,7 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 	const characterMemorySummaries = await buildCharacterMemorySummaries({
 		meetingId,
 		topic: input.topic,
-		lastShares: input.lastShares,
+		lastShares: persistedLastShares,
 		grokAi: locals.seams.grokAi
 	});
 	const completeMeetingResult = await locals.seams.database.completeMeeting({
@@ -153,55 +150,50 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 	let callbackScan: { detected: number; saved: number; skipped: number; failed: number } | null = null;
 	let callbackScanError: string | null = null;
 
-	const sharesResult = await locals.seams.database.getMeetingShares(meetingId);
-	if (sharesResult.ok) {
-		const scanResult = await scanForCallbacks({
-			meetingId,
-			shares: sharesResult.value.map((share) => ({
-				id: share.id,
-				meetingId: share.meetingId,
-				characterId: share.characterId,
-				content: share.content,
-				interactionType: 'standard'
-			})),
-			grokAi: locals.seams.grokAi,
-			database: {
-				createCallback: async (candidate) => {
-					const created = await locals.seams.database.createCallback(candidate);
-					if (!created.ok) {
-						return err(created.error.code, created.error.message, created.error.details);
-					}
-					return ok({ id: created.value.id });
+	const scanResult = await scanForCallbacks({
+		meetingId,
+		shares: sharesResult.value.map((share) => ({
+			id: share.id,
+			meetingId: share.meetingId,
+			characterId: share.characterId,
+			content: share.content,
+			interactionType: 'standard'
+		})),
+		grokAi: locals.seams.grokAi,
+		database: {
+			createCallback: async (candidate) => {
+				const created = await locals.seams.database.createCallback(candidate);
+				if (!created.ok) {
+					return err(created.error.code, created.error.message, created.error.details);
 				}
+				return ok({ id: created.value.id });
 			}
-		});
+		}
+	});
 
-		if (scanResult.ok) {
-			callbackScan = scanResult.value;
-			const userId = locals.userId ?? process.env.PROBE_USER_ID?.trim() ?? null;
-			if (userId) {
-				const presentCharacterIds = Array.from(
-					new Set(
-						sharesResult.value
-							.map((share) => share.characterId)
-							.filter((characterId): characterId is string => characterId !== null)
-					)
-				);
-				const lifecycleResult = await runCallbackLifecycleWorkflow({
-					meetingId,
-					userId,
-					presentCharacterIds,
-					database: locals.seams.database
-				});
-				if (!lifecycleResult.ok) {
-					callbackScanError = lifecycleResult.error.message;
-				}
+	if (scanResult.ok) {
+		callbackScan = scanResult.value;
+		const userId = locals.userId ?? process.env.PROBE_USER_ID?.trim() ?? null;
+		if (userId) {
+			const presentCharacterIds = Array.from(
+				new Set(
+					sharesResult.value
+						.map((share) => share.characterId)
+						.filter((characterId): characterId is string => characterId !== null)
+				)
+			);
+			const lifecycleResult = await runCallbackLifecycleWorkflow({
+				meetingId,
+				userId,
+				presentCharacterIds,
+				database: locals.seams.database
+			});
+			if (!lifecycleResult.ok) {
+				callbackScanError = lifecycleResult.error.message;
 			}
-		} else {
-			callbackScanError = scanResult.error.message;
 		}
 	} else {
-		callbackScanError = sharesResult.error.message;
+		callbackScanError = scanResult.error.message;
 	}
 
 	return json(

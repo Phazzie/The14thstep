@@ -1,7 +1,7 @@
 # Context Compact Handoff (Copy/Paste)
 
-Branch: `codex/recoverymeeting-isolated-2026-02-16`
-Last pushed commit: `db74596`
+Branch: `codex/recoverymeeting-isolated-2026-02-16`  
+Last pushed commit: `0621a8e`  
 Repo: `/mnt/c/Users/latro/Downloads/t/recoverymeeting-codex`
 
 ## Immediate resume commands
@@ -11,37 +11,41 @@ cd /mnt/c/Users/latro/Downloads/t/recoverymeeting-codex
 export PATH="/home/latro/.nvm/versions/node/v24.13.0/bin:$PATH"
 cd app
 npm run check
-npm run verify:contracts
-npm run verify:core
+npm run test:unit -- --run
+npm run verify
 ```
 
-## Current milestone reality
+## Current project reality
 
-- Complete: 0, 1, 2, 3, 4
-- Functional/mostly complete: 5, 6
-- Partial: 7, 8
-- Not complete: 9, 10
+- Milestones 0 through 10 are complete in this branch.
+- Production URL is live: `https://the14thstep.vercel.app`.
+- Milestone 10 production proof is captured in `plans/m10-production-evidence-2026-02-20.md`.
+- Remaining work is quality hardening, observability, and optional follow-up automation.
 
-## Top 3 priorities next
+## Critical operational truths
 
-1. Finish Milestone 7 lifecycle/evolution logic and integration tests.
-2. Finish Milestone 8 crisis UX/state policy and safety test coverage.
-3. Complete Milestone 9 verify pipeline (fixture freshness + composition + e2e + CI hardening).
+1. Character identity bridge:
+   - Domain code uses slugs (for example `marcus`), DB uses UUIDs.
+   - If `public.characters` is empty, persistence can fail with UUID parse errors (`22P02`).
+2. Bootstrap identity coherence:
+   - `auth.users.id` must have matching `public.users.id` rows for meeting creation FK integrity.
+3. Production parity checks:
+   - Keep `XAI_API_KEY`, `SUPABASE_URL`, and `SUPABASE_SERVICE_ROLE_KEY` aligned across local and Vercel.
+4. Crisis safety contract:
+   - Crisis mode must return Marcus then Heather and block normal share generation.
 
-## Key files to read first
+## Where persistent logs live
 
-- `plans/spec-augmentation-2026-02-16.md`
+- `CHANGELOG.md`
+- `LESSONS_LEARNED.md`
+- `decision-log.md`
 - `plans/milestone-status.md`
-- `plans/turnover-handoff-2026-02-16.md`
-- `app/src/routes/meeting/[id]/share/+server.ts`
-- `app/src/routes/meeting/[id]/close/+server.ts`
-- `app/src/routes/meeting/[id]/crisis/+server.ts`
+- `plans/m10-production-evidence-2026-02-20.md`
+- `plans/post-m10-quality-audit-2026-02-20.md`
+- `plans/the-14th-step-execplan.md`
 
-## Known TODO anchors
+## Optional next priorities
 
-- `TODO(M7)` in `app/src/routes/meeting/[id]/share/+server.ts`
-- `TODO(M7)` in `app/src/routes/meeting/[id]/close/+server.ts`
-- `TODO(M8)` in `app/src/routes/meeting/[id]/crisis/+server.ts`
-- `TODO(M8)` in `app/src/routes/meeting/[id]/+page.svelte`
-- `TODO(M9)` in `app/scripts/verify-fixtures.mjs`
-- `TODO(M9)` in `app/scripts/verify-composition.mjs`
+1. Add automated nightly production smoke checks (auth, SSE share, crisis route, callback lifecycle probe).
+2. Add lightweight production observability dashboard for crisis and callback lifecycle events.
+3. Expand composition/e2e failure-mode scenarios (rate limits, upstream retries, degraded DB reads).

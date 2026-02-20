@@ -2,6 +2,19 @@
 
 This file captures practical lessons we want future work to reuse.
 
+## 2026-02-20
+
+### Process
+- Milestone closure quality improved once we required a single evidence file per milestone (`plans/m10-production-evidence-2026-02-20.md`) instead of scattered log snippets.
+- Context compaction is safer when compact handoff docs are maintained continuously, not only at session end.
+
+### Technical
+- Auth smoke should always include an auth-bound persistence assertion (for example, meeting row `user_id` equals the signed-in smoke user), otherwise fallback IDs can hide defects.
+- Crisis-mode verification needs both positive-path checks (Marcus then Heather sequence) and negative-path checks (normal share blocked with `409`) to catch partial regressions.
+- Character identity bridge stability depends on seeded `public.characters`; empty tables can manifest as UUID parse errors far away from the real root cause.
+- Close/share endpoints should treat client transcript context as untrusted and rebuild prompt/summary context from persisted DB shares to avoid prompt poisoning.
+- E2E reliability in this workspace improved by raising Playwright `webServer` timeout; otherwise healthy builds can fail before tests start.
+
 ## 2026-02-19
 
 ### Process

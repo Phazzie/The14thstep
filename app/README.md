@@ -18,6 +18,61 @@ npm run test:unit -- --run
 npm run test:e2e
 ```
 
+## Verification Pipeline
+
+- Full verification command:
+
+```bash
+npm run verify
+```
+
+- Verify lanes run in order:
+  - `lint:verify`
+  - `check`
+  - `verify:fixtures`
+  - `verify:contracts`
+  - `verify:core`
+  - `verify:composition`
+  - `test:e2e`
+
+- If `lint:verify` is slow/hangs in this mixed Windows/WSL environment, run the remaining lanes directly so regression checks still execute:
+
+```bash
+npm run check
+npm run test:unit -- --run
+npm run verify:fixtures
+npm run verify:contracts
+npm run verify:core
+npm run verify:composition
+npm run test:e2e
+```
+
+## Production Ops Runbook
+
+### Rollback
+
+1. Open Vercel project `the14thstep`.
+2. Locate the previously healthy production deployment.
+3. Promote/alias that deployment back to `https://the14thstep.vercel.app`.
+4. Re-run quick smoke checks:
+   - `GET /` responds `200`
+   - setup/join action returns redirect
+   - SSE share route emits chunk events.
+
+### Break-glass checks
+
+1. Env parity:
+   - Verify `XAI_API_KEY`, `SUPABASE_URL`, and `SUPABASE_SERVICE_ROLE_KEY` are set in Vercel production.
+   - If behavior drifts between local and production, compare secret fingerprints (never print raw keys in logs).
+2. Bootstrap data coherence:
+   - `auth.users.id` and `public.users.id` must both exist for test/probe users.
+   - Missing `public.users` profile row will surface as `meetings.user_id` FK failures during join.
+3. Character identity readiness:
+   - Ensure `public.characters` includes the 6 core characters (`Marcus`, `Heather`, `Meechie`, `Gemini`, `Gypsy`, `Chrystal`).
+   - Missing core character rows can break slug-to-UUID mapping at persistence time.
+4. Crisis safety path:
+   - Verify crisis trigger still yields Marcus then Heather and blocks normal share generation while crisis mode is active.
+
 ## Milestone 0 Probes
 
 Create `.env.local` from `.env.example` and populate required credentials for external probes.

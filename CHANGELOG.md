@@ -2,6 +2,42 @@
 
 All notable changes to this repository are documented in this file.
 
+## [2026-02-20]
+
+### Added
+- Milestone 10 production evidence dossier:
+  - `plans/m10-production-evidence-2026-02-20.md`
+- Updated compact handoff artifacts for context-safe resume:
+  - `plans/context-compact-handoff.md`
+  - `HANDOFF_TO_OTHER_CODEX.md`
+
+### Changed
+- `plans/milestone-status.md` updated to a 2026-02-20 snapshot with Milestone 10 marked complete.
+- `plans/m7-m9-m10-m8-execution-checklist.md` synchronized to final Milestone 10 completion state.
+- `plans/the-14th-step-execplan.md` updated so Progress/Outcomes and revision notes reflect full Milestone 10 completion evidence.
+- `app/README.md` now includes a production rollback and break-glass runbook section.
+- `app/src/routes/meeting/[id]/share/+server.ts` now derives crisis state and recent-share prompt context from persisted meeting shares only (single DB read per request), and no longer trusts client-provided `recentShares`.
+- `app/src/routes/meeting/[id]/close/+server.ts` now derives summary/memory transcript inputs from persisted meeting shares instead of client-submitted `lastShares`.
+- `app/src/lib/server/seams/database/adapter.ts` now scopes `getActiveCallbacks` to the current meeting via `origin_share_id -> shares.meeting_id` and refreshes character-id maps before failing unknown core ids.
+- `app/src/routes/meeting/[id]/+page.svelte` now treats crisis 409 share-stream errors as a state transition into crisis mode instead of repeated transient errors.
+- `app/playwright.config.ts` now sets `webServer.timeout` to `180000` to reduce false e2e startup timeouts in slower workspaces.
+- Governance logs synchronized with production closeout learnings:
+  - `decision-log.md`
+  - `LESSONS_LEARNED.md`
+- Added targeted post-milestone audit record:
+  - `plans/post-m10-quality-audit-2026-02-20.md`
+
+### Verified
+- Production deployment remains healthy at `https://the14thstep.vercel.app`.
+- Auth/session smoke verified with sign-in and sign-out action redirects and rendered signed-in/signed-out UI markers.
+- Auth-bound join persistence verified by matching `meetings.user_id` to a distinct signed-in smoke user id.
+- Crisis mode verified in production:
+  - trigger detected and persisted (`significanceScore: 10`),
+  - Marcus then Heather response order confirmed,
+  - normal share generation blocked during crisis (`409`).
+- Callback lifecycle persistence verified in production (`times_referenced` increment + `last_referenced_at` update).
+- Schema readiness checks verified for `characters`, `users`, `meetings`, `shares`, and `callbacks`.
+
 ## [2026-02-19]
 
 ### Added

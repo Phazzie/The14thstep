@@ -53,8 +53,10 @@ Optional but useful for Supabase CLI operations:
 - [x] (2026-02-16 12:02Z) Closed remaining Milestone 6 scope by enforcing exact memory retrieval rules in `memory-builder` (`>=7`, `>=6` user shares, plus last 3 meetings), adding continuity notes from user profile context, updating prompt-template section contract (`YOUR HISTORY`, `CONTINUITY NOTES`, `CALLBACK OPPORTUNITIES THIS MEETING`), and adding second-meeting continuity verification test (`milestone6-continuity.spec.ts`).
 - [x] (2026-02-19 13:05Z) Completed Milestone 7 lifecycle implementation and Milestone 8 crisis enforcement updates by adding callback lifecycle core/workflow modules, expanding database seam methods (`updateCallback`, `getMeetingCountAfterDate`), wiring lifecycle in `share/+server.ts` and `close/+server.ts`, adding crisis engine + setup/load crisis detection, and validating with `npm run check` plus `npm run test:unit -- --run` (104 tests passing).
 - [x] (2026-02-19 14:14Z) Completed Milestone 9 by replacing verify scaffolds with real fixture freshness enforcement, adding composition tests under `app/tests/composition/`, adding Playwright browser flow tests under `app/tests/e2e/`, updating `npm run verify` to run all required gates, and expanding CI workflow to run full verify + artifact upload on failure.
-- [ ] (2026-02-19 14:16Z) Attempted Milestone 10 deployment execution; blocked by missing `VERCEL_TOKEN`/`VERCEL_ORG_ID`/`VERCEL_PROJECT_ID` plus shell runtime drift (`node` unavailable, Windows `npx` using unsupported Node 25 for Vercel CLI).
+- [x] (2026-02-19 14:16Z) Attempted Milestone 10 deployment execution and captured blocker evidence: missing `VERCEL_TOKEN`/`VERCEL_ORG_ID`/`VERCEL_PROJECT_ID` plus shell runtime drift (`node` unavailable, Windows `npx` using unsupported Node 25 for Vercel CLI).
 - [x] (2026-02-19 19:42Z) Resumed Milestone 10 with working credentials and completed production deploy/repair cycle: deployed preview + production, aliased `https://the14thstep.vercel.app`, fixed setup FK failure by restoring missing `public.users` probe profile row, corrected mismatched production `XAI_API_KEY`, redeployed, and validated setup + SSE share + close in production smoke checks.
+- [x] (2026-02-20 08:03Z) Completed Milestone 10 production closeout evidence: verified auth/session sign in/out flow, proved auth-bound meeting creation with distinct smoke user, verified crisis route sequence and share blocking (`409`), verified callback lifecycle persistence increment, confirmed production schema readiness checks, and documented ops runbook notes in `app/README.md` plus full evidence in `plans/m10-production-evidence-2026-02-20.md`.
+- [x] (2026-02-20 10:05Z) Ran a post-M10 hardening pass: moved share/close context sources to persisted DB shares (removed trust in client-provided transcript snippets), scoped callback retrieval by meeting id, added character-map refresh retry logic, improved client crisis-mode transition handling on 409, increased Playwright startup timeout reliability, and documented residual risks in `plans/post-m10-quality-audit-2026-02-20.md`.
 - [x] Milestone 0: Repository bootstrap and reality probes complete
 - [x] Milestone 1: Hexagonal skeleton with all seam contracts, mocks, and contract tests green
 - [x] Milestone 2: Domain core (pure meeting workflow logic) tested with zero I/O
@@ -65,7 +67,7 @@ Optional but useful for Supabase CLI operations:
 - [x] Milestone 7: Callback engine with conditional probability matrix producing organic recurring moments
 - [x] Milestone 8: Crisis response system â€” detection, intervention, UI state change, resource display
 - [x] Milestone 9: CI pipeline, composition tests, fixture freshness, governance artifacts
-- [ ] Milestone 10: Production deploy to Vercel â€” public URL serving authenticated meetings (deployed and partially verified; authenticated signup/login and crisis e2e smoke still pending)
+- [x] Milestone 10: Production deploy to Vercel â€” public URL serving authenticated meetings with production auth/crisis/callback/schema smoke evidence captured in `plans/m10-production-evidence-2026-02-20.md`
 
 ## Surprises & Discoveries
 
@@ -198,7 +200,7 @@ Optional but useful for Supabase CLI operations:
 
 ## Outcomes & Retrospective
 
-Milestones 0 through 9 are complete in this branch, including a working full verify pipeline and CI wiring. Milestone 10 is actively in progress: production deployment is live at `https://the14thstep.vercel.app`, setup and meeting creation now succeed, SSE share streaming works again after xAI env correction, and close flow responds successfully in production smoke checks. Remaining Milestone 10 scope is final authenticated user-path verification (signup/login/session), crisis-flow end-to-end production smoke, and documenting final completion evidence/ops runbook updates.
+Milestones 0 through 10 are complete in this branch. Production is live at `https://the14thstep.vercel.app` with evidence-backed validation for auth/session flow, authenticated meeting creation persistence, crisis-mode intervention path, callback lifecycle update persistence, and schema readiness checks. Remaining work is optional hardening (automated recurring production smoke runs, observability dashboards, and deeper failure-path coverage), not milestone-scope completion.
 
 ## Context and Orientation
 
@@ -1067,3 +1069,7 @@ Revision note (2026-02-19, Codex milestone-7/8 complete): Updated Progress, Surp
 Revision note (2026-02-19, Codex milestone-9 complete): Updated Progress, Surprises & Discoveries, Decision Log, and Outcomes & Retrospective to capture Milestone 9 completion evidence (`npm run verify` and expanded composition/e2e/CI lanes), and documented Milestone 10 blockers (missing Vercel credentials plus local runtime/filesystem constraints).
 
 Revision note (2026-02-19, Codex milestone-10 resumed): Updated Progress, Surprises & Discoveries, Decision Log, and Outcomes & Retrospective after live production deploy, Supabase probe-user profile repair, `XAI_API_KEY` parity correction, and successful production smoke evidence for setup redirect, SSE share streaming, and close flow.
+
+Revision note (2026-02-20, Codex milestone-10 complete): Updated Progress and Outcomes to mark Milestone 10 fully complete with production auth/session, crisis-path, callback lifecycle, and schema-readiness evidence (`plans/m10-production-evidence-2026-02-20.md`), and added production rollback/break-glass notes to `app/README.md`.
+
+Revision note (2026-02-20, Codex hardening sweep): Added post-completion hardening updates for share/close trust boundaries, callback meeting scoping, adapter map refresh behavior, crisis-mode client transition handling, Playwright startup timeout stability, and captured remaining risk backlog in `plans/post-m10-quality-audit-2026-02-20.md`.

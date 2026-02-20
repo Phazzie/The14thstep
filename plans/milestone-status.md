@@ -1,4 +1,4 @@
-# Milestone Status Snapshot (2026-02-19)
+# Milestone Status Snapshot (2026-02-20)
 
 This file is a fast resume map for incomplete milestones.
 
@@ -52,19 +52,33 @@ This file is a fast resume map for incomplete milestones.
 
 ## Milestone 10 - Production Deploy (Vercel)
 
-- Completion: 85%
-- Status: In Progress (deployed + core smoke passed)
+- Completion: 100%
+- Status: Complete
 - Completion notes:
-  - Production deployment succeeded via CLI from non-git temp deploy context, then aliased to `https://the14thstep.vercel.app`.
-  - Runtime setup failure on `POST /?/join` was diagnosed to missing `public.users` profile data for `PROBE_USER_ID` (foreign-key violation on `meetings.user_id`).
-  - One-time production data repair applied: inserted/upserted probe profile row in `public.users`.
-  - Share streaming failure was diagnosed to mismatched production `XAI_API_KEY`; env was corrected and production redeployed.
-  - Smoke checks now pass for `/`, `/probes/sse`, setup redirect, SSE share stream, and close endpoint.
+  - Production deployment completed and aliased to `https://the14thstep.vercel.app`.
+  - Auth/session smoke now verified in production:
+    - sign in/out actions return redirect envelopes,
+    - signed-in and signed-out UI states render as expected.
+  - Auth-bound join behavior proven with a distinct smoke user:
+    - created meeting row `user_id` matched authenticated user id (not fallback path).
+  - Crisis-mode production smoke verified:
+    - crisis trigger persisted user share with `significanceScore: 10`,
+    - Marcus then Heather response ordering confirmed,
+    - sticky crisis resources payload confirmed,
+    - normal share generation rejected during crisis mode (`409`).
+  - Callback lifecycle production smoke verified:
+    - callback included in streaming share payload,
+    - callback `times_referenced` incremented to `1`,
+    - `last_referenced_at` updated in production DB.
+  - Schema-readiness checks passed for `characters`, `users`, `meetings`, `shares`, `callbacks`, and probe-user profile coherence.
+  - Post-completion hardening pass applied:
+    - share/close routes now use persisted DB transcript context (not client transcript snippets),
+    - callback retrieval now honors `meetingId` scope,
+    - client crisis mode now transitions on share-route 409 responses.
+  - Remaining risk backlog captured in `plans/post-m10-quality-audit-2026-02-20.md`.
+  - Evidence captured in `plans/m10-production-evidence-2026-02-20.md`.
 
-### Next 10 tasks
+### Optional follow-up tasks
 
-1. Run full authenticated signup/login smoke (not probe-user path) and verify setup redirect uses `locals.userId`.
-2. Run crisis-mode end-to-end smoke in production and record expected Marcus-then-Heather sequence evidence.
-3. Verify callback lifecycle behavior in production across at least two meetings (aging + reference updates).
-4. Record final Milestone 10 completion evidence in this file and ExecPlan once auth + crisis smoke are complete.
-5. Add a small ops runbook entry for required production bootstrap data (`auth.users` + `public.users` coherence).
+1. Add a lightweight automated nightly production smoke runner for auth, crisis, and SSE checks.
+2. Add observability dashboards for callback lifecycle transitions and crisis route usage rates.

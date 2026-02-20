@@ -30,7 +30,6 @@ interface ShareStreamRequest {
 	interactionType?: ShareInteractionType;
 	userName?: string;
 	userMood?: string;
-	recentShares?: Array<{ speaker: string; content: string; isUserShare?: boolean }>;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -127,28 +126,9 @@ function isShareInteractionType(value: unknown): value is ShareInteractionType {
 	return typeof value === 'string' && SHARE_INTERACTION_TYPES.includes(value as ShareInteractionType);
 }
 
-function normalizeRecentShares(
-	value: unknown
-): SeamResult<Array<{ speaker: string; content: string; isUserShare: boolean }>> {
-	if (value === undefined) return ok([]);
-	if (!Array.isArray(value)) {
-		return err(SeamErrorCodes.INPUT_INVALID, 'recentShares must be an array when provided');
-	}
-
-	const shares: Array<{ speaker: string; content: string; isUserShare: boolean }> = [];
-	for (const item of value.slice(-8)) {
-		if (!isObject(item) || !isNonEmptyString(item.speaker) || !isNonEmptyString(item.content)) {
-			return err(SeamErrorCodes.INPUT_INVALID, 'Each recent share must include speaker and content');
-		}
-
-		shares.push({
-			speaker: item.speaker.trim(),
-			content: item.content.trim(),
-			isUserShare: item.isUserShare === true
-		});
-	}
-
-	return ok(shares);
+function normalizePromptScalar(value: string, maxLength = 160): string {
+	const compact = value.replace(/\s+/g, ' ').trim();
+	return compact.slice(0, maxLength);
 }
 
 async function parseBodyRequest(request: Request): Promise<SeamResult<ShareStreamRequest>> {
@@ -186,18 +166,14 @@ async function parseBodyRequest(request: Request): Promise<SeamResult<ShareStrea
 		return err(SeamErrorCodes.INPUT_INVALID, 'userMood must be a non-empty string when provided');
 	}
 
-	const recentSharesResult = normalizeRecentShares(body.recentShares);
-	if (!recentSharesResult.ok) return recentSharesResult;
-
 	return ok({
-		topic: body.topic.trim(),
+		topic: normalizePromptScalar(body.topic),
 		sequenceOrder,
 		characterId: body.characterId?.trim(),
 		crisisMode: body.crisisMode,
 		interactionType: body.interactionType,
-		userName: body.userName?.trim(),
-		userMood: body.userMood?.trim(),
-		recentShares: recentSharesResult.value
+		userName: body.userName ? normalizePromptScalar(body.userName, 80) : undefined,
+		userMood: body.userMood ? normalizePromptScalar(body.userMood, 80) : undefined
 	});
 }
 
@@ -223,14 +199,13 @@ function parseQueryRequest(url: URL): SeamResult<ShareStreamRequest> {
 	}
 
 	return ok({
-		topic,
+		topic: normalizePromptScalar(topic),
 		sequenceOrder,
 		characterId,
 		crisisMode,
 		interactionType: interactionTypeRaw as ShareInteractionType | undefined,
-		userName,
-		userMood,
-		recentShares: undefined
+		userName: userName ? normalizePromptScalar(userName, 80) : undefined,
+		userMood: userMood ? normalizePromptScalar(userMood, 80) : undefined
 	});
 }
 
@@ -298,23 +273,17 @@ async function generateValidatedShare(input: {
 	return err(SeamErrorCodes.CONTRACT_VIOLATION, 'Generated share failed quality validation after retries');
 }
 
-async function resolveRecentShares(
-	meetingId: string,
-	input: ShareStreamRequest,
-	locals: App.Locals
-): Promise<SeamResult<Array<{ speaker: string; content: string; isUserShare: boolean }>>> {
-	if (input.recentShares && input.recentShares.length > 0) {
-		return ok(input.recentShares.map((share) => ({ ...share, isUserShare: share.isUserShare === true })));
-	}
-
-	const sharesResult = await locals.seams.database.getMeetingShares(meetingId);
-	if (!sharesResult.ok) {
-		return err(sharesResult.error.code, sharesResult.error.message, sharesResult.error.details);
-	}
-
-	const recent = sharesResult.value.slice(-8).map((share) => {
+function mapRecentSharesFromMeeting(
+	shares: Array<{
+		characterId: string | null;
+		isUserShare: boolean;
+		content: string;
+	}>,
+	userName: string
+): Array<{ speaker: string; content: string; isUserShare: boolean }> {
+	return shares.slice(-8).map((share) => {
 		const speaker = share.isUserShare
-			? input.userName ?? 'User'
+			? userName
 			: CORE_CHARACTERS.find((character) => character.id === share.characterId)?.name ?? 'Character';
 		return {
 			speaker,
@@ -322,27 +291,6 @@ async function resolveRecentShares(
 			isUserShare: share.isUserShare
 		};
 	});
-
-	return ok(recent);
-}
-
-async function detectPersistedCrisisMode(
-	meetingId: string,
-	locals: App.Locals
-): Promise<SeamResult<boolean>> {
-	const sharesResult = await locals.seams.database.getMeetingShares(meetingId);
-	if (!sharesResult.ok) {
-		return err(sharesResult.error.code, sharesResult.error.message, sharesResult.error.details);
-	}
-
-	return ok(
-		isMeetingInCrisis({
-			shares: sharesResult.value.map((share) => ({
-				content: share.content,
-				significanceScore: share.significanceScore
-			}))
-		})
-	);
 }
 
 function createShareStream(
@@ -617,23 +565,25 @@ async function handleShareRequest(
 	}
 
 	const input = inputResult.value;
-	const persistedCrisisResult = await detectPersistedCrisisMode(meetingId, locals);
-	if (!persistedCrisisResult.ok) {
-		return json(persistedCrisisResult, { status: toStatus(persistedCrisisResult.error.code) });
+	const meetingSharesResult = await locals.seams.database.getMeetingShares(meetingId);
+	if (!meetingSharesResult.ok) {
+		return json(meetingSharesResult, { status: toStatus(meetingSharesResult.error.code) });
 	}
 
-	if (persistedCrisisResult.value || input.crisisMode) {
+	const persistedCrisisMode = isMeetingInCrisis({
+		shares: meetingSharesResult.value.map((share) => ({
+			content: share.content,
+			significanceScore: share.significanceScore
+		}))
+	});
+	if (persistedCrisisMode || input.crisisMode) {
 		return json(err(SeamErrorCodes.INPUT_INVALID, 'Character shares are paused during crisis mode'), {
 			status: 409
 		});
 	}
 
-	const recentSharesResult = await resolveRecentShares(meetingId, input, locals);
-	if (!recentSharesResult.ok) {
-		return json(recentSharesResult, { status: toStatus(recentSharesResult.error.code) });
-	}
-
-	return createShareStream(meetingId, input, recentSharesResult.value, locals);
+	const recentShares = mapRecentSharesFromMeeting(meetingSharesResult.value, input.userName ?? 'User');
+	return createShareStream(meetingId, input, recentShares, locals);
 }
 
 export const POST: RequestHandler = async ({ params, locals, request }) => {
