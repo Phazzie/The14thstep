@@ -1,6 +1,7 @@
 import { SeamErrorCodes, err, ok, type SeamResult } from './seam';
 import type { DatabasePort, MeetingRecord, ShareRecord } from '$lib/seams/database/contract';
 import type { GrokAiPort } from '$lib/seams/grok-ai/contract';
+import { detectCrisisContent as detectCrisisContentFromEngine } from './crisis-engine';
 
 export type ShareInteractionType =
 	| 'standard'
@@ -40,15 +41,6 @@ export interface MeetingWorkflowDeps {
 	grokAi: GrokAiPort;
 }
 
-const CRISIS_KEYWORDS = [
-	'want to die',
-	'kill myself',
-	'end it',
-	'overdose',
-	'harm myself',
-	'cannot go on'
-] as const;
-
 const HEAVY_DISCLOSURE_KEYWORDS = [
 	'custody',
 	'prison',
@@ -80,7 +72,7 @@ function includesAny(text: string, phrases: readonly string[]): boolean {
 }
 
 export function detectCrisisContent(content: string): boolean {
-	return includesAny(normalize(content), CRISIS_KEYWORDS);
+	return detectCrisisContentFromEngine(content);
 }
 
 export function detectHeavyDisclosureContent(content: string): boolean {

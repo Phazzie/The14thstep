@@ -1,9 +1,12 @@
 import { CORE_CHARACTERS } from '$lib/core/characters';
 import { shouldIncludeCallback } from '$lib/core/callback-engine';
+import { applyReferenceLifecycle } from '$lib/core/callback-lifecycle';
+import { isMeetingInCrisis } from '$lib/core/crisis-engine';
 import { buildPromptContext } from '$lib/core/memory-builder';
 import { addShare, scoreSignificance, type ShareInteractionType } from '$lib/core/meeting';
 import { buildCharacterSharePrompt, buildQualityValidationPrompt } from '$lib/core/prompt-templates';
 import { SeamErrorCodes, err, ok, type SeamErrorCode, type SeamResult } from '$lib/core/seam';
+import type { CallbackScope, CallbackStatus, CallbackType } from '$lib/seams/database/contract';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
@@ -323,6 +326,25 @@ async function resolveRecentShares(
 	return ok(recent);
 }
 
+async function detectPersistedCrisisMode(
+	meetingId: string,
+	locals: App.Locals
+): Promise<SeamResult<boolean>> {
+	const sharesResult = await locals.seams.database.getMeetingShares(meetingId);
+	if (!sharesResult.ok) {
+		return err(sharesResult.error.code, sharesResult.error.message, sharesResult.error.details);
+	}
+
+	return ok(
+		isMeetingInCrisis({
+			shares: sharesResult.value.map((share) => ({
+				content: share.content,
+				significanceScore: share.significanceScore
+			}))
+		})
+	);
+}
+
 function createShareStream(
 	meetingId: string,
 	input: ShareStreamRequest,
@@ -338,14 +360,20 @@ function createShareStream(
 		start(controller) {
 			void (async () => {
 				const memoryUserId = locals.userId ?? process.env.PROBE_USER_ID?.trim() ?? null;
-	let heavyMemoryLines: string[] | undefined;
-	let continuityLines: string[] | undefined;
-	let selectedCallbacks: Array<{
+				let heavyMemoryLines: string[] | undefined;
+				let continuityLines: string[] | undefined;
+				let selectedCallbacks: Array<{
 					id: string;
-					callbackType: string;
-					scope: string;
+					originShareId: string;
+					characterId: string;
+					callbackType: CallbackType;
+					scope: CallbackScope;
 					potentialScore: number;
 					originalText: string;
+					timesReferenced: number;
+					lastReferencedAt: string | null;
+					status: CallbackStatus;
+					parentCallbackId: string | null;
 				}> = [];
 
 				if (memoryUserId) {
@@ -355,10 +383,10 @@ function createShareStream(
 						meetingId,
 						database: locals.seams.database
 					});
-		if (memoryResult.ok) {
-			heavyMemoryLines = memoryResult.value.heavyMemoryLines.slice(0, 6);
-			continuityLines = memoryResult.value.continuityLines.slice(0, 4);
-			const latestUserShare = [...recentShares].reverse().find((share) => share.isUserShare)?.content;
+					if (memoryResult.ok) {
+						heavyMemoryLines = memoryResult.value.heavyMemoryLines.slice(0, 6);
+						continuityLines = memoryResult.value.continuityLines.slice(0, 4);
+						const latestUserShare = [...recentShares].reverse().find((share) => share.isUserShare)?.content;
 						const originatedCallbacksCount = memoryResult.value.callbacks.filter(
 							(callback) => callback.characterId === selectedCharacter.id
 						).length;
@@ -373,16 +401,21 @@ function createShareStream(
 									latestUserShareText: latestUserShare,
 									meetingsSinceLastReferenced: estimateMeetingsSinceLastReferenced(callback.lastReferencedAt)
 								});
-								// TODO(M7): incorporate lifecycle state transitions (stale/retired/legend) after sequential meeting updates.
 								return decision.include;
 							})
 							.slice(0, 3)
 							.map((callback) => ({
 								id: callback.id,
+								originShareId: callback.originShareId,
+								characterId: callback.characterId,
 								callbackType: callback.callbackType,
 								scope: callback.scope,
 								potentialScore: callback.potentialScore,
-								originalText: callback.originalText
+								originalText: callback.originalText,
+								timesReferenced: callback.timesReferenced,
+								lastReferencedAt: callback.lastReferencedAt,
+								status: callback.status,
+								parentCallbackId: callback.parentCallbackId
 							}));
 					}
 				}
@@ -483,9 +516,47 @@ function createShareStream(
 					return;
 				}
 
+				const callbackLifecycleWarnings: string[] = [];
 				for (const callback of selectedCallbacks) {
-					// TODO(M7): evolve callbacks (parent/child linkage) when generated share meaningfully mutates callback content.
-					await locals.seams.database.markCallbackReferenced(callback.id);
+					const lifecycle = applyReferenceLifecycle({
+						callback,
+						referencingCharacterId: selectedCharacter.id,
+						generatedShareText: fullText,
+						significanceScore
+					});
+
+					const updateResult = await locals.seams.database.updateCallback({
+						id: callback.id,
+						updates: {
+							timesReferenced: lifecycle.timesReferenced,
+							lastReferencedAt: lifecycle.lastReferencedAt,
+							status: lifecycle.status,
+							scope: lifecycle.scope
+						}
+					});
+					if (!updateResult.ok) {
+						callbackLifecycleWarnings.push(
+							`updateCallback(${callback.id}) failed: ${updateResult.error.message}`
+						);
+						continue;
+					}
+
+					if (lifecycle.evolutionCandidate) {
+						const createResult = await locals.seams.database.createCallback({
+							originShareId: saved.value.id,
+							characterId: lifecycle.evolutionCandidate.characterId,
+							originalText: lifecycle.evolutionCandidate.originalText,
+							callbackType: lifecycle.evolutionCandidate.callbackType,
+							scope: lifecycle.evolutionCandidate.scope,
+							potentialScore: lifecycle.evolutionCandidate.potentialScore,
+							parentCallbackId: lifecycle.evolutionCandidate.parentCallbackId
+						});
+						if (!createResult.ok) {
+							callbackLifecycleWarnings.push(
+								`createCallback(child of ${callback.id}) failed: ${createResult.error.message}`
+							);
+						}
+					}
 				}
 
 				controller.enqueue(
@@ -494,13 +565,14 @@ function createShareStream(
 						value: {
 							share: saved.value,
 							callbacksUsed: selectedCallbacks,
-							character: {
-								id: selectedCharacter.id,
-								name: selectedCharacter.name,
-								color: selectedCharacter.color
+								character: {
+									id: selectedCharacter.id,
+									name: selectedCharacter.name,
+									color: selectedCharacter.color
+								},
+								callbackLifecycleWarnings
 							}
-						}
-					})
+						})
 				);
 				controller.enqueue(
 					sseChunk('done', {
@@ -545,7 +617,12 @@ async function handleShareRequest(
 	}
 
 	const input = inputResult.value;
-	if (input.crisisMode) {
+	const persistedCrisisResult = await detectPersistedCrisisMode(meetingId, locals);
+	if (!persistedCrisisResult.ok) {
+		return json(persistedCrisisResult, { status: toStatus(persistedCrisisResult.error.code) });
+	}
+
+	if (persistedCrisisResult.value || input.crisisMode) {
 		return json(err(SeamErrorCodes.INPUT_INVALID, 'Character shares are paused during crisis mode'), {
 			status: 409
 		});

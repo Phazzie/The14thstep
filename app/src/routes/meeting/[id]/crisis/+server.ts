@@ -11,6 +11,12 @@ interface CrisisRequest {
 	sequenceOrder: number;
 }
 
+interface CrisisResourcesPayload {
+	sticky: true;
+	title: string;
+	lines: string[];
+}
+
 function isObject(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null;
 }
@@ -38,6 +44,12 @@ function toStatus(code: SeamErrorCode): number {
 		default:
 			return 500;
 	}
+}
+
+function wait(ms: number): Promise<void> {
+	return new Promise((resolve) => {
+		setTimeout(resolve, ms);
+	});
 }
 
 async function parseRequest(request: Request): Promise<SeamResult<CrisisRequest>> {
@@ -80,12 +92,13 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 	}
 
 	const input = inputResult.value;
-	// TODO(M8): enforce timed crisis sequence policy (quiet pause + deterministic ordering) via persisted meeting state.
 	const marcus = CORE_CHARACTERS.find((character) => character.id === 'marcus');
 	const heather = CORE_CHARACTERS.find((character) => character.id === 'heather');
 	if (!marcus || !heather) {
 		return json(err(SeamErrorCodes.NOT_FOUND, 'Required crisis characters are unavailable'), { status: 404 });
 	}
+
+	await wait(2000);
 
 	const marcusGeneration = await locals.seams.grokAi.generateShare({
 		meetingId,
@@ -145,12 +158,15 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 	return json(
 		ok({
 			shares: [marcusShare.value, heatherShare.value],
-			// TODO(M8): move resource rendering to a sticky/persistent panel contract instead of raw string array payload.
-			resources: [
-				'988 - Suicide & Crisis Lifeline',
-				'1-800-662-4357 - SAMHSA National Helpline',
-				'You can stay here with us.'
-			]
+			resources: {
+				sticky: true,
+				title: "If you're in crisis",
+				lines: [
+					'988 - Suicide & Crisis Lifeline',
+					'1-800-662-4357 - SAMHSA National Helpline',
+					'You can stay here with us.'
+				]
+			} satisfies CrisisResourcesPayload
 		}),
 		{ status: 200 }
 	);

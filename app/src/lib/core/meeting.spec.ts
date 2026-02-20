@@ -10,12 +10,17 @@ import {
 	scoreSignificance,
 	type MeetingWorkflowDeps
 } from './meeting';
-import type { DatabasePort, MeetingRecord, ShareRecord, UserProfile } from '$lib/seams/database/contract';
+import type {
+	DatabasePort,
+	MeetingRecord,
+	ShareRecord,
+	UserProfile
+} from '$lib/seams/database/contract';
 import type { GrokAiPort } from '$lib/seams/grok-ai/contract';
 
 function createDeps(overrides: Partial<MeetingWorkflowDeps> = {}): MeetingWorkflowDeps {
 	const database: DatabasePort = {
-		getUserById: async (_userId: string) =>
+		getUserById: async () =>
 			ok<UserProfile>({
 				id: 'user-1',
 				displayName: 'trap',
@@ -45,8 +50,8 @@ function createDeps(overrides: Partial<MeetingWorkflowDeps> = {}): MeetingWorkfl
 				sequenceOrder: input.sequenceOrder,
 				createdAt: '2026-02-16T00:01:00.000Z'
 			}),
-		getHeavyMemory: async (_userId: string) => ok<ShareRecord[]>([]),
-		getShareById: async (_shareId: string) =>
+		getHeavyMemory: async () => ok<ShareRecord[]>([]),
+		getShareById: async () =>
 			ok<ShareRecord>({
 				id: 'share-lookup',
 				meetingId: 'meeting-1',
@@ -57,8 +62,8 @@ function createDeps(overrides: Partial<MeetingWorkflowDeps> = {}): MeetingWorkfl
 				sequenceOrder: 1,
 				createdAt: '2026-02-16T00:01:00.000Z'
 			}),
-		getMeetingShares: async (_meetingId: string) => ok<ShareRecord[]>([]),
-		createCallback: async (_input) =>
+		getMeetingShares: async () => ok<ShareRecord[]>([]),
+		createCallback: async () =>
 			ok({
 				id: 'callback-1',
 				originShareId: 'share-1',
@@ -72,8 +77,8 @@ function createDeps(overrides: Partial<MeetingWorkflowDeps> = {}): MeetingWorkfl
 				status: 'active' as const,
 				parentCallbackId: null
 			}),
-		getActiveCallbacks: async (_input) => ok([]),
-		markCallbackReferenced: async (_callbackId) =>
+		getActiveCallbacks: async () => ok([]),
+		markCallbackReferenced: async () =>
 			ok({
 				id: 'callback-1',
 				originShareId: 'share-1',
@@ -87,7 +92,7 @@ function createDeps(overrides: Partial<MeetingWorkflowDeps> = {}): MeetingWorkfl
 				status: 'active' as const,
 				parentCallbackId: null
 			}),
-		completeMeeting: async (_input) =>
+		completeMeeting: async () =>
 			ok<MeetingRecord>({
 				id: 'meeting-1',
 				userId: 'user-1',
@@ -96,7 +101,22 @@ function createDeps(overrides: Partial<MeetingWorkflowDeps> = {}): MeetingWorkfl
 				listeningOnly: false,
 				startedAt: '2026-02-16T00:00:00.000Z',
 				endedAt: '2026-02-16T01:00:00.000Z'
-			})
+			}),
+		updateCallback: async () =>
+			ok({
+				id: 'callback-1',
+				originShareId: 'share-1',
+				characterId: 'marcus',
+				originalText: 'Now I stay.',
+				callbackType: 'self_deprecation' as const,
+				scope: 'character' as const,
+				potentialScore: 7,
+				timesReferenced: 1,
+				lastReferencedAt: '2026-02-16T00:01:00.000Z',
+				status: 'active' as const,
+				parentCallbackId: null
+			}),
+		getMeetingCountAfterDate: async () => ok(0)
 	};
 
 	const grokAi: GrokAiPort = {

@@ -47,7 +47,11 @@
 
 	interface CrisisResponseValue {
 		shares: ShareRecord[];
-		resources: string[];
+		resources: {
+			sticky: boolean;
+			title: string;
+			lines: string[];
+		};
 	}
 
 	type MeetingPhase = 'sharing' | 'closing' | 'reflection';
@@ -56,6 +60,10 @@
 	const defaultTopic = $derived(data.defaultTopic);
 	const initialUserName = $derived(data.initialUserName);
 	const initialMood = $derived(data.initialMood);
+	const initialCrisisMode = $derived(data.initialCrisisMode === true);
+	const shouldTriggerInitialCrisisSupport = $derived(
+		data.shouldTriggerInitialCrisisSupport === true
+	);
 	let topic = $state('');
 	let userName = $state('');
 	let userMood = $state('present');
@@ -68,12 +76,21 @@
 	let statusLine = $state('');
 	let errorMessage = $state('');
 	let crisisMode = $state(false);
+	let crisisResources = $state({
+		title: "If you're in crisis",
+		lines: [
+			'988 - Suicide & Crisis Lifeline',
+			'1-800-662-4357 - SAMHSA National Helpline',
+			'You can stay here with us.'
+		]
+	});
 	let heavyMode = $state(false);
 	let sharing = $state(false);
 	let postingShare = $state(false);
 	let closing = $state(false);
 	let expandingShareId = $state<string | null>(null);
 	let crisisResponding = $state(false);
+	let setupCrisisSupportRequested = $state(false);
 	let activeCharacterId = $state<string | null>(null);
 	let meetingPhase = $state<MeetingPhase>('sharing');
 	let transcriptContainer: HTMLDivElement | null = null;
@@ -86,10 +103,19 @@
 	});
 
 	$effect(() => {
-		transcript.length;
+		if (!initialCrisisMode) return;
+		if (!crisisMode) crisisMode = true;
+		if (!shouldTriggerInitialCrisisSupport || setupCrisisSupportRequested) return;
+		setupCrisisSupportRequested = true;
+		void requestCrisisSupport(topic || defaultTopic);
+	});
+
+	$effect(() => {
+		const transcriptCount = transcript.length;
 		if (transcriptContainer) {
 			transcriptContainer.scrollTop = transcriptContainer.scrollHeight;
 		}
+		void transcriptCount;
 	});
 
 	function isRecord(value: unknown): value is Record<string, unknown> {
@@ -99,7 +125,11 @@
 	function parseSeamResult<T>(value: unknown): SeamResult<T> | null {
 		if (!isRecord(value) || typeof value.ok !== 'boolean') return null;
 		if (value.ok) return { ok: true, value: value.value as T };
-		if (!isRecord(value.error) || typeof value.error.message !== 'string' || typeof value.error.code !== 'string') {
+		if (
+			!isRecord(value.error) ||
+			typeof value.error.message !== 'string' ||
+			typeof value.error.code !== 'string'
+		) {
 			return null;
 		}
 		return {
@@ -128,7 +158,9 @@
 			copy[existingIndex] = entry;
 			transcript = copy.sort((left, right) => left.sequenceOrder - right.sequenceOrder);
 		} else {
-			transcript = [...transcript, entry].sort((left, right) => left.sequenceOrder - right.sequenceOrder);
+			transcript = [...transcript, entry].sort(
+				(left, right) => left.sequenceOrder - right.sequenceOrder
+			);
 		}
 
 		if (!entry.isUserShare && entry.characterId) activeCharacterId = entry.characterId;
@@ -253,14 +285,20 @@
 		const eventSource = new EventSource(`/meeting/${data.meetingId}/share?${search.toString()}`);
 
 		eventSource.addEventListener('chunk', (event) => {
-			const parsed = parseSeamResult<{ chunk?: string }>(JSON.parse((event as MessageEvent<string>).data));
+			const parsed = parseSeamResult<{ chunk?: string }>(
+				JSON.parse((event as MessageEvent<string>).data)
+			);
 			if (parsed?.ok && typeof parsed.value.chunk === 'string') {
-				streamingDraft = streamingDraft ? `${streamingDraft} ${parsed.value.chunk}` : parsed.value.chunk;
+				streamingDraft = streamingDraft
+					? `${streamingDraft} ${parsed.value.chunk}`
+					: parsed.value.chunk;
 			}
 		});
 
 		eventSource.addEventListener('persisted', (event) => {
-			const parsed = parseSeamResult<{ share?: ShareRecord }>(JSON.parse((event as MessageEvent<string>).data));
+			const parsed = parseSeamResult<{ share?: ShareRecord }>(
+				JSON.parse((event as MessageEvent<string>).data)
+			);
 			if (parsed?.ok && isRecord(parsed.value.share)) {
 				upsertShare(parsed.value.share as ShareRecord);
 				statusLine = 'Character share generated and saved.';
@@ -317,6 +355,12 @@
 			for (const share of payload.value.shares) {
 				upsertShare(share);
 			}
+			if (payload.value.resources?.sticky) {
+				crisisResources = {
+					title: payload.value.resources.title,
+					lines: payload.value.resources.lines
+				};
+			}
 			statusLine = 'Crisis support responses added. You are not alone.';
 		} catch (cause) {
 			errorMessage = cause instanceof Error ? cause.message : String(cause);
@@ -371,11 +415,13 @@
 </script>
 
 <main class="mx-auto grid max-w-6xl gap-4 p-4 lg:grid-cols-[2fr_1fr]">
-	<section class="space-y-4 rounded-xl border border-gray-700 bg-gray-900 p-4">
+	<section class="sticky top-4 space-y-4 rounded-xl border border-gray-700 bg-gray-900 p-4">
 		<header class="space-y-2">
 			<h1 class="text-2xl font-bold text-amber-200">Meeting Room</h1>
 			<p class="text-sm text-gray-300">Meeting ID: <code>{data.meetingId}</code></p>
-			<p class="text-sm text-gray-300">{userName} · {data.initialCleanTime ?? 'clean time not set'}</p>
+			<p class="text-sm text-gray-300">
+				{userName} · {data.initialCleanTime ?? 'clean time not set'}
+			</p>
 		</header>
 
 		<MeetingCircle characters={data.characters} {activeCharacterId} {crisisMode} />
@@ -383,15 +429,24 @@
 		<section class="grid gap-2 sm:grid-cols-3">
 			<label class="text-sm text-gray-200">
 				Topic
-				<input class="mt-1 w-full rounded-md border border-gray-700 bg-gray-800 p-2" bind:value={topic} />
+				<input
+					class="mt-1 w-full rounded-md border border-gray-700 bg-gray-800 p-2"
+					bind:value={topic}
+				/>
 			</label>
 			<label class="text-sm text-gray-200">
 				Your Name
-				<input class="mt-1 w-full rounded-md border border-gray-700 bg-gray-800 p-2" bind:value={userName} />
+				<input
+					class="mt-1 w-full rounded-md border border-gray-700 bg-gray-800 p-2"
+					bind:value={userName}
+				/>
 			</label>
 			<label class="text-sm text-gray-200">
 				Mood
-				<input class="mt-1 w-full rounded-md border border-gray-700 bg-gray-800 p-2" bind:value={userMood} />
+				<input
+					class="mt-1 w-full rounded-md border border-gray-700 bg-gray-800 p-2"
+					bind:value={userMood}
+				/>
 			</label>
 		</section>
 
@@ -428,12 +483,15 @@
 			<SystemMessage message={`Streaming: ${streamingDraft}`} kind="success" />
 		{/if}
 
-		<div bind:this={transcriptContainer} class="max-h-[28rem] space-y-3 overflow-y-auto rounded-xl border border-gray-700 bg-gray-950 p-3">
+		<div
+			bind:this={transcriptContainer}
+			class="max-h-[28rem] space-y-3 overflow-y-auto rounded-xl border border-gray-700 bg-gray-950 p-3"
+		>
 			{#if transcript.length === 0}
 				<SystemMessage message="No shares yet." kind="info" />
 			{:else}
 				<ol class="space-y-3">
-					{#each transcript as entry}
+					{#each transcript as entry (entry.id)}
 						<ShareMessage
 							{entry}
 							expandedText={expandedShares[entry.id]}
@@ -449,10 +507,10 @@
 	<section class="space-y-4 rounded-xl border border-gray-700 bg-gray-900 p-4">
 		{#if crisisMode}
 			<section class="rounded-xl border border-rose-600 bg-rose-950/30 p-4">
-				<h2 class="text-base font-semibold text-rose-200">If you're in crisis</h2>
-				<p class="text-sm text-rose-100">988 - Suicide & Crisis Lifeline</p>
-				<p class="text-sm text-rose-100">1-800-662-4357 - SAMHSA National Helpline</p>
-				<p class="text-sm text-rose-100">You can stay here with us.</p>
+				<h2 class="text-base font-semibold text-rose-200">{crisisResources.title}</h2>
+				{#each crisisResources.lines as line (`${line}`)}
+					<p class="text-sm text-rose-100">{line}</p>
+				{/each}
 			</section>
 		{/if}
 
