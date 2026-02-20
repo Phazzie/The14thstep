@@ -1,4 +1,5 @@
 import { SeamErrorCodes, err, ok, type SeamResult } from '$lib/core/seam';
+import { CORE_CHARACTERS } from '$lib/core/characters';
 import {
 	type CallbackRecord,
 	type DatabasePort,
@@ -8,10 +9,12 @@ import {
 	validateCallbackRecord,
 	validateCompleteMeetingInput,
 	validateCreateCallbackInput,
+	validateGetMeetingCountAfterDateInput,
 	validateAppendShareInput,
 	validateCreateMeetingInput,
 	validateMeetingRecord,
 	validateShareRecord,
+	validateUpdateCallbackInput,
 	validateUserProfile
 } from '$lib/seams/database/contract';
 import {
@@ -35,9 +38,19 @@ interface QueryResponseLike<T = unknown> {
 	data: T | null;
 	error: QueryErrorLike | null;
 	status?: number;
+	count?: number | null;
 }
 
 const NETWORK_STATUSES = new Set([0, 408, 429, 502, 503, 504, 522, 524]);
+const UUID_V4_PATTERN =
+	/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const CORE_CHARACTER_NAME_BY_ID = new Map(CORE_CHARACTERS.map((character) => [character.id, character.name]));
+const CORE_CHARACTER_ID_BY_NAME = new Map(CORE_CHARACTERS.map((character) => [character.name, character.id]));
+
+interface CharacterMaps {
+	dbIdByDomainId: Map<string, string>;
+	domainIdByDbId: Map<string, string>;
+}
 
 function isObject(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null;
@@ -66,6 +79,10 @@ function asBoolean(value: unknown): boolean | undefined {
 
 function asStatus(value: unknown): number | undefined {
 	return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function isUuidLike(value: string): boolean {
+	return UUID_V4_PATTERN.test(value);
 }
 
 function upstreamDetails(
@@ -187,6 +204,116 @@ function mapCallbackRecordRow(row: unknown): CallbackRecord {
 
 export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): DatabasePort {
 	const supabase = options.supabase ?? createSupabaseServiceRoleClient();
+	let characterMapsPromise: Promise<SeamResult<CharacterMaps>> | null = null;
+
+	function mapCharacterIdToDomainId(maps: CharacterMaps, characterId: string | null): string | null {
+		if (characterId === null) return null;
+		return maps.domainIdByDbId.get(characterId) ?? characterId;
+	}
+
+	async function loadCharacterMaps(method: keyof DatabasePort): Promise<SeamResult<CharacterMaps>> {
+		const coreNames = CORE_CHARACTERS.map((character) => character.name);
+		const existingResponse = (await supabase
+			.from('characters')
+			.select('id, name')
+			.in('name', coreNames)) as QueryResponseLike<unknown[]>;
+		if (existingResponse.error) return mapUpstreamError(method, existingResponse);
+		if (!Array.isArray(existingResponse.data)) {
+			return err(SeamErrorCodes.CONTRACT_VIOLATION, 'characters lookup response is not an array', {
+				method,
+				provider: 'supabase'
+			});
+		}
+
+		const existingNames = new Set(
+			existingResponse.data
+				.map((row) => (isObject(row) ? asString(row.name) : undefined))
+				.filter((name): name is string => isNonEmptyString(name))
+		);
+		const missingProfiles = CORE_CHARACTERS.filter((character) => !existingNames.has(character.name));
+		if (missingProfiles.length > 0) {
+			const today = new Date().toISOString().slice(0, 10);
+			const insertResponse = (await supabase
+				.from('characters')
+				.insert(
+					missingProfiles.map((character) => ({
+						name: character.name,
+						tier: character.tier,
+						archetype: character.archetype,
+						clean_time_start: today,
+						voice: character.voice,
+						wound: character.wound,
+						contradiction: character.contradiction,
+						quirk: character.quirk,
+						color: character.color,
+						avatar: character.avatar,
+						intro_style: character.id
+					}))
+				)
+				.select('id, name')) as QueryResponseLike<unknown[]>;
+			if (insertResponse.error) return mapUpstreamError(method, insertResponse);
+		}
+
+		const finalResponse = (await supabase
+			.from('characters')
+			.select('id, name')
+			.in('name', coreNames)) as QueryResponseLike<unknown[]>;
+		if (finalResponse.error) return mapUpstreamError(method, finalResponse);
+		if (!Array.isArray(finalResponse.data)) {
+			return err(SeamErrorCodes.CONTRACT_VIOLATION, 'characters final lookup response is not an array', {
+				method,
+				provider: 'supabase'
+			});
+		}
+
+		const dbIdByDomainId = new Map<string, string>();
+		const domainIdByDbId = new Map<string, string>();
+
+		for (const row of finalResponse.data) {
+			if (!isObject(row)) continue;
+			const dbId = asString(row.id);
+			const name = asString(row.name);
+			if (!isNonEmptyString(dbId) || !isNonEmptyString(name)) continue;
+			const domainId = CORE_CHARACTER_ID_BY_NAME.get(name);
+			if (!domainId) continue;
+			dbIdByDomainId.set(domainId, dbId);
+			domainIdByDbId.set(dbId, domainId);
+		}
+
+		return ok({ dbIdByDomainId, domainIdByDbId });
+	}
+
+	async function getCharacterMaps(method: keyof DatabasePort): Promise<SeamResult<CharacterMaps>> {
+		if (characterMapsPromise === null) {
+			characterMapsPromise = loadCharacterMaps(method);
+		}
+
+		const mapsResult = await characterMapsPromise;
+		if (!mapsResult.ok) {
+			characterMapsPromise = null;
+		}
+		return mapsResult;
+	}
+
+	async function resolveDbCharacterId(
+		method: keyof DatabasePort,
+		characterId: string
+	): Promise<SeamResult<string>> {
+		if (isUuidLike(characterId)) return ok(characterId);
+
+		const mapsResult = await getCharacterMaps(method);
+		if (!mapsResult.ok) return mapsResult;
+
+		const mapped = mapsResult.value.dbIdByDomainId.get(characterId);
+		if (mapped) return ok(mapped);
+
+		const coreName = CORE_CHARACTER_NAME_BY_ID.get(characterId);
+		return err(SeamErrorCodes.INPUT_INVALID, `Unknown characterId: ${characterId}`, {
+			method,
+			provider: 'supabase',
+			expectedCoreName: coreName ?? null
+		});
+	}
 
 	return {
 		async getUserById(userId) {
@@ -247,11 +374,18 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid appendShare input');
 			}
 
+			let dbCharacterId = input.characterId;
+			if (isNonEmptyString(dbCharacterId)) {
+				const resolved = await resolveDbCharacterId('appendShare', dbCharacterId);
+				if (!resolved.ok) return resolved;
+				dbCharacterId = resolved.value;
+			}
+
 			const response = (await supabase
 				.from('shares')
 				.insert({
 					meeting_id: input.meetingId,
-					character_id: input.characterId,
+					character_id: dbCharacterId,
 					is_user_share: input.isUserShare,
 					content: input.content,
 					significance_score: input.significanceScore,
@@ -266,6 +400,11 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 			if (response.error) return mapUpstreamError('appendShare', response);
 
 			const share = mapShareRecordRow(response.data);
+			if (share.characterId !== null) {
+				const mapsResult = await getCharacterMaps('appendShare');
+				if (!mapsResult.ok) return mapsResult;
+				share.characterId = mapCharacterIdToDomainId(mapsResult.value, share.characterId);
+			}
 			if (!validateShareRecord(share)) {
 				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'appendShare response violates ShareRecord');
 			}
@@ -293,6 +432,11 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 			}
 
 			const shares = response.data.map((row) => mapShareRecordRow(row));
+			const mapsResult = await getCharacterMaps('getHeavyMemory');
+			if (!mapsResult.ok) return mapsResult;
+			for (const share of shares) {
+				share.characterId = mapCharacterIdToDomainId(mapsResult.value, share.characterId);
+			}
 			if (!shares.every((share) => validateShareRecord(share))) {
 				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'getHeavyMemory response violates ShareRecord[]');
 			}
@@ -322,6 +466,11 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 			}
 
 			const share = mapShareRecordRow(response.data);
+			if (share.characterId !== null) {
+				const mapsResult = await getCharacterMaps('getShareById');
+				if (!mapsResult.ok) return mapsResult;
+				share.characterId = mapCharacterIdToDomainId(mapsResult.value, share.characterId);
+			}
 			if (!validateShareRecord(share)) {
 				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'getShareById response violates ShareRecord');
 			}
@@ -349,6 +498,11 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 			}
 
 			const shares = response.data.map((row) => mapShareRecordRow(row));
+			const mapsResult = await getCharacterMaps('getMeetingShares');
+			if (!mapsResult.ok) return mapsResult;
+			for (const share of shares) {
+				share.characterId = mapCharacterIdToDomainId(mapsResult.value, share.characterId);
+			}
 			if (!shares.every((share) => validateShareRecord(share))) {
 				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'getMeetingShares response violates ShareRecord[]');
 			}
@@ -361,11 +515,14 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid createCallback input');
 			}
 
+			const resolvedCharacterId = await resolveDbCharacterId('createCallback', input.characterId);
+			if (!resolvedCharacterId.ok) return resolvedCharacterId;
+
 			const response = (await supabase
 				.from('callbacks')
 				.insert({
 					origin_share_id: input.originShareId,
-					character_id: input.characterId,
+					character_id: resolvedCharacterId.value,
 					original_text: input.originalText,
 					callback_type: input.callbackType,
 					scope: input.scope,
@@ -380,6 +537,9 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 			if (response.error) return mapUpstreamError('createCallback', response);
 
 			const callback = mapCallbackRecordRow(response.data);
+			const mapsResult = await getCharacterMaps('createCallback');
+			if (!mapsResult.ok) return mapsResult;
+			callback.characterId = mapCharacterIdToDomainId(mapsResult.value, callback.characterId) ?? '';
 			if (!validateCallbackRecord(callback)) {
 				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'createCallback response violates CallbackRecord');
 			}
@@ -392,13 +552,16 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid getActiveCallbacks input');
 			}
 
+			const resolvedCharacterId = await resolveDbCharacterId('getActiveCallbacks', input.characterId);
+			if (!resolvedCharacterId.ok) return resolvedCharacterId;
+
 			const response = (await supabase
 				.from('callbacks')
 				.select(
 					'id, origin_share_id, character_id, original_text, callback_type, scope, potential_score, times_referenced, last_referenced_at, status, parent_callback_id'
 				)
-				.in('status', ['active', 'legend'])
-				.or(`character_id.eq.${input.characterId},scope.eq.room`)
+				.in('status', ['active', 'stale', 'retired', 'legend'])
+				.or(`character_id.eq.${resolvedCharacterId.value},scope.eq.room`)
 				.order('potential_score', { ascending: false })
 				.order('times_referenced', { ascending: false })
 				.limit(30)) as QueryResponseLike<unknown[]>;
@@ -409,6 +572,11 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 			}
 
 			const callbacks = response.data.map((row) => mapCallbackRecordRow(row));
+			const mapsResult = await getCharacterMaps('getActiveCallbacks');
+			if (!mapsResult.ok) return mapsResult;
+			for (const callback of callbacks) {
+				callback.characterId = mapCharacterIdToDomainId(mapsResult.value, callback.characterId) ?? '';
+			}
 			if (!callbacks.every((callback) => validateCallbackRecord(callback))) {
 				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'getActiveCallbacks response violates CallbackRecord[]');
 			}
@@ -456,6 +624,9 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 			if (updateResponse.error) return mapUpstreamError('markCallbackReferenced', updateResponse);
 
 			const callback = mapCallbackRecordRow(updateResponse.data);
+			const mapsResult = await getCharacterMaps('markCallbackReferenced');
+			if (!mapsResult.ok) return mapsResult;
+			callback.characterId = mapCharacterIdToDomainId(mapsResult.value, callback.characterId) ?? '';
 			if (!validateCallbackRecord(callback)) {
 				return err(
 					SeamErrorCodes.CONTRACT_VIOLATION,
@@ -489,6 +660,67 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 			}
 
 			return ok(meeting);
+		},
+
+		async updateCallback(input) {
+			if (!validateUpdateCallbackInput(input)) {
+				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid updateCallback input');
+			}
+
+			const payload: Record<string, unknown> = {};
+			if (input.updates.timesReferenced !== undefined) {
+				payload.times_referenced = input.updates.timesReferenced;
+			}
+			if (input.updates.lastReferencedAt !== undefined) {
+				payload.last_referenced_at = input.updates.lastReferencedAt;
+			}
+			if (input.updates.status !== undefined) {
+				payload.status = input.updates.status;
+			}
+			if (input.updates.scope !== undefined) {
+				payload.scope = input.updates.scope;
+			}
+
+			const response = (await supabase
+				.from('callbacks')
+				.update(payload)
+				.eq('id', input.id)
+				.select(
+					'id, origin_share_id, character_id, original_text, callback_type, scope, potential_score, times_referenced, last_referenced_at, status, parent_callback_id'
+				)
+				.single()) as QueryResponseLike;
+			if (response.error) return mapUpstreamError('updateCallback', response);
+
+			const callback = mapCallbackRecordRow(response.data);
+			const mapsResult = await getCharacterMaps('updateCallback');
+			if (!mapsResult.ok) return mapsResult;
+			callback.characterId = mapCharacterIdToDomainId(mapsResult.value, callback.characterId) ?? '';
+			if (!validateCallbackRecord(callback)) {
+				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'updateCallback response violates CallbackRecord');
+			}
+
+			return ok(callback);
+		},
+
+		async getMeetingCountAfterDate(input) {
+			if (!validateGetMeetingCountAfterDateInput(input)) {
+				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid getMeetingCountAfterDate input');
+			}
+
+			const response = (await supabase
+				.from('meetings')
+				.select('*', { count: 'exact', head: true })
+				.eq('user_id', input.userId)
+				.gt('started_at', input.startedAfter)) as QueryResponseLike;
+			if (response.error) return mapUpstreamError('getMeetingCountAfterDate', response);
+			if (typeof response.count !== 'number' || !Number.isInteger(response.count) || response.count < 0) {
+				return err(
+					SeamErrorCodes.CONTRACT_VIOLATION,
+					'getMeetingCountAfterDate response did not include a valid count'
+				);
+			}
+
+			return ok(response.count);
 		}
 	};
 }

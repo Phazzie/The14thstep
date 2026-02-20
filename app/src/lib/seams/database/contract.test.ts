@@ -5,9 +5,11 @@ import {
 	validateCallbackRecord,
 	validateCompleteMeetingInput,
 	validateCreateCallbackInput,
+	validateGetMeetingCountAfterDateInput,
 	validateAppendShareInput,
 	validateMeetingRecord,
 	validateShareRecord,
+	validateUpdateCallbackInput,
 	validateUserProfile
 } from './contract';
 import { createDatabaseMock } from './mock';
@@ -38,6 +40,21 @@ describe('database seam contract', () => {
 				meetingId: '2f5dcf63-cf80-4e09-8e3e-13f93da72cf3',
 				summary: 'Room stayed grounded.',
 				notableMoments: { marcus: 'Stayed seated.' }
+			})
+		).toBe(true);
+		expect(
+			validateUpdateCallbackInput({
+				id: '17b9f6ab-0f63-4b06-90d8-06bcdb54922d',
+				updates: {
+					status: 'retired',
+					timesReferenced: 4
+				}
+			})
+		).toBe(true);
+		expect(
+			validateGetMeetingCountAfterDateInput({
+				userId: 'fab8bc65-1f5e-4ef1-8606-ab51921f9a07',
+				startedAfter: '2026-02-01T00:00:00.000Z'
 			})
 		).toBe(true);
 		expect(
@@ -114,6 +131,24 @@ describe('database seam contract', () => {
 		expect(createdCallback.ok).toBe(true);
 		if (createdCallback.ok) {
 			expect(createdCallback.value).toEqual(createCallbackSample);
+		}
+
+		const updatedCallback = await mock.updateCallback({
+			id: '17b9f6ab-0f63-4b06-90d8-06bcdb54922d',
+			updates: { status: 'stale' }
+		});
+		expect(updatedCallback.ok).toBe(true);
+		if (updatedCallback.ok) {
+			expect(updatedCallback.value).toEqual(createCallbackSample);
+		}
+
+		const meetingCount = await mock.getMeetingCountAfterDate({
+			userId: 'fab8bc65-1f5e-4ef1-8606-ab51921f9a07',
+			startedAfter: '2026-02-01T00:00:00.000Z'
+		});
+		expect(meetingCount.ok).toBe(true);
+		if (meetingCount.ok) {
+			expect(meetingCount.value).toBe(16);
 		}
 	});
 

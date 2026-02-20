@@ -1,5 +1,6 @@
 import { CORE_CHARACTERS } from '$lib/core/characters';
 import { closeMeeting } from '$lib/core/meeting';
+import { runCallbackLifecycleWorkflow } from '$lib/core/callback-lifecycle-workflow';
 import { scanForCallbacks } from '$lib/core/callback-scanner';
 import { SeamErrorCodes, err, ok, type SeamErrorCode, type SeamResult } from '$lib/core/seam';
 import { json } from '@sveltejs/kit';
@@ -177,7 +178,25 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 
 		if (scanResult.ok) {
 			callbackScan = scanResult.value;
-			// TODO(M7): apply lifecycle updates here (active->stale->retired->legend) after callback scan/save cycle.
+			const userId = locals.userId ?? process.env.PROBE_USER_ID?.trim() ?? null;
+			if (userId) {
+				const presentCharacterIds = Array.from(
+					new Set(
+						sharesResult.value
+							.map((share) => share.characterId)
+							.filter((characterId): characterId is string => characterId !== null)
+					)
+				);
+				const lifecycleResult = await runCallbackLifecycleWorkflow({
+					meetingId,
+					userId,
+					presentCharacterIds,
+					database: locals.seams.database
+				});
+				if (!lifecycleResult.ok) {
+					callbackScanError = lifecycleResult.error.message;
+				}
+			}
 		} else {
 			callbackScanError = scanResult.error.message;
 		}

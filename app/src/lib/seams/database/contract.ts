@@ -71,6 +71,21 @@ export interface CompleteMeetingInput {
 	notableMoments?: Record<string, string>;
 }
 
+export interface UpdateCallbackInput {
+	id: string;
+	updates: {
+		timesReferenced?: number;
+		lastReferencedAt?: string;
+		status?: CallbackStatus;
+		scope?: CallbackScope;
+	};
+}
+
+export interface GetMeetingCountAfterDateInput {
+	userId: string;
+	startedAfter: string;
+}
+
 export interface DatabasePort {
 	getUserById(userId: string): Promise<SeamResult<UserProfile>>;
 	createMeeting(
@@ -87,6 +102,8 @@ export interface DatabasePort {
 	}): Promise<SeamResult<CallbackRecord[]>>;
 	markCallbackReferenced(callbackId: string): Promise<SeamResult<CallbackRecord>>;
 	completeMeeting(input: CompleteMeetingInput): Promise<SeamResult<MeetingRecord>>;
+	updateCallback(input: UpdateCallbackInput): Promise<SeamResult<CallbackRecord>>;
+	getMeetingCountAfterDate(input: GetMeetingCountAfterDateInput): Promise<SeamResult<number>>;
 }
 
 export const DATABASE_ERROR_CODES: readonly SeamErrorCode[] = [
@@ -258,4 +275,33 @@ export function validateCompleteMeetingInput(value: unknown): value is CompleteM
 	if (value.notableMoments === undefined) return true;
 	if (!isObject(value.notableMoments)) return false;
 	return Object.values(value.notableMoments).every((item) => typeof item === 'string');
+}
+
+export function validateUpdateCallbackInput(value: unknown): value is UpdateCallbackInput {
+	if (!isObject(value) || !isNonEmptyString(value.id) || !isObject(value.updates)) return false;
+	const updates = value.updates;
+	if (updates.timesReferenced !== undefined) {
+		if (
+			typeof updates.timesReferenced !== 'number' ||
+			!Number.isInteger(updates.timesReferenced) ||
+			updates.timesReferenced < 0
+		) {
+			return false;
+		}
+	}
+	if (updates.lastReferencedAt !== undefined && !isNonEmptyString(updates.lastReferencedAt)) {
+		return false;
+	}
+	if (updates.status !== undefined && !isCallbackStatus(updates.status)) {
+		return false;
+	}
+	if (updates.scope !== undefined && !isCallbackScope(updates.scope)) {
+		return false;
+	}
+
+	return Object.keys(updates).length > 0;
+}
+
+export function validateGetMeetingCountAfterDateInput(value: unknown): value is GetMeetingCountAfterDateInput {
+	return isObject(value) && isNonEmptyString(value.userId) && isNonEmptyString(value.startedAfter);
 }

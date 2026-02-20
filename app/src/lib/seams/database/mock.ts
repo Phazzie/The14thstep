@@ -4,18 +4,22 @@ import type {
 	CompleteMeetingInput,
 	CreateCallbackInput,
 	DatabasePort,
+	GetMeetingCountAfterDateInput,
 	MeetingRecord,
 	ShareRecord,
+	UpdateCallbackInput,
 	UserProfile
 } from './contract';
 import {
 	validateCallbackRecord,
 	validateCompleteMeetingInput,
 	validateCreateCallbackInput,
+	validateGetMeetingCountAfterDateInput,
 	validateAppendShareInput,
 	validateCreateMeetingInput,
 	validateMeetingRecord,
 	validateShareRecord,
+	validateUpdateCallbackInput,
 	validateUserProfile
 } from './contract';
 import appendShareSample from './fixtures/appendShare.sample.json';
@@ -39,7 +43,9 @@ type DatabaseMethod =
 	| 'createCallback'
 	| 'getActiveCallbacks'
 	| 'markCallbackReferenced'
-	| 'completeMeeting';
+	| 'completeMeeting'
+	| 'updateCallback'
+	| 'getMeetingCountAfterDate';
 
 interface DatabaseMockOptions {
 	scenarios?: Partial<Record<DatabaseMethod, DatabaseScenario>>;
@@ -54,6 +60,8 @@ interface DatabaseMockOptions {
 		getActiveCallbacks?: CallbackRecord[];
 		markCallbackReferenced?: CallbackRecord;
 		completeMeeting?: MeetingRecord;
+		updateCallback?: CallbackRecord;
+		getMeetingCountAfterDate?: number;
 	};
 }
 
@@ -92,7 +100,9 @@ export function createDatabaseMock(options: DatabaseMockOptions = {}): DatabaseP
 		getActiveCallbacks: (options.fixtures?.getActiveCallbacks ?? getActiveCallbacksSample) as CallbackRecord[],
 		markCallbackReferenced:
 			(options.fixtures?.markCallbackReferenced ?? createCallbackSample) as CallbackRecord,
-		completeMeeting: (options.fixtures?.completeMeeting ?? createMeetingSample) as MeetingRecord
+		completeMeeting: (options.fixtures?.completeMeeting ?? createMeetingSample) as MeetingRecord,
+		updateCallback: (options.fixtures?.updateCallback ?? createCallbackSample) as CallbackRecord,
+		getMeetingCountAfterDate: options.fixtures?.getMeetingCountAfterDate ?? 16
 	};
 	const fault = parseFaultFixture();
 
@@ -230,6 +240,33 @@ export function createDatabaseMock(options: DatabaseMockOptions = {}): DatabaseP
 				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'Fixture violates MeetingRecord');
 			}
 			return ok(fixtures.completeMeeting);
+		},
+
+		async updateCallback(input: UpdateCallbackInput) {
+			if (!validateUpdateCallbackInput(input)) {
+				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid updateCallback input');
+			}
+			if (scenarios.updateCallback === 'fault') {
+				return err(fault.code, fault.message, fault.details);
+			}
+			if (!validateCallbackRecord(fixtures.updateCallback)) {
+				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'Fixture violates CallbackRecord');
+			}
+			return ok(fixtures.updateCallback);
+		},
+
+		async getMeetingCountAfterDate(input: GetMeetingCountAfterDateInput) {
+			if (!validateGetMeetingCountAfterDateInput(input)) {
+				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid getMeetingCountAfterDate input');
+			}
+			if (scenarios.getMeetingCountAfterDate === 'fault') {
+				return err(fault.code, fault.message, fault.details);
+			}
+			const count = fixtures.getMeetingCountAfterDate;
+			if (!Number.isInteger(count) || count < 0) {
+				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'Fixture violates meeting count');
+			}
+			return ok(count);
 		}
 	};
 }
