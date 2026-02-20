@@ -11,7 +11,8 @@ export interface UserProfile {
 
 export interface MeetingRecord {
 	id: string;
-	userId: string;
+	userId: string | null;
+	guestSessionId: string | null;
 	topic: string;
 	userMood: string;
 	listeningOnly: boolean;
@@ -36,5 +37,6 @@ export interface DatabasePort {
 		input: Omit<MeetingRecord, 'id' | 'startedAt' | 'endedAt'>
 	): Promise<SeamResult<MeetingRecord>>;
 	appendShare(input: Omit<ShareRecord, 'id' | 'createdAt'>): Promise<SeamResult<ShareRecord>>;
-	getHeavyMemory(userId: string): Promise<SeamResult<ShareRecord[]>>;
+	getHeavyMemoryByUser(userId: string): Promise<SeamResult<ShareRecord[]>>;
+	getRecentGuestMemory(guestSessionId: string): Promise<SeamResult<ShareRecord[]>>;
 }

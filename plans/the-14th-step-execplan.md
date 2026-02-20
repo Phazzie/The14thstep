@@ -33,10 +33,80 @@ Optional but useful for Supabase CLI operations:
 - `SUPABASE_ACCESS_TOKEN` (if using Supabase CLI loginless workflows)
 - `SUPABASE_DB_PASSWORD` (if linking and pushing migrations through CLI)
 
+
+## Static Gap Audit (2026-02-20)
+
+A static repository review confirms the prior QA findings and uncovers additional blockers that prevent a usable "start meeting now" experience. The current implementation is still a Milestone 0 scaffold and cannot deliver a first meeting end-to-end even with valid credentials.
+
+Confirmed gaps from QA:
+
+- Home route is placeholder copy only; there is no guest path, account path, or onboarding safety rails.
+- Auth seam only models authenticated sessions and has no guest identity contract.
+- Meeting contracts and schema require `user_id`, so anonymous starts are structurally rejected.
+- Configuration concerns are not isolated behind user-safe error mapping.
+- Product copy and tone are still development placeholders.
+
+Additional gaps discovered in this review:
+
+- There are no account routes (`/login`, `/signup`) and no server auth guard (`hooks.server.ts`), so session enforcement and redirect behavior do not exist.
+- There is no meeting orchestration route or workflow (`+page.server.ts`, `+server.ts`, or domain service) that can create a meeting, select characters, stream shares, or persist outputs.
+- The only API endpoint is a probe-only SSE stream at `/api/probes/sse`; production meeting streaming is not implemented.
+- Seam contracts exist but there are no adapter implementations (Supabase auth/database adapter, xAI adapter), so seams cannot execute real I/O.
+- Character data has no seed path; `characters` can remain empty and meeting composition would fail once wired.
+- Database migration lacks Row Level Security and policies, so secure per-user history access is unspecified.
+- Automated tests are scaffold-level smoke tests (heading visible, `1 + 2 === 3`) and do not validate real user journeys, guest identity, persistence, crisis response, or error handling.
+- App README is probe-centric and does not document user-facing runbooks for guest meeting flow, account flow, or degraded-mode behavior when external keys are absent.
+
+## Autonomous Remediation Plan (Milestone Order)
+
+This sequence is designed so implementation can proceed autonomously with clear dependency order and working increments after each milestone.
+
+### Milestone A - Replace placeholder shell with dual-path entry
+
+Implement a production home experience in `app/src/routes/+page.svelte` with two explicit calls to action: `Start as guest` and `Create account`. Add plain-language safety copy and a short expectations panel (what happens next, crisis disclaimer, privacy notes). Introduce route-level tests that verify both CTAs and copy are present.
+
+### Milestone B - Introduce unified session identity model with guest support
+
+Extend `app/src/lib/seams/auth/contract.ts` to model a discriminated union identity (`authenticated` and `guest`) and add guest-session creation and resolution methods. Add domain-level session type(s) used by UI and meeting services so all downstream logic can branch on identity type without null checks.
+
+### Milestone C - Enable guest-compatible meeting persistence
+
+Update `app/src/lib/seams/database/contract.ts` and Supabase migrations so meetings can be created by either authenticated users or guests. Preserve account history by keeping `user_id` nullable (or equivalent dual-key strategy) while adding guest tracking fields such as `guest_session_id`. Add compatibility queries that fetch history for accounts and ephemeral recent context for guests.
+
+### Milestone D - Build minimal meeting runner and streaming path
+
+Create the first runnable meeting flow: start meeting request, create meeting record, generate at least one streamed character share, append shares, and render incremental UI updates. Use a server route dedicated to meeting SSE (separate from probe route) and wire through seam bundle interfaces.
+
+### Milestone E - Add adapter implementations for auth, database, and xAI seams
+
+Implement concrete adapters for Supabase auth/database and xAI Responses API in server-only modules, including request/response mapping to seam result envelopes. Ensure unsupported xAI parameters are never sent and `store: false` is always set.
+
+### Milestone F - Harden runtime configuration and user-safe error surfaces
+
+Add a central server config module that validates required secrets on startup/runtime boundaries. Convert missing-key or upstream config faults into generic user messages (for example: `Meeting service is temporarily unavailable`) while logging actionable diagnostics server-side. Explicitly prevent raw env var names or stack traces from surfacing in UI.
+
+### Milestone G - Define and apply product voice on critical screens
+
+Rewrite copy for home, onboarding/setup, meeting state banners, auth screens, and error toasts using the plainspoken tone target from product guidelines. Add snapshot/assertion tests for critical copy anchors to prevent regression to placeholder/dev wording.
+
+### Milestone H - Security and data integrity hardening
+
+Add Supabase RLS policies for users, meetings, shares, and callbacks to enforce per-user/account access and safe guest constraints. Include migration tests or SQL verification scripts for policy behavior.
+
+### Milestone I - End-to-end acceptance coverage for the real journey
+
+Add integration/e2e suites for: guest start to first streamed share, account signup/signin to persisted history, crisis keyword trigger behavior, and degraded mode when external dependencies are unavailable. Replace scaffold demo tests with behavior-driven tests that exercise real routes.
+
+### Milestone J - Docs, operational runbooks, and release readiness
+
+Update `app/README.md` with user-flow run instructions, environment tiers (required vs optional), failure-mode expectations, and verification commands. Record completed outcomes and lessons in this ExecPlan and close remaining Milestone 0 assumptions that are no longer true.
+
 ## Progress
 
 - [x] (2026-02-15 23:40Z) Created Milestone 0 scaffolding artifacts: `seam-registry.json`, `decision-log.md`, seam contract files under `app/src/lib/seams/**`, shared result envelope in `app/src/lib/core/seam.ts`, and probe scripts in `app/probes/**`.
 - [x] (2026-02-15 23:40Z) Added and validated local SSE probe path: endpoint `app/src/routes/api/probes/sse/+server.ts`, UI `app/src/routes/probes/sse/+page.svelte`, and CLI probe `npm run probe:sse` returning PASS.
+- [x] (2026-02-20 00:00Z) Completed static gap audit and rewrote autonomous remediation order (Milestones A-J) to prioritize usable guest/account entry, guest-capable sessions/data model, production meeting flow, config hardening, and voice overhaul.
+- [x] (2026-02-20 15:20Z) Executed Milestones A-C and a minimal Milestone D slice: shipped dual-path home UI, guest session route/cookie flow, guest-capable session/database seam contracts, guest meeting schema migration, and a first meeting SSE route with UI rendering.
 - [ ] Milestone 0: Repository bootstrap and reality probes complete (completed: local probe + scaffolding; remaining: live `probe:grok-voice` and live `probe:supabase-memory` with credentials).
 - [ ] Milestone 1: Hexagonal skeleton with all seam contracts, mocks, and contract tests green
 - [ ] Milestone 2: Domain core (pure meeting workflow logic) tested with zero I/O
@@ -59,8 +129,20 @@ Optional but useful for Supabase CLI operations:
   Evidence: `npm run lint` and targeted `npx eslint ...` produced no rule output and did not complete within timeout windows.
 - Observation: Both deployment CLIs can run from `npx`, so global installation is not required.
   Evidence: `npx --yes vercel --version` returned `50.17.1`; `npx --yes supabase --version` returned `2.76.8`.
+- Observation: Static scan shows no production meeting implementation path yet; all runnable behavior is probe or scaffold level.
+  Evidence: only `app/src/routes/api/probes/sse/+server.ts` provides SSE, while `app/src/routes/+page.svelte` is placeholder copy and no meeting/auth server routes exist under `app/src/routes/**`.
+- Observation: Vitest workspace includes browser projects and exits with an unhandled error when Playwright browser binaries are absent, even though server-side tests pass.
+  Evidence: `npm run test:unit -- --run` reported passing tests plus a browser launch error requiring `npx playwright install`.
 
 ## Decision Log
+
+- Decision: Re-baseline implementation sequence around user-visible usability before advanced memory/callback sophistication.
+  Rationale: Current repo state is pre-product scaffold; shipping guest/account entry, session identity, meeting persistence, and config-safe UX first creates a runnable spine that later milestones can build on without blocking users at the front door.
+  Date/Author: 2026-02-20
+
+- Decision: Implement guest identity as a first-class session kind with server cookie bootstrap before full Supabase auth adapters are wired.
+  Rationale: This unlocks immediate "start meeting now" usability and allows meeting orchestration and persistence contracts to evolve without blocking on account UI or external credentials.
+  Date/Author: 2026-02-20
 
 - Decision: Database is Supabase (PostgreSQL), not Appwrite.
   Rationale: The memory retrieval system requires relational queries with JOINs, foreign keys, significance score filtering across tables, and prefix-based key lookups. Appwrite's document-based database cannot express these queries without a full schema redesign. Supabase IS PostgreSQL and supports every query pattern in the spec natively. Supabase Auth also provides the authentication layer.
@@ -101,6 +183,7 @@ Optional but useful for Supabase CLI operations:
 ## Outcomes & Retrospective
 
 Milestone 0 is partially complete. We now have a running local probe route for streaming, scripted probe entry points for xAI and Supabase, and a baseline seam contract skeleton anchored by a shared result envelope. Remaining Milestone 0 work is credential-gated: execute live Grok voice validation and live Supabase memory-latency validation against real infrastructure.
+Milestones A-C from the remediation plan are now functionally underway in code: the home page exposes guest/account entry choices, guest sessions can be created via a server route, and the meeting model now supports guest identity in both seam contracts and SQL migration form. A minimal Milestone D vertical slice also exists through `/meeting` + `/api/meetings/stream`, proving end-to-end guest entry to streamed room output on localhost without external keys.
 
 ## Context and Orientation
 
@@ -955,3 +1038,7 @@ Revision note (2026-02-15, setup alignment): Added AGENTS.md + PLANS.md reposito
 Revision note (2026-02-15, Codex): Updated Progress, Surprises & Discoveries, Decision Log, and Outcomes & Retrospective to capture Milestone 0 scaffolding completion status, local SSE probe evidence, environment blockers (credentials, ESLint stall), and implementation location decisions.
 
 Revision note (2026-02-15, Codex env/deploy update): Added explicit environment prerequisites, CLI strategy (`npx vercel`, `npx supabase`), and corresponding discoveries/decisions so deployment can run end-to-end without global installs.
+
+Revision note (2026-02-20, static gap audit): Added a comprehensive gap audit (including additional blockers beyond prior QA report) and replaced implementation sequencing with an autonomous Milestones A-J remediation plan that can be executed end-to-end without waiting for further planning clarification.
+
+Revision note (2026-02-20, milestone execution): Began executing the remediation plan in code by completing Milestones A-C and adding a minimal Milestone D streaming slice (guest start route, meeting stream endpoint, UI updates, seam contract updates, migration, and tests/docs alignment).

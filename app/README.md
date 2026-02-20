@@ -18,6 +18,16 @@ npm run test:unit -- --run
 npm run test:e2e
 ```
 
+## Current User Flow (Milestones A-D)
+
+1. Open `/` and choose one of two paths:
+   - `Start as guest` for immediate meeting access
+   - `Create account` (placeholder route while auth adapter work is in progress)
+2. Guest flow sets a secure guest session cookie and redirects to `/meeting`.
+3. `/meeting` opens an SSE stream and renders initial room shares.
+
+This path is intentionally minimal and does not require external API keys for the local happy path.
+
 ## Milestone 0 Probes
 
 Create `.env.local` from `.env.example` and populate required credentials for external probes.

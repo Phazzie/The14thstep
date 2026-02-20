@@ -4,10 +4,17 @@ import { render } from 'vitest-browser-svelte';
 import Page from './+page.svelte';
 
 describe('/+page.svelte', () => {
-	it('should render h1', async () => {
+	it('shows dual-path entry actions', async () => {
 		render(Page);
 
-		const heading = page.getByRole('heading', { level: 1 });
-		await expect.element(heading).toBeInTheDocument();
+		await expect
+			.element(page.getByRole('heading', { name: /Need a meeting right now/i }))
+			.toBeVisible();
+		await expect
+			.element(page.getByRole('link', { name: /Start as guest/i }))
+			.toHaveAttribute('href', '/start/guest');
+		await expect
+			.element(page.getByRole('link', { name: /Create account/i }))
+			.toHaveAttribute('href', '/signup');
 	});
 });
