@@ -1,5 +1,7 @@
 import { CORE_CHARACTERS } from '$lib/core/characters';
 import { detectCrisisContent, isMeetingInCrisis } from '$lib/core/crisis-engine';
+import { initializeMeetingPhase } from '$lib/core/ritual-orchestration';
+import type { MeetingPhaseState } from '$lib/core/types';
 import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 
@@ -28,6 +30,9 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
 	const initialCrisisMode = crisisFromSetup || crisisFromShares;
 	const shouldTriggerInitialCrisisSupport = crisisFromSetup && !crisisFromShares;
 
+	// Initialize phase state for this meeting
+	const phaseState: MeetingPhaseState = initializeMeetingPhase();
+
 	return {
 		meetingId,
 		userId: locals.userId,
@@ -38,6 +43,7 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
 		initialCrisisMode,
 		shouldTriggerInitialCrisisSupport,
 		listeningOnly,
+		phaseState,
 		characters: CORE_CHARACTERS.map((character) => ({
 			id: character.id,
 			name: character.name,

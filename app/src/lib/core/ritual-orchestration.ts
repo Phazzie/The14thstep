@@ -1,6 +1,7 @@
 import type { MeetingPhase, MeetingPhaseState, CharacterProfile } from './types';
 import { MeetingPhase as MeetingPhaseEnum } from './types';
-import { SeamResult, ok, err, SeamErrorCodes } from './seam';
+import type { SeamResult } from './seam';
+import { ok, err, SeamErrorCodes } from './seam';
 
 /**
  * The canonical intro order for the ritual.
@@ -34,7 +35,7 @@ const VALID_TRANSITIONS: Record<MeetingPhase, MeetingPhase[]> = {
 		MeetingPhaseEnum.SHARING_ROUND_3,
 		MeetingPhaseEnum.CLOSING
 	],
-	[MeetingPhaseEnum.CLOSING]: [MeetingPhaseEnum.POST_MEETING],
+	[MeetingPhaseEnum.CLOSING]: [MeetingPhaseEnum.POST_MEETING, MeetingPhaseEnum.CRISIS_MODE],
 	[MeetingPhaseEnum.POST_MEETING]: []
 };
 

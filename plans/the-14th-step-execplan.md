@@ -33,8 +33,102 @@ Optional but useful for Supabase CLI operations:
 - `SUPABASE_ACCESS_TOKEN` (if using Supabase CLI loginless workflows)
 - `SUPABASE_DB_PASSWORD` (if linking and pushing migrations through CLI)
 
+## Autonomous Execution Charter (Start-to-Finish)
+
+This plan now runs in autonomous mode with milestone completion rules that forbid carryover debt. A completed milestone must leave nothing deferred from that milestone's scope.
+
+### Scope lock and change control
+
+- Lock scope to the Writing Engine & Narrative Context System specification for Milestones 11-19 below.
+- Do not add net-new product scope while Milestones 11-19 are in progress, unless the change is required to satisfy the specification or unblock a failing integration.
+- If a new requirement is discovered that belongs to a completed milestone, reopen that milestone and close it again only after the new requirement is integrated, tested, and documented.
+
+### Milestone definition of done (zero leftovers)
+
+A milestone is complete only when all of the following are true:
+
+1. Contract and types are updated first and validated.
+2. Pure logic/prompt code is implemented.
+3. Runtime wiring is complete in routes/composition layers.
+4. Unit and integration/composition tests for that slice pass.
+5. Docs/governance updates are committed (`Progress`, `Decision Log`, `CHANGELOG.md`, `LESSONS_LEARNED.md` as applicable).
+6. No open TODO/FIXME notes remain for that milestone's scope.
+
+### Mandatory review gates
+
+- Midpoint deep review gate: after Milestone 15 closes, run an extensive bug/regression/risk review across Milestones 11-15 and fix all high-severity findings before starting Milestone 16.
+- Final deep review gate: after Milestone 19 implementation closes, run an extensive end-to-end code review and corrective pass before marking the program complete.
+- At both gates, findings are ordered by severity with file references and explicitly resolved or accepted with rationale.
+
+### Parallel execution with integration controls
+
+Parallel work is required, but integration discipline is mandatory.
+
+- Lane A: contracts/schema/adapters.
+- Lane B: prompt construction, style constitution, narrative context, quality/candidate scoring.
+- Lane C: tests, composition/e2e coverage, docs/governance.
+
+Integration instructions:
+
+1. Merge order is A -> B -> C at each milestone boundary unless a milestone explicitly needs a different order.
+2. Every lane branch must rebase on the current milestone integration tip before merge.
+3. Every merge must pass `npm run check`, `npm run test:unit -- --run`, and touched composition/e2e tests before the next lane merges.
+4. Do not mark a milestone complete until cross-lane integration tests pass on the merged result, not only on lane branches.
+
+### Milestone map for this program (no carryover)
+
+- Milestone 11: Character foundation complete (types, schema, adapters, fixtures, tests).
+- Milestone 12: Style constitution and prompt contract complete.
+- Milestone 13: Voice example generation pipeline complete.
+- Milestone 14: Narrative context generation + cache + fallback complete.
+- Milestone 15: Share quality gate + retries + skip behavior complete.
+- Midpoint deep review gate and correction pass.
+- Milestone 16: Crisis detection and crisis-mode runtime complete.
+- Milestone 17: Memory extraction, storage, and reinjection complete.
+- Milestone 18: Meeting ritual structure (opening through closing) fully wired complete.
+- Milestone 19: Release readiness, full integration verification, and closeout complete.
+- Final deep review gate and correction pass.
+
+### Risk register mapped to milestones
+
+The following known blind spots are explicitly owned by milestones so they are not deferred:
+
+1. Data migration/backfill risk for new required character fields is closed in Milestone 11, including reversible migration strategy and backfill validation.
+2. Slug-vs-UUID identity drift risk is closed in Milestone 11 by defining one canonical mapping path and adding integration tests that exercise persistence end-to-end.
+3. Cost and latency risk from additional AI calls is closed across Milestones 14-15 with explicit timeout/fallback behavior, request budgets, and observable runtime metrics.
+4. AI output reliability drift risk is closed across Milestones 13-15 with strict output-shape contracts, retry/skip gates, and negative-path tests.
+5. Crisis safety coverage risk is closed in Milestone 16 with conservative detection behavior, explicit runtime pause semantics, and crisis-path tests.
+6. Crisis policy/resource correctness risk is closed in Milestone 16 by hard-coding required resources and validating UI/runtime behavior in composition tests.
+7. Observability gap risk is closed in Milestones 15-19 by adding structured logs/metrics for retries, skips, validator scores, and crisis activation.
+8. Rollout safety risk is closed in Milestone 19 by requiring release-gate validation and controlled rollout checks before completion.
+9. Parallel integration regression risk is closed at every milestone boundary using the A->B->C merge/test gates above.
+10. Human quality drift risk is closed in Milestone 19 with transcript-sample review criteria and acceptance evidence in governance artifacts.
+
+### Robust and meaningful testing standard (required for every milestone)
+
+Tests must prove behavior, not just code path execution.
+
+1. Each milestone must include at least one failing-before/passing-after test that verifies user-visible behavior for that milestone.
+2. Each milestone must include at least one negative-path test (invalid input, upstream failure, malformed AI JSON, timeout, or fallback path).
+3. Prompt-related milestones must include string-level contract tests that assert forbidden instructions are absent and required sections are present/omitted correctly.
+4. Integration milestones must include composition tests that hit route-level behavior, not only pure-function unit tests.
+5. Milestone completion is blocked if tests only assert mock internals without asserting externally observable outcomes (response shape, persisted records, rendered state, stream events, or logs).
+6. Midpoint and final review gates must include a test-audit step that identifies weak tests (tautological assertions, snapshot-only coverage, no failure-path checks) and replaces them with behavioral assertions.
+7. No milestone is complete unless `npm run check` and `npm run test:unit -- --run` pass, plus all touched composition/e2e tests for that milestone.
+
 ## Progress
 
+- [ ] (2026-02-21 00:00Z) Milestone 11 complete with no carryover: CharacterProfile contract/schema/adapters/tests upgraded to required writing-system fields (`lie`, `voiceExamples` tuple, `discomfortRegister`, `programRelationship`, `lostThing`, `cleanTimeStart`).
+- [ ] (2026-02-21 00:00Z) Milestone 12 complete with no carryover: `style-constitution.ts` introduced and injected into all generation and quality-validation prompts; forbidden prompt patterns removed (`exact sentence count`, forced physical action, archetype injection, empty placeholders).
+- [ ] (2026-02-21 00:00Z) Milestone 13 complete with no carryover: voice-example pipeline implemented (7 candidates, 4-axis scoring, threshold filtering, persistence) with tests.
+- [ ] (2026-02-21 00:00Z) Milestone 14 complete with no carryover: one-call meeting-start narrative context table generation with meeting-duration cache and degraded fallback path.
+- [ ] (2026-02-21 00:00Z) Milestone 15 complete with no carryover: quality validator thresholds (`voiceConsistency`, `authenticity` >= 6), retry budget, skip behavior, and skip logging shipped.
+- [ ] (2026-02-21 00:00Z) Midpoint deep review complete: extensive code review findings for Milestones 11-15 resolved or accepted with rationale.
+- [ ] (2026-02-21 00:00Z) Milestone 16 complete with no carryover: crisis detection call precedes character response generation; crisis-mode behavior and resources fully enforced.
+- [ ] (2026-02-21 00:00Z) Milestone 17 complete with no carryover: post-meeting memory extraction call + persistence + injection format shipped and validated.
+- [ ] (2026-02-21 00:00Z) Milestone 18 complete with no carryover: meeting phases (opening, empty chair, intros, topic selection, sharing rounds, closing) implemented in runtime flow.
+- [ ] (2026-02-21 00:00Z) Milestone 19 complete with no carryover: integration verification, docs/governance closeout, and release gate evidence complete.
+- [ ] (2026-02-21 00:00Z) Final deep review complete: extensive end-to-end code review and corrective pass complete with no unresolved high-severity findings.
 - [x] (2026-02-15 23:40Z) Created Milestone 0 scaffolding artifacts: `seam-registry.json`, `decision-log.md`, seam contract files under `app/src/lib/seams/**`, shared result envelope in `app/src/lib/core/seam.ts`, and probe scripts in `app/probes/**`.
 - [x] (2026-02-15 23:40Z) Added and validated local SSE probe path: endpoint `app/src/routes/api/probes/sse/+server.ts`, UI `app/src/routes/probes/sse/+page.svelte`, and CLI probe `npm run probe:sse` returning PASS.
 - [x] (2026-02-16 03:23Z) Completed Milestone 1 seam skeleton implementation by adding fixture sets, fixture-backed mocks, runtime contract validators, and green contract tests for `grok-ai`, `database`, `auth`, `uuid`, and `clock` under `app/src/lib/seams/**`.
@@ -113,6 +207,26 @@ Optional but useful for Supabase CLI operations:
   Evidence: Vercel runtime share stream returned `UPSTREAM_ERROR` with xAI `403`; comparing local vs Vercel `XAI_API_KEY` fingerprints showed mismatch, and key rotation + redeploy restored SSE chunk streaming.
 
 ## Decision Log
+
+- Decision: Re-scope active work into vertical milestones (11-19) that cannot carry leftovers.
+  Rationale: Prior milestone tracking allowed partially complete slices to be marked complete with deferred follow-up. The writing-engine spec requires production-safe behavior per slice (contract + logic + wiring + tests + docs) before proceeding.
+  Date/Author: 2026-02-21 (Codex)
+
+- Decision: Add mandatory midpoint and final deep-review correction gates.
+  Rationale: The user explicitly requested autonomous execution with extensive review/correction halfway and at the end. Hard gates reduce drift and catch integration regressions before final rollout.
+  Date/Author: 2026-02-21 (Codex)
+
+- Decision: Execute in parallel lanes with strict integration merge gates.
+  Rationale: Parallelization improves throughput, but only if merges are controlled by cross-lane validation (`check`, unit, composition/e2e). This preserves autonomy while protecting integration quality.
+  Date/Author: 2026-02-21 (Codex)
+
+- Decision: Attach a risk register directly to Milestones 11-19 with explicit ownership.
+  Rationale: The project currently has known blind spots (migration safety, identity mapping, safety coverage, rollout risk) that can be forgotten if they are not milestone-owned. Direct mapping removes ambiguity and prevents deferral.
+  Date/Author: 2026-02-21 (Codex)
+
+- Decision: Enforce robust, behavior-first testing requirements at milestone level.
+  Rationale: Green tests are insufficient when they only assert internals or snapshots. The new test standard requires failing-before/passing-after, negative-path, and route-level behavior proofs so milestone closure reflects real user impact.
+  Date/Author: 2026-02-21 (Codex)
 
 - Decision: Database is Supabase (PostgreSQL), not Appwrite.
   Rationale: The memory retrieval system requires relational queries with JOINs, foreign keys, significance score filtering across tables, and prefix-based key lookups. Appwrite's document-based database cannot express these queries without a full schema redesign. Supabase IS PostgreSQL and supports every query pattern in the spec natively. Supabase Auth also provides the authentication layer.
@@ -200,7 +314,7 @@ Optional but useful for Supabase CLI operations:
 
 ## Outcomes & Retrospective
 
-Milestones 0 through 10 are complete in this branch. Production is live at `https://the14thstep.vercel.app` with evidence-backed validation for auth/session flow, authenticated meeting creation persistence, crisis-mode intervention path, callback lifecycle update persistence, and schema readiness checks. Remaining work is optional hardening (automated recurring production smoke runs, observability dashboards, and deeper failure-path coverage), not milestone-scope completion.
+Milestones 0 through 10 remain complete in this branch as the delivered baseline. This ExecPlan has now entered a new active phase (Milestones 11-19) to implement the Writing Engine & Narrative Context System specification with zero-carryover milestone closure rules, mandatory midpoint/final review correction gates, and strict cross-lane integration requirements. Completion should no longer be interpreted as "feature mostly implemented"; completion now means contract, implementation, wiring, tests, and governance are all closed for that slice.
 
 ## Context and Orientation
 
@@ -1073,3 +1187,7 @@ Revision note (2026-02-19, Codex milestone-10 resumed): Updated Progress, Surpri
 Revision note (2026-02-20, Codex milestone-10 complete): Updated Progress and Outcomes to mark Milestone 10 fully complete with production auth/session, crisis-path, callback lifecycle, and schema-readiness evidence (`plans/m10-production-evidence-2026-02-20.md`), and added production rollback/break-glass notes to `app/README.md`.
 
 Revision note (2026-02-20, Codex hardening sweep): Added post-completion hardening updates for share/close trust boundaries, callback meeting scoping, adapter map refresh behavior, crisis-mode client transition handling, Playwright startup timeout stability, and captured remaining risk backlog in `plans/post-m10-quality-audit-2026-02-20.md`.
+
+Revision note (2026-02-21, Codex autonomous execution reset): Added an explicit autonomous execution charter with scope lock, zero-carryover milestone closure rules, mandatory midpoint/final deep-review correction gates, parallel-lane integration controls, and a new Milestone 11-19 map for the Writing Engine & Narrative Context System specification.
+
+Revision note (2026-02-21, Codex risk-and-test hardening): Added a milestone-mapped risk register for known blind spots and a mandatory robust/meaningful testing standard (behavior-first, negative-path, and route-level verification) so milestone completion reflects real integration quality.

@@ -1,5 +1,6 @@
 import { CORE_CHARACTERS } from '$lib/core/characters';
 import { closeMeeting } from '$lib/core/meeting';
+import { buildPostMeetingMemoryExtractionPrompt } from '$lib/core/prompt-templates';
 import { runCallbackLifecycleWorkflow } from '$lib/core/callback-lifecycle-workflow';
 import { scanForCallbacks } from '$lib/core/callback-scanner';
 import { SeamErrorCodes, err, ok, type SeamErrorCode, type SeamResult } from '$lib/core/seam';
@@ -10,9 +11,59 @@ interface CloseRequest {
 	topic: string;
 }
 
+interface ExtractedMeetingMemory {
+	userMemory: string;
+	highMoment: string;
+	characterThreads: Record<string, string>;
+}
+
 function speakerNameForShare(characterId: string | null): string {
 	if (characterId === null) return 'User';
 	return CORE_CHARACTERS.find((character) => character.id === characterId)?.name ?? 'Character';
+}
+
+function renderTranscript(lastShares: Array<{ speakerName: string; content: string }>, limit = 12): string {
+	return lastShares
+		.slice(-limit)
+		.map((share) => `${share.speakerName}: ${share.content}`)
+		.join('\n');
+}
+
+function stripCodeFences(value: string): string {
+	const trimmed = value.trim();
+	if (!trimmed.startsWith('```')) return trimmed;
+	return trimmed.replace(/^```(?:json)?\s*/i, '').replace(/```$/, '').trim();
+}
+
+function parseExtractedMeetingMemory(raw: string): ExtractedMeetingMemory | null {
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(stripCodeFences(raw));
+	} catch {
+		return null;
+	}
+
+	if (typeof parsed !== 'object' || parsed === null) return null;
+	const value = parsed as Record<string, unknown>;
+	if (typeof value.userMemory !== 'string' || typeof value.highMoment !== 'string') return null;
+	if (typeof value.characterThreads !== 'object' || value.characterThreads === null) return null;
+
+	const characterThreads = Object.entries(value.characterThreads as Record<string, unknown>).reduce<
+		Record<string, string>
+	>((acc, [key, entry]) => {
+		if (typeof key !== 'string' || typeof entry !== 'string') return acc;
+		const normalizedKey = key.trim();
+		const normalizedValue = entry.trim();
+		if (!normalizedKey || !normalizedValue) return acc;
+		acc[normalizedKey] = normalizedValue;
+		return acc;
+	}, {});
+
+	return {
+		userMemory: value.userMemory.trim(),
+		highMoment: value.highMoment.trim(),
+		characterThreads
+	};
 }
 
 async function buildCharacterMemorySummaries(input: {
@@ -47,6 +98,30 @@ async function buildCharacterMemorySummaries(input: {
 	}
 
 	return summaries;
+}
+
+async function extractPostMeetingMemory(input: {
+	meetingId: string;
+	topic: string;
+	lastShares: Array<{ speakerName: string; content: string }>;
+	grokAi: App.Locals['seams']['grokAi'];
+}): Promise<ExtractedMeetingMemory | null> {
+	const transcript = renderTranscript(input.lastShares, 14);
+	const extraction = await input.grokAi.generateShare({
+		meetingId: input.meetingId,
+		characterId: 'memory-extractor',
+		prompt: buildPostMeetingMemoryExtractionPrompt(
+			input.topic,
+			transcript,
+			CORE_CHARACTERS.slice(0, 6).map((character) => character.id)
+		),
+		contextMessages: [{ role: 'assistant', content: transcript }]
+	});
+	if (!extraction.ok) return null;
+
+	const parsed = parseExtractedMeetingMemory(extraction.value.shareText);
+	if (!parsed) return null;
+	return parsed;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -132,16 +207,40 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 		return json(result, { status: toStatus(result.error.code) });
 	}
 
-	const characterMemorySummaries = await buildCharacterMemorySummaries({
+	const extractedMemory = await extractPostMeetingMemory({
 		meetingId,
 		topic: input.topic,
 		lastShares: persistedLastShares,
 		grokAi: locals.seams.grokAi
 	});
+	const extractedCharacterCount = Object.keys(extractedMemory?.characterThreads ?? {}).length;
+	const shouldBuildFallbackCharacterSummaries = extractedCharacterCount < CORE_CHARACTERS.slice(0, 6).length;
+	const fallbackCharacterMemorySummaries = shouldBuildFallbackCharacterSummaries
+		? await buildCharacterMemorySummaries({
+				meetingId,
+				topic: input.topic,
+				lastShares: persistedLastShares,
+				grokAi: locals.seams.grokAi
+			})
+		: {};
+	const characterMemorySummaries = {
+		...fallbackCharacterMemorySummaries,
+		...(extractedMemory?.characterThreads ?? {})
+	};
+	const notableMoments =
+		extractedMemory && (extractedMemory.userMemory || extractedMemory.highMoment)
+			? {
+					...characterMemorySummaries,
+					userMemory: extractedMemory.userMemory || result.value.summary.trim(),
+					highMoment: extractedMemory.highMoment || result.value.summary.trim(),
+					characterThreads: JSON.stringify(characterMemorySummaries)
+				}
+			: characterMemorySummaries;
+
 	const completeMeetingResult = await locals.seams.database.completeMeeting({
 		meetingId,
 		summary: result.value.summary,
-		notableMoments: characterMemorySummaries
+		notableMoments
 	});
 	if (!completeMeetingResult.ok) {
 		return json(completeMeetingResult, { status: toStatus(completeMeetingResult.error.code) });

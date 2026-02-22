@@ -1,6 +1,6 @@
 import { CORE_CHARACTERS } from '$lib/core/characters';
 import { addShare } from '$lib/core/meeting';
-import { buildHeatherCrisisPrompt, buildMarcusCrisisPrompt } from '$lib/core/prompt-templates';
+import { buildMarcusCrisisPrompt } from '$lib/core/prompt-templates';
 import { SeamErrorCodes, err, ok, type SeamErrorCode, type SeamResult } from '$lib/core/seam';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
@@ -92,78 +92,49 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 	}
 
 	const input = inputResult.value;
-	const marcus = CORE_CHARACTERS.find((character) => character.id === 'marcus');
-	const heather = CORE_CHARACTERS.find((character) => character.id === 'heather');
-	if (!marcus || !heather) {
-		return json(err(SeamErrorCodes.NOT_FOUND, 'Required crisis characters are unavailable'), { status: 404 });
+	const designatedCharacter = CORE_CHARACTERS.find((character) => character.id === 'marcus') ?? CORE_CHARACTERS[0];
+	if (!designatedCharacter) {
+		return json(err(SeamErrorCodes.NOT_FOUND, 'Crisis responder is unavailable'), { status: 404 });
 	}
 
 	await wait(2000);
 
-	const marcusGeneration = await locals.seams.grokAi.generateShare({
+	const generation = await locals.seams.grokAi.generateShare({
 		meetingId,
-		characterId: marcus.id,
+		characterId: designatedCharacter.id,
 		prompt: buildMarcusCrisisPrompt(input.userName, input.userText),
 		contextMessages: [{ role: 'user', content: input.userText }]
 	});
-	if (!marcusGeneration.ok) {
-		return json(marcusGeneration, { status: toStatus(marcusGeneration.error.code) });
+	if (!generation.ok) {
+		return json(generation, { status: toStatus(generation.error.code) });
 	}
 
-	const marcusShare = await addShare(
+	const crisisShare = await addShare(
 		{ database: locals.seams.database, grokAi: locals.seams.grokAi },
 		{
 			meetingId,
-			characterId: marcus.id,
+			characterId: designatedCharacter.id,
 			isUserShare: false,
-			content: marcusGeneration.value.shareText.trim(),
+			content: generation.value.shareText.trim(),
 			sequenceOrder: input.sequenceOrder,
 			interactionType: 'respond_to',
 			significanceScore: 10
 		}
 	);
-	if (!marcusShare.ok) {
-		return json(marcusShare, { status: toStatus(marcusShare.error.code) });
-	}
-
-	const heatherGeneration = await locals.seams.grokAi.generateShare({
-		meetingId,
-		characterId: heather.id,
-		prompt: buildHeatherCrisisPrompt(input.userName, input.userText),
-		contextMessages: [
-			{ role: 'user', content: input.userText },
-			{ role: 'assistant', content: marcusShare.value.content }
-		]
-	});
-	if (!heatherGeneration.ok) {
-		return json(heatherGeneration, { status: toStatus(heatherGeneration.error.code) });
-	}
-
-	const heatherShare = await addShare(
-		{ database: locals.seams.database, grokAi: locals.seams.grokAi },
-		{
-			meetingId,
-			characterId: heather.id,
-			isUserShare: false,
-			content: heatherGeneration.value.shareText.trim(),
-			sequenceOrder: input.sequenceOrder + 1,
-			interactionType: 'respond_to',
-			significanceScore: 10
-		}
-	);
-	if (!heatherShare.ok) {
-		return json(heatherShare, { status: toStatus(heatherShare.error.code) });
+	if (!crisisShare.ok) {
+		return json(crisisShare, { status: toStatus(crisisShare.error.code) });
 	}
 
 	return json(
 		ok({
-			shares: [marcusShare.value, heatherShare.value],
+			shares: [crisisShare.value],
 			resources: {
 				sticky: true,
 				title: "If you're in crisis",
 				lines: [
-					'988 - Suicide & Crisis Lifeline',
-					'1-800-662-4357 - SAMHSA National Helpline',
+					'Call or text 988 - Suicide & Crisis Lifeline',
+					'Text HOME to 741741 - Crisis Text Line',
+					'If you are in immediate danger, call 911.',
 					'You can stay here with us.'
 				]
 			} satisfies CrisisResourcesPayload

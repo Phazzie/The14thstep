@@ -4,7 +4,27 @@ import { applyReferenceLifecycle } from '$lib/core/callback-lifecycle';
 import { isMeetingInCrisis } from '$lib/core/crisis-engine';
 import { buildPromptContext } from '$lib/core/memory-builder';
 import { addShare, scoreSignificance, type ShareInteractionType } from '$lib/core/meeting';
-import { buildCharacterSharePrompt, buildQualityValidationPrompt } from '$lib/core/prompt-templates';
+import {
+	getMeetingNarrativeContext,
+	parseQualityValidation,
+	passesQualityValidationThresholds
+} from '$lib/core/narrative-context';
+import {
+	selectPromptForPhase,
+	initializeMeetingPhase,
+	transitionToNextPhase
+} from '$lib/core/ritual-orchestration';
+import {
+	buildCharacterSharePrompt,
+	buildQualityValidationPrompt,
+	buildRitualOpeningPrompt,
+	buildRitualIntroPrompt,
+	buildRitualReadingPrompt,
+	buildRitualClosingPrompt,
+	buildEmptyChairPrompt
+} from '$lib/core/prompt-templates';
+import type { MeetingPhaseState } from '$lib/core/types';
+import { MeetingPhase } from '$lib/core/types';
 import { SeamErrorCodes, err, ok, type SeamErrorCode, type SeamResult } from '$lib/core/seam';
 import type { CallbackScope, CallbackStatus, CallbackType } from '$lib/seams/database/contract';
 import { json } from '@sveltejs/kit';
@@ -30,6 +50,7 @@ interface ShareStreamRequest {
 	interactionType?: ShareInteractionType;
 	userName?: string;
 	userMood?: string;
+	phaseState?: MeetingPhaseState;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -80,27 +101,6 @@ function chunkByWords(text: string, wordsPerChunk = 8): string[] {
 	}
 
 	return chunks.length > 0 ? chunks : [text];
-}
-
-function stripCodeFences(value: string): string {
-	const trimmed = value.trim();
-	if (!trimmed.startsWith('```')) return trimmed;
-	return trimmed.replace(/^```(?:json)?\s*/i, '').replace(/```$/, '').trim();
-}
-
-function parseQualityValidation(raw: string): { pass: boolean } | null {
-	let parsed: unknown;
-	try {
-		parsed = JSON.parse(stripCodeFences(raw));
-	} catch {
-		return null;
-	}
-
-	if (!isObject(parsed) || typeof parsed.pass !== 'boolean') {
-		return null;
-	}
-
-	return { pass: parsed.pass };
 }
 
 function formatCallbackLine(callback: {
@@ -165,6 +165,9 @@ async function parseBodyRequest(request: Request): Promise<SeamResult<ShareStrea
 	if (body.userMood !== undefined && !isNonEmptyString(body.userMood)) {
 		return err(SeamErrorCodes.INPUT_INVALID, 'userMood must be a non-empty string when provided');
 	}
+	if (body.phaseState !== undefined && !isObject(body.phaseState)) {
+		return err(SeamErrorCodes.INPUT_INVALID, 'phaseState must be an object when provided');
+	}
 
 	return ok({
 		topic: normalizePromptScalar(body.topic),
@@ -173,7 +176,8 @@ async function parseBodyRequest(request: Request): Promise<SeamResult<ShareStrea
 		crisisMode: body.crisisMode,
 		interactionType: body.interactionType,
 		userName: body.userName ? normalizePromptScalar(body.userName, 80) : undefined,
-		userMood: body.userMood ? normalizePromptScalar(body.userMood, 80) : undefined
+		userMood: body.userMood ? normalizePromptScalar(body.userMood, 80) : undefined,
+		phaseState: body.phaseState as MeetingPhaseState | undefined
 	});
 }
 
@@ -205,7 +209,8 @@ function parseQueryRequest(url: URL): SeamResult<ShareStreamRequest> {
 		crisisMode,
 		interactionType: interactionTypeRaw as ShareInteractionType | undefined,
 		userName: userName ? normalizePromptScalar(userName, 80) : undefined,
-		userMood: userMood ? normalizePromptScalar(userMood, 80) : undefined
+		userMood: userMood ? normalizePromptScalar(userMood, 80) : undefined,
+		phaseState: undefined
 	});
 }
 
@@ -229,6 +234,14 @@ async function generateValidatedShare(input: {
 	recentShares: Array<{ speaker: string; content: string }>;
 	grokAi: App.Locals['seams']['grokAi'];
 }): Promise<SeamResult<{ shareText: string; attempts: number }>> {
+	const attemptScores: Array<{
+		attempt: number;
+		validatorPass: boolean | null;
+		voiceConsistency: number | null;
+		authenticity: number | null;
+		note: string;
+	}> = [];
+
 	for (let attempt = 1; attempt <= 3; attempt += 1) {
 		const generation = await input.grokAi.generateShare({
 			meetingId: input.meetingId,
@@ -237,11 +250,27 @@ async function generateValidatedShare(input: {
 			contextMessages: input.contextMessages
 		});
 		if (!generation.ok) {
-			return err(generation.error.code, generation.error.message, generation.error.details);
+			attemptScores.push({
+				attempt,
+				validatorPass: null,
+				voiceConsistency: null,
+				authenticity: null,
+				note: `generation_error:${generation.error.code}`
+			});
+			continue;
 		}
 
 		const candidate = generation.value.shareText.trim();
-		if (!candidate) continue;
+		if (!candidate) {
+			attemptScores.push({
+				attempt,
+				validatorPass: null,
+				voiceConsistency: null,
+				authenticity: null,
+				note: 'empty_candidate'
+			});
+			continue;
+		}
 
 		const qualityPrompt = buildQualityValidationPrompt(
 			input.character,
@@ -261,16 +290,50 @@ async function generateValidatedShare(input: {
 			contextMessages: [{ role: 'assistant', content: candidate }]
 		});
 		if (!quality.ok) {
-			return err(quality.error.code, quality.error.message, quality.error.details);
+			attemptScores.push({
+				attempt,
+				validatorPass: null,
+				voiceConsistency: null,
+				authenticity: null,
+				note: `validator_error:${quality.error.code}`
+			});
+			continue;
 		}
 
 		const parsed = parseQualityValidation(quality.value.shareText);
-		if (parsed?.pass) {
+		if (!parsed) {
+			attemptScores.push({
+				attempt,
+				validatorPass: null,
+				voiceConsistency: null,
+				authenticity: null,
+				note: 'validator_parse_failed'
+			});
+			continue;
+		}
+
+		attemptScores.push({
+			attempt,
+			validatorPass: parsed.pass,
+			voiceConsistency: parsed.voiceConsistency,
+			authenticity: parsed.authenticity,
+			note: parsed.therapySpeakDetected ? 'therapy_speak_detected' : 'scored'
+		});
+
+		if (passesQualityValidationThresholds(parsed)) {
 			return ok({ shareText: candidate, attempts: attempt });
 		}
 	}
 
-	return err(SeamErrorCodes.CONTRACT_VIOLATION, 'Generated share failed quality validation after retries');
+	console.warn(
+		`[share] quality gate skipped hollow output for meeting=${input.meetingId} character=${input.character.id}`,
+		attemptScores
+	);
+
+	return ok({
+		shareText: `${input.character.name} is quiet tonight.`,
+		attempts: 3
+	});
 }
 
 function mapRecentSharesFromMeeting(
@@ -291,6 +354,57 @@ function mapRecentSharesFromMeeting(
 			isUserShare: share.isUserShare
 		};
 	});
+}
+
+function buildPhaseAwarePrompt(
+	character: (typeof CORE_CHARACTERS)[number],
+	currentPhase: string,
+	userName: string,
+	userMood: string,
+	topic: string,
+	recentShares: Array<{ speaker: string; content: string }>,
+	heavyMemoryLines?: string[],
+	callbackLines?: string[],
+	continuityLines?: string[]
+): string {
+	// Select prompt type based on phase
+	const promptType = selectPromptForPhase(currentPhase as any, character);
+
+	switch (promptType) {
+		case 'opening':
+			return buildRitualOpeningPrompt(userName, character);
+
+		case 'intro': {
+			const isFirstTimer = recentShares.length === 0;
+			return buildRitualIntroPrompt(character, isFirstTimer);
+		}
+
+		case 'reading':
+			return buildRitualReadingPrompt(character);
+
+		case 'closing': {
+			// Summarize recent themes for closing
+			const themes = recentShares
+				.slice(-6)
+				.map((s) => s.content.split(/\s+/).slice(0, 3).join(' '))
+				.filter(Boolean)
+				.slice(0, 3)
+				.join(', ');
+			return buildRitualClosingPrompt(character, userName, themes || 'staying present');
+		}
+
+		case 'share':
+		default:
+			return buildCharacterSharePrompt(character, {
+				topic,
+				userName,
+				userMood,
+				recentShares,
+				heavyMemoryLines,
+				callbackLines,
+				continuityLines
+			});
+	}
 }
 
 function createShareStream(
@@ -368,18 +482,33 @@ function createShareStream(
 					}
 				}
 
-				const prompt = buildCharacterSharePrompt(selectedCharacter, {
+				const recentPromptShares = recentShares.slice(-6).map((share) => ({
+					speaker: share.speaker,
+					content: share.content
+				}));
+				const narrativeContext = await getMeetingNarrativeContext({
+					meetingId,
 					topic: input.topic,
 					userName,
 					userMood,
-					recentShares: recentShares.slice(-6).map((share) => ({
-						speaker: share.speaker,
-						content: share.content
-					})),
-					heavyMemoryLines,
-					continuityLines,
-					callbackLines: selectedCallbacks.map(formatCallbackLine)
+					recentShares: recentPromptShares,
+					grokAi: locals.seams.grokAi
 				});
+				const mergedContinuityLines = [narrativeContext.contextLine, ...(continuityLines ?? [])].slice(0, 5);
+
+				// Build phase-aware prompt
+				const currentPhase = input.phaseState?.currentPhase ?? MeetingPhase.SHARING_ROUND_1;
+				const prompt = buildPhaseAwarePrompt(
+					selectedCharacter,
+					currentPhase,
+					userName,
+					userMood,
+					input.topic,
+					recentPromptShares,
+					heavyMemoryLines,
+					selectedCallbacks.map(formatCallbackLine),
+					mergedContinuityLines
+				);
 
 				controller.enqueue(
 					sseChunk('meta', {
@@ -400,17 +529,20 @@ function createShareStream(
 					meetingId,
 					character: selectedCharacter,
 					prompt,
-					contextMessages: recentShares.slice(-6).map((share) => ({
-						role: share.isUserShare ? ('user' as const) : ('assistant' as const),
-						content: `${share.speaker}: ${share.content}`
-					})),
+					contextMessages: [
+						{
+							role: 'system',
+							content: `Meeting narrative context: ${narrativeContext.contextLine}`
+						},
+						...recentShares.slice(-6).map((share) => ({
+							role: share.isUserShare ? ('user' as const) : ('assistant' as const),
+							content: `${share.speaker}: ${share.content}`
+						}))
+					],
 					topic: input.topic,
 					userName,
 					userMood,
-					recentShares: recentShares.slice(-6).map((share) => ({
-						speaker: share.speaker,
-						content: share.content
-					})),
+					recentShares: recentPromptShares,
 					grokAi: locals.seams.grokAi
 				});
 

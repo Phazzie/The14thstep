@@ -5,6 +5,7 @@ import {
 	scoreSignificance,
 	type ShareInteractionType
 } from '$lib/core/meeting';
+import { buildCrisisTriagePrompt } from '$lib/core/prompt-templates';
 import { SeamErrorCodes, err, ok, type SeamErrorCode, type SeamResult } from '$lib/core/seam';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
@@ -26,6 +27,11 @@ interface UserShareRequest {
 	isFirstUserShare?: boolean;
 }
 
+interface CrisisTriageParse {
+	crisis: boolean;
+	confidence: 'high' | 'medium' | 'low';
+}
+
 function isObject(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null;
 }
@@ -36,6 +42,59 @@ function isNonEmptyString(value: unknown): value is string {
 
 function isShareInteractionType(value: unknown): value is ShareInteractionType {
 	return typeof value === 'string' && SHARE_INTERACTION_TYPES.includes(value as ShareInteractionType);
+}
+
+function stripCodeFences(value: string): string {
+	const trimmed = value.trim();
+	if (!trimmed.startsWith('```')) return trimmed;
+	return trimmed.replace(/^```(?:json)?\s*/i, '').replace(/```$/, '').trim();
+}
+
+function parseCrisisTriage(raw: string): CrisisTriageParse | null {
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(stripCodeFences(raw));
+	} catch {
+		return null;
+	}
+
+	if (typeof parsed !== 'object' || parsed === null) return null;
+	const value = parsed as Record<string, unknown>;
+	if (typeof value.crisis !== 'boolean') return null;
+	if (value.confidence !== 'high' && value.confidence !== 'medium' && value.confidence !== 'low') {
+		return null;
+	}
+
+	return {
+		crisis: value.crisis,
+		confidence: value.confidence
+	};
+}
+
+async function detectCrisisWithAi(input: {
+	meetingId: string;
+	content: string;
+	grokAi: App.Locals['seams']['grokAi'];
+}): Promise<boolean> {
+	const result = await input.grokAi.generateShare({
+		meetingId: input.meetingId,
+		characterId: 'crisis-triage',
+		prompt: buildCrisisTriagePrompt(input.content),
+		contextMessages: [{ role: 'user', content: input.content }]
+	});
+	if (!result.ok) {
+		return detectCrisisContent(input.content);
+	}
+
+	const parsed = parseCrisisTriage(result.value.shareText);
+	if (!parsed) {
+		return true;
+	}
+	if (!parsed.crisis && parsed.confidence === 'low') {
+		return true;
+	}
+
+	return parsed.crisis;
 }
 
 function toStatus(code: SeamErrorCode): number {
@@ -106,14 +165,20 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 
 	const input = inputResult.value;
 	const interactionType = input.interactionType ?? 'standard';
-	const crisis = detectCrisisContent(input.content);
-	const heavy = detectHeavyDisclosureContent(input.content);
-	const significanceScore = scoreSignificance({
+	const crisis = await detectCrisisWithAi({
+		meetingId,
 		content: input.content,
-		interactionType,
-		isUserShare: true,
-		isFirstUserShare: input.isFirstUserShare
+		grokAi: locals.seams.grokAi
 	});
+	const heavy = detectHeavyDisclosureContent(input.content);
+	const significanceScore = crisis
+		? 10
+		: scoreSignificance({
+			content: input.content,
+			interactionType,
+			isUserShare: true,
+			isFirstUserShare: input.isFirstUserShare
+		});
 
 	const result = await addShare(
 		{

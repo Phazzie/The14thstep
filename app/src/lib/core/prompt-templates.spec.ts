@@ -109,7 +109,9 @@ describe('prompt templates', () => {
 		expect(prompt).toContain('opening this meeting for trap');
 		expect(prompt).toContain('empty chair');
 		expect(prompt).toContain(STYLE_CONSTITUTION);
-		expect(prompt).not.toContain('therapy-speak');
+		// Constraint: avoid clichéd therapy opening phrases
+		expect(prompt).not.toContain('safe space');
+		expect(prompt).not.toContain('vulnerable');
 	});
 
 	it('builds ritual intro prompt with first-timer acknowledgment', () => {
@@ -132,7 +134,9 @@ describe('prompt templates', () => {
 		expect(prompt).toContain('showing up');
 		expect(prompt).toContain('Street-level wisdom');
 		expect(prompt).toContain(STYLE_CONSTITUTION);
-		expect(prompt).not.toContain('polished inspiration');
+		// Constraint: avoid therapy-speak and clichés
+		expect(prompt).not.toContain('breakthrough');
+		expect(prompt).not.toContain('transformation');
 	});
 
 	it('builds ritual closing prompt with confidentiality reminder', () => {
@@ -152,7 +156,11 @@ describe('prompt templates', () => {
 		expect(prompt).toContain('empty chair');
 		expect(prompt).toContain('recovery');
 		expect(prompt).toContain('2-3 sentences');
-		expect(prompt).not.toContain('names');
-		expect(prompt).not.toContain('therapy-speak');
+		// Constraint: no character names in the actual prompt content
+		expect(prompt).not.toContain('Marcus');
+		expect(prompt).not.toContain('Heather');
+		// Constraint: no banned therapy-speak phrases
+		expect(prompt).not.toContain('vulnerable');
+		expect(prompt).not.toContain('journey');
 	});
 });
