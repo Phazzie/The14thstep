@@ -207,8 +207,9 @@ function getRoundNumber(phase: MeetingPhase): number | undefined {
  */
 export function selectPromptForPhase(
 	phase: MeetingPhase,
-	_character: CharacterProfile
+	character: CharacterProfile
 ): 'opening' | 'intro' | 'share' | 'closing' | 'reading' {
+	void character;
 	switch (phase) {
 		case MeetingPhaseEnum.OPENING:
 			return 'opening';

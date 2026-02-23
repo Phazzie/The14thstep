@@ -19,7 +19,8 @@ interface ExtractedMeetingMemory {
 	characterThreads: Record<string, string>;
 }
 
-function toClosingPhaseState(_current: MeetingPhaseState): MeetingPhaseState {
+function toClosingPhaseState(current: MeetingPhaseState): MeetingPhaseState {
+	void current;
 	return {
 		currentPhase: MeetingPhase.CLOSING,
 		phaseStartedAt: new Date(),

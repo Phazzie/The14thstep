@@ -23,11 +23,14 @@ function makeCallback(overrides: Partial<CallbackRecord> = {}): CallbackRecord {
 describe('runCallbackLifecycleWorkflow', () => {
 	it('retires callbacks when inactivity crosses threshold', async () => {
 		const updates: Array<{ id: string; status?: string }> = [];
-		const getActiveCallbacks = async (_input: {
+		const getActiveCallbacks = async (input: {
 			characterId: string;
 			meetingId: string;
 			scopeToMeeting?: boolean;
-		}) => ok([makeCallback()]);
+		}) => {
+			void input;
+			return ok([makeCallback()]);
+		};
 		const result = await runCallbackLifecycleWorkflow({
 			meetingId: 'meeting-1',
 			userId: 'user-1',
