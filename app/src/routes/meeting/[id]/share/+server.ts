@@ -1,10 +1,32 @@
-import { CORE_CHARACTERS } from '$lib/core/characters';
+import { CORE_CHARACTERS, validateCharacterNarrativeFields } from '$lib/core/characters';
 import { shouldIncludeCallback } from '$lib/core/callback-engine';
 import { applyReferenceLifecycle } from '$lib/core/callback-lifecycle';
 import { isMeetingInCrisis } from '$lib/core/crisis-engine';
 import { buildPromptContext } from '$lib/core/memory-builder';
 import { addShare, scoreSignificance, type ShareInteractionType } from '$lib/core/meeting';
-import { buildCharacterSharePrompt, buildQualityValidationPrompt } from '$lib/core/prompt-templates';
+import {
+	getMeetingNarrativeContext,
+	parseQualityValidation,
+	passesQualityValidationThresholds
+} from '$lib/core/narrative-context';
+import {
+	selectPromptForPhase,
+	INTRO_ORDER,
+	initializeMeetingPhase,
+	isRoundComplete,
+	recordCharacterSpoke,
+	transitionToNextPhase
+} from '$lib/core/ritual-orchestration';
+import {
+	buildCharacterSharePrompt,
+	buildQualityValidationPrompt,
+	buildRitualOpeningPrompt,
+	buildRitualIntroPrompt,
+	buildRitualReadingPrompt,
+	buildRitualClosingPrompt
+} from '$lib/core/prompt-templates';
+import type { MeetingPhaseState } from '$lib/core/types';
+import { MeetingPhase } from '$lib/core/types';
 import { SeamErrorCodes, err, ok, type SeamErrorCode, type SeamResult } from '$lib/core/seam';
 import type { CallbackScope, CallbackStatus, CallbackType } from '$lib/seams/database/contract';
 import { json } from '@sveltejs/kit';
@@ -30,6 +52,7 @@ interface ShareStreamRequest {
 	interactionType?: ShareInteractionType;
 	userName?: string;
 	userMood?: string;
+	phaseState?: MeetingPhaseState;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -82,27 +105,6 @@ function chunkByWords(text: string, wordsPerChunk = 8): string[] {
 	return chunks.length > 0 ? chunks : [text];
 }
 
-function stripCodeFences(value: string): string {
-	const trimmed = value.trim();
-	if (!trimmed.startsWith('```')) return trimmed;
-	return trimmed.replace(/^```(?:json)?\s*/i, '').replace(/```$/, '').trim();
-}
-
-function parseQualityValidation(raw: string): { pass: boolean } | null {
-	let parsed: unknown;
-	try {
-		parsed = JSON.parse(stripCodeFences(raw));
-	} catch {
-		return null;
-	}
-
-	if (!isObject(parsed) || typeof parsed.pass !== 'boolean') {
-		return null;
-	}
-
-	return { pass: parsed.pass };
-}
-
 function formatCallbackLine(callback: {
 	callbackType: string;
 	scope: string;
@@ -129,6 +131,48 @@ function isShareInteractionType(value: unknown): value is ShareInteractionType {
 function normalizePromptScalar(value: string, maxLength = 160): string {
 	const compact = value.replace(/\s+/g, ' ').trim();
 	return compact.slice(0, maxLength);
+}
+
+function revivePhaseState(value: unknown): MeetingPhaseState | null {
+	if (!isObject(value)) return null;
+	if (typeof value.currentPhase !== 'string') return null;
+	if (!Object.values(MeetingPhase).includes(value.currentPhase as MeetingPhase)) return null;
+
+	const rawPhaseStartedAt = value.phaseStartedAt;
+	let phaseStartedAt: Date;
+	if (rawPhaseStartedAt instanceof Date) {
+		phaseStartedAt = rawPhaseStartedAt;
+	} else if (typeof rawPhaseStartedAt === 'string') {
+		const parsed = new Date(rawPhaseStartedAt);
+		if (!Number.isFinite(parsed.getTime())) return null;
+		phaseStartedAt = parsed;
+	} else {
+		return null;
+	}
+
+	if (!Array.isArray(value.charactersSpokenThisRound)) return null;
+	const charactersSpokenThisRound = value.charactersSpokenThisRound.filter(
+		(entry): entry is string => typeof entry === 'string'
+	);
+	if (charactersSpokenThisRound.length !== value.charactersSpokenThisRound.length) return null;
+
+	if (typeof value.userHasSharedInRound !== 'boolean') return null;
+
+	let roundNumber: number | undefined;
+	if (value.roundNumber !== undefined) {
+		if (typeof value.roundNumber !== 'number' || !Number.isInteger(value.roundNumber) || value.roundNumber < 0) {
+			return null;
+		}
+		roundNumber = value.roundNumber;
+	}
+
+	return {
+		currentPhase: value.currentPhase as MeetingPhase,
+		phaseStartedAt,
+		roundNumber,
+		charactersSpokenThisRound,
+		userHasSharedInRound: value.userHasSharedInRound
+	};
 }
 
 async function parseBodyRequest(request: Request): Promise<SeamResult<ShareStreamRequest>> {
@@ -165,6 +209,14 @@ async function parseBodyRequest(request: Request): Promise<SeamResult<ShareStrea
 	if (body.userMood !== undefined && !isNonEmptyString(body.userMood)) {
 		return err(SeamErrorCodes.INPUT_INVALID, 'userMood must be a non-empty string when provided');
 	}
+	if (body.phaseState !== undefined && !isObject(body.phaseState)) {
+		return err(SeamErrorCodes.INPUT_INVALID, 'phaseState must be an object when provided');
+	}
+	const revivedPhaseState: MeetingPhaseState | undefined =
+		body.phaseState !== undefined ? (revivePhaseState(body.phaseState as unknown) ?? undefined) : undefined;
+	if (body.phaseState !== undefined && !revivedPhaseState) {
+		return err(SeamErrorCodes.INPUT_INVALID, 'phaseState is invalid');
+	}
 
 	return ok({
 		topic: normalizePromptScalar(body.topic),
@@ -173,7 +225,8 @@ async function parseBodyRequest(request: Request): Promise<SeamResult<ShareStrea
 		crisisMode: body.crisisMode,
 		interactionType: body.interactionType,
 		userName: body.userName ? normalizePromptScalar(body.userName, 80) : undefined,
-		userMood: body.userMood ? normalizePromptScalar(body.userMood, 80) : undefined
+		userMood: body.userMood ? normalizePromptScalar(body.userMood, 80) : undefined,
+		phaseState: revivedPhaseState
 	});
 }
 
@@ -205,7 +258,8 @@ function parseQueryRequest(url: URL): SeamResult<ShareStreamRequest> {
 		crisisMode,
 		interactionType: interactionTypeRaw as ShareInteractionType | undefined,
 		userName: userName ? normalizePromptScalar(userName, 80) : undefined,
-		userMood: userMood ? normalizePromptScalar(userMood, 80) : undefined
+		userMood: userMood ? normalizePromptScalar(userMood, 80) : undefined,
+		phaseState: undefined
 	});
 }
 
@@ -218,7 +272,7 @@ function pickCharacter(characterId: string | undefined, sequenceOrder: number) {
 	return CORE_CHARACTERS[sequenceOrder % CORE_CHARACTERS.length];
 }
 
-async function generateValidatedShare(input: {
+export async function _generateValidatedShare(input: {
 	meetingId: string;
 	character: (typeof CORE_CHARACTERS)[number];
 	prompt: string;
@@ -228,7 +282,17 @@ async function generateValidatedShare(input: {
 	userMood: string;
 	recentShares: Array<{ speaker: string; content: string }>;
 	grokAi: App.Locals['seams']['grokAi'];
-}): Promise<SeamResult<{ shareText: string; attempts: number }>> {
+}): Promise<SeamResult<{ shareText: string; attempts: number; fallbackUsed: boolean }>> {
+	const attemptScores: Array<{
+		attempt: number;
+		validatorPass: boolean | null;
+		voiceConsistency: number | null;
+		authenticity: number | null;
+		note: string;
+	}> = [];
+	let lastUpstreamError: { code: SeamErrorCode; message: string; details?: Record<string, unknown> } | null = null;
+	let hadGeneratedCandidate = false;
+
 	for (let attempt = 1; attempt <= 3; attempt += 1) {
 		const generation = await input.grokAi.generateShare({
 			meetingId: input.meetingId,
@@ -237,11 +301,29 @@ async function generateValidatedShare(input: {
 			contextMessages: input.contextMessages
 		});
 		if (!generation.ok) {
-			return err(generation.error.code, generation.error.message, generation.error.details);
+			lastUpstreamError = generation.error;
+			attemptScores.push({
+				attempt,
+				validatorPass: null,
+				voiceConsistency: null,
+				authenticity: null,
+				note: `generation_error:${generation.error.code}`
+			});
+			continue;
 		}
 
 		const candidate = generation.value.shareText.trim();
-		if (!candidate) continue;
+		if (!candidate) {
+			attemptScores.push({
+				attempt,
+				validatorPass: null,
+				voiceConsistency: null,
+				authenticity: null,
+				note: 'empty_candidate'
+			});
+			continue;
+		}
+		hadGeneratedCandidate = true;
 
 		const qualityPrompt = buildQualityValidationPrompt(
 			input.character,
@@ -261,16 +343,56 @@ async function generateValidatedShare(input: {
 			contextMessages: [{ role: 'assistant', content: candidate }]
 		});
 		if (!quality.ok) {
-			return err(quality.error.code, quality.error.message, quality.error.details);
+			lastUpstreamError = quality.error;
+			attemptScores.push({
+				attempt,
+				validatorPass: null,
+				voiceConsistency: null,
+				authenticity: null,
+				note: `validator_error:${quality.error.code}`
+			});
+			continue;
 		}
 
 		const parsed = parseQualityValidation(quality.value.shareText);
-		if (parsed?.pass) {
-			return ok({ shareText: candidate, attempts: attempt });
+		if (!parsed) {
+			attemptScores.push({
+				attempt,
+				validatorPass: null,
+				voiceConsistency: null,
+				authenticity: null,
+				note: 'validator_parse_failed'
+			});
+			continue;
+		}
+
+		attemptScores.push({
+			attempt,
+			validatorPass: parsed.pass,
+			voiceConsistency: parsed.voiceConsistency,
+			authenticity: parsed.authenticity,
+			note: parsed.therapySpeakDetected ? 'therapy_speak_detected' : 'scored'
+		});
+
+		if (passesQualityValidationThresholds(parsed)) {
+			return ok({ shareText: candidate, attempts: attempt, fallbackUsed: false });
 		}
 	}
 
-	return err(SeamErrorCodes.CONTRACT_VIOLATION, 'Generated share failed quality validation after retries');
+	console.warn(
+		`[share] quality gate skipped hollow output for meeting=${input.meetingId} character=${input.character.id}`,
+		attemptScores
+	);
+
+	if (!hadGeneratedCandidate && lastUpstreamError) {
+		return err(lastUpstreamError.code, lastUpstreamError.message, lastUpstreamError.details);
+	}
+
+	return ok({
+		shareText: `${input.character.name} is quiet tonight.`,
+		attempts: 3,
+		fallbackUsed: true
+	});
 }
 
 function mapRecentSharesFromMeeting(
@@ -291,6 +413,57 @@ function mapRecentSharesFromMeeting(
 			isUserShare: share.isUserShare
 		};
 	});
+}
+
+function buildPhaseAwarePrompt(
+	character: (typeof CORE_CHARACTERS)[number],
+	currentPhase: MeetingPhase,
+	userName: string,
+	userMood: string,
+	topic: string,
+	recentShares: Array<{ speaker: string; content: string }>,
+	heavyMemoryLines?: string[],
+	callbackLines?: string[],
+	continuityLines?: string[]
+): string {
+	// Select prompt type based on phase
+	const promptType = selectPromptForPhase(currentPhase, character);
+
+	switch (promptType) {
+		case 'opening':
+			return buildRitualOpeningPrompt(userName, character);
+
+		case 'intro': {
+			const isFirstTimer = recentShares.length === 0;
+			return buildRitualIntroPrompt(character, isFirstTimer);
+		}
+
+		case 'reading':
+			return buildRitualReadingPrompt(character);
+
+		case 'closing': {
+			// Summarize recent themes for closing
+			const themes = recentShares
+				.slice(-6)
+				.map((s) => s.content.split(/\s+/).slice(0, 3).join(' '))
+				.filter(Boolean)
+				.slice(0, 3)
+				.join(', ');
+			return buildRitualClosingPrompt(character, userName, themes || 'staying present');
+		}
+
+		case 'share':
+		default:
+			return buildCharacterSharePrompt(character, {
+				topic,
+				userName,
+				userMood,
+				recentShares,
+				heavyMemoryLines,
+				callbackLines,
+				continuityLines
+			});
+	}
 }
 
 function createShareStream(
@@ -368,18 +541,74 @@ function createShareStream(
 					}
 				}
 
-				const prompt = buildCharacterSharePrompt(selectedCharacter, {
+				const recentPromptShares = recentShares.slice(-6).map((share) => ({
+					speaker: share.speaker,
+					content: share.content
+				}));
+				const narrativeContext = await getMeetingNarrativeContext({
+					meetingId,
 					topic: input.topic,
 					userName,
 					userMood,
-					recentShares: recentShares.slice(-6).map((share) => ({
-						speaker: share.speaker,
-						content: share.content
-					})),
-					heavyMemoryLines,
-					continuityLines,
-					callbackLines: selectedCallbacks.map(formatCallbackLine)
+					recentShares: recentPromptShares,
+					grokAi: locals.seams.grokAi
 				});
+				const mergedContinuityLines = [narrativeContext.contextLine, ...(continuityLines ?? [])].slice(0, 5);
+				const narrativeFieldValidation = validateCharacterNarrativeFields(selectedCharacter);
+				if (!narrativeFieldValidation.ok) {
+					console.warn(
+						`[share] Character ${selectedCharacter.id} missing narrative fields: ${narrativeFieldValidation.missingFields.join(', ')}`
+					);
+				}
+
+				let currentPhaseState = input.phaseState ?? initializeMeetingPhase();
+				let phaseLoaded = !!input.phaseState;
+				if (!input.phaseState) {
+					const persistedPhaseStateResult = await locals.seams.database.getMeetingPhase(meetingId);
+					if (persistedPhaseStateResult.ok && persistedPhaseStateResult.value) {
+						currentPhaseState = persistedPhaseStateResult.value;
+						phaseLoaded = true;
+					} else if (persistedPhaseStateResult.ok) {
+						phaseLoaded = true;
+					} else if (!persistedPhaseStateResult.ok) {
+						console.warn(
+							`[share] getMeetingPhase failed for meeting=${meetingId}: ${persistedPhaseStateResult.error.message}`
+						);
+					}
+				}
+				if (currentPhaseState.currentPhase === MeetingPhase.SETUP) {
+					const meetingStartTransition = transitionToNextPhase(currentPhaseState, 'meeting_start');
+					if (meetingStartTransition.ok) {
+						currentPhaseState = meetingStartTransition.value;
+					} else {
+						console.warn(
+							`[share] meeting_start transition failed for meeting=${meetingId}: ${meetingStartTransition.error.message}`
+						);
+					}
+				}
+
+				// Build phase-aware prompt
+				const currentPhase = currentPhaseState.currentPhase;
+				if (currentPhase === MeetingPhase.INTRODUCTIONS) {
+					const introIndex = currentPhaseState.charactersSpokenThisRound.length;
+					const expectedCharacterId = INTRO_ORDER[introIndex];
+					if (expectedCharacterId && selectedCharacter.id !== expectedCharacterId) {
+						console.warn(
+							`[share] Intro order violation in meeting=${meetingId}: expected ${expectedCharacterId}, got ${selectedCharacter.id}`
+						);
+					}
+				}
+				const prompt = buildPhaseAwarePrompt(
+					selectedCharacter,
+					currentPhase,
+					userName,
+					userMood,
+					input.topic,
+					recentPromptShares,
+					heavyMemoryLines,
+					selectedCallbacks.map(formatCallbackLine),
+					mergedContinuityLines
+				);
 
 				controller.enqueue(
 					sseChunk('meta', {
@@ -396,21 +625,24 @@ function createShareStream(
 					})
 				);
 
-				const generated = await generateValidatedShare({
+				const generated = await _generateValidatedShare({
 					meetingId,
 					character: selectedCharacter,
 					prompt,
-					contextMessages: recentShares.slice(-6).map((share) => ({
-						role: share.isUserShare ? ('user' as const) : ('assistant' as const),
-						content: `${share.speaker}: ${share.content}`
-					})),
+					contextMessages: [
+						{
+							role: 'system',
+							content: `Meeting narrative context: ${narrativeContext.contextLine}`
+						},
+						...recentShares.slice(-6).map((share) => ({
+							role: share.isUserShare ? ('user' as const) : ('assistant' as const),
+							content: `${share.speaker}: ${share.content}`
+						}))
+					],
 					topic: input.topic,
 					userName,
 					userMood,
-					recentShares: recentShares.slice(-6).map((share) => ({
-						speaker: share.speaker,
-						content: share.content
-					})),
+					recentShares: recentPromptShares,
 					grokAi: locals.seams.grokAi
 				});
 
@@ -464,6 +696,72 @@ function createShareStream(
 					return;
 				}
 
+				let phaseStateAfterShare = currentPhaseState;
+				const recordCharacterResult = recordCharacterSpoke(currentPhaseState, selectedCharacter.id);
+				if (recordCharacterResult.ok) {
+					phaseStateAfterShare = recordCharacterResult.value;
+				} else {
+					console.warn(
+						`[share] recordCharacterSpoke failed for meeting=${meetingId}: ${recordCharacterResult.error.message}`
+					);
+				}
+
+				const speakerCount =
+					phaseStateAfterShare.charactersSpokenThisRound.length +
+					(phaseStateAfterShare.userHasSharedInRound ? 1 : 0);
+				let transitionTrigger:
+					| 'share_complete'
+					| 'round_complete'
+					| 'user_input'
+					| 'meeting_start'
+					| null = null;
+
+				if (
+					currentPhase === MeetingPhase.OPENING ||
+					currentPhase === MeetingPhase.EMPTY_CHAIR ||
+					currentPhase === MeetingPhase.CLOSING ||
+					currentPhase === MeetingPhase.CRISIS_MODE
+				) {
+					transitionTrigger = 'share_complete';
+				} else if (currentPhase === MeetingPhase.INTRODUCTIONS && speakerCount >= 2) {
+					transitionTrigger = 'round_complete';
+				} else if (
+					(currentPhase === MeetingPhase.SHARING_ROUND_1 ||
+						currentPhase === MeetingPhase.SHARING_ROUND_2 ||
+						currentPhase === MeetingPhase.SHARING_ROUND_3) &&
+					isRoundComplete(phaseStateAfterShare)
+				) {
+					transitionTrigger = 'round_complete';
+				}
+
+				let phaseStateToPersist = phaseStateAfterShare;
+				if (transitionTrigger) {
+					const transitionResult = transitionToNextPhase(phaseStateAfterShare, transitionTrigger);
+					if (transitionResult.ok) {
+						phaseStateToPersist = transitionResult.value;
+					} else {
+						console.warn(
+							`[share] transitionToNextPhase failed for meeting=${meetingId}: ${transitionResult.error.message}`
+						);
+					}
+				}
+
+				if (phaseLoaded) {
+					const updateMeetingPhaseResult = await locals.seams.database.updateMeetingPhase(
+						meetingId,
+						phaseStateToPersist
+					);
+					if (!updateMeetingPhaseResult.ok) {
+						console.error(
+							`[share] Failed to persist phase state for meeting=${meetingId}: ${updateMeetingPhaseResult.error.message}`
+						);
+					}
+				} else {
+					console.warn(
+						`[share] Skipping phase persistence because phase state could not be loaded for meeting=${meetingId}`
+					);
+				}
+
 				const callbackLifecycleWarnings: string[] = [];
 				for (const callback of selectedCallbacks) {
 					const lifecycle = applyReferenceLifecycle({
@@ -512,6 +810,11 @@ function createShareStream(
 						ok: true,
 						value: {
 							share: saved.value,
+							phaseState: phaseStateToPersist,
+							generation: {
+								attempts: generated.value.attempts,
+								fallbackUsed: generated.value.fallbackUsed
+							},
 							callbacksUsed: selectedCallbacks,
 								character: {
 									id: selectedCharacter.id,
@@ -527,7 +830,8 @@ function createShareStream(
 						ok: true,
 						value: {
 							meetingId,
-							characterId: selectedCharacter.id
+							characterId: selectedCharacter.id,
+							phaseState: phaseStateToPersist
 						}
 					})
 				);
@@ -568,6 +872,24 @@ async function handleShareRequest(
 	const meetingSharesResult = await locals.seams.database.getMeetingShares(meetingId);
 	if (!meetingSharesResult.ok) {
 		return json(meetingSharesResult, { status: toStatus(meetingSharesResult.error.code) });
+	}
+	const persistedPhaseStateResult = await locals.seams.database.getMeetingPhase(meetingId);
+	if (persistedPhaseStateResult.ok && persistedPhaseStateResult.value) {
+		if (persistedPhaseStateResult.value.currentPhase === MeetingPhase.CRISIS_MODE) {
+			return json(err(SeamErrorCodes.INPUT_INVALID, 'Character shares are paused during crisis mode'), {
+				status: 409
+			});
+		}
+		if (persistedPhaseStateResult.value.currentPhase === MeetingPhase.POST_MEETING) {
+			return json(err(SeamErrorCodes.INPUT_INVALID, 'Character shares are unavailable after the meeting closes'), {
+				status: 409
+			});
+		}
+	}
+	if (!persistedPhaseStateResult.ok) {
+		console.warn(
+			`[share] getMeetingPhase pre-check failed for meeting=${meetingId}: ${persistedPhaseStateResult.error.message}`
+		);
 	}
 
 	const persistedCrisisMode = isMeetingInCrisis({

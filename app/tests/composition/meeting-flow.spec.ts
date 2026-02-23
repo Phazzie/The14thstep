@@ -126,6 +126,18 @@ function createInMemoryDatabase(userId: string): { state: InMemoryState; databas
 			return ok(shares);
 		},
 
+		async updateMeetingPhase(meetingId) {
+			const meeting = state.meetings.find((entry) => entry.id === meetingId);
+			if (!meeting) return err(SeamErrorCodes.NOT_FOUND, 'Meeting not found');
+			return ok(undefined);
+		},
+
+		async getMeetingPhase(meetingId) {
+			const meeting = state.meetings.find((entry) => entry.id === meetingId);
+			if (!meeting) return err(SeamErrorCodes.NOT_FOUND, 'Meeting not found');
+			return ok(null);
+		},
+
 		async createCallback(input) {
 			state.ids.callback += 1;
 			const callback: CallbackRecord = {

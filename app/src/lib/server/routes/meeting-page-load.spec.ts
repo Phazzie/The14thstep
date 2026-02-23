@@ -9,7 +9,8 @@ describe('meeting page server load', () => {
 				userId: 'user-1',
 				seams: {
 					database: {
-						getMeetingShares: async () => ({ ok: true, value: [] })
+						getMeetingShares: async () => ({ ok: true, value: [] }),
+						getMeetingPhase: async () => ({ ok: true, value: null })
 					}
 				}
 			},
@@ -29,7 +30,8 @@ describe('meeting page server load', () => {
 				userId: 'user-1',
 				seams: {
 					database: {
-						getMeetingShares: async () => ({ ok: true, value: [] })
+						getMeetingShares: async () => ({ ok: true, value: [] }),
+						getMeetingPhase: async () => ({ ok: true, value: null })
 					}
 				}
 			},
@@ -61,7 +63,8 @@ describe('meeting page server load', () => {
 										createdAt: '2026-02-19T00:00:00.000Z'
 									}
 								]
-							}) as never
+							}) as never,
+						getMeetingPhase: async () => ({ ok: true, value: null })
 					}
 				}
 			},
@@ -71,6 +74,36 @@ describe('meeting page server load', () => {
 		expect((result as { initialCrisisMode: boolean }).initialCrisisMode).toBe(true);
 		expect((result as { shouldTriggerInitialCrisisSupport: boolean }).shouldTriggerInitialCrisisSupport).toBe(
 			false
+		);
+	});
+
+	it('returns persisted ritual phase state when available', async () => {
+		const result = await load({
+			params: { id: 'meeting-1' },
+			locals: {
+				userId: 'user-1',
+				seams: {
+					database: {
+						getMeetingShares: async () => ({ ok: true, value: [] }),
+						getMeetingPhase: async () => ({
+							ok: true,
+							value: {
+								currentPhase: 'crisis_mode',
+								phaseStartedAt: new Date('2026-02-22T20:00:00.000Z'),
+								roundNumber: 2,
+								charactersSpokenThisRound: ['marcus'],
+								userHasSharedInRound: true
+							}
+						})
+					}
+				}
+			},
+			url: new URL('http://localhost/meeting/meeting-1?mind=staying%20present')
+		} as never);
+
+		expect((result as { phaseState: { currentPhase: string } }).phaseState.currentPhase).toBe('crisis_mode');
+		expect((result as { phaseState: { userHasSharedInRound: boolean } }).phaseState.userHasSharedInRound).toBe(
+			true
 		);
 	});
 });

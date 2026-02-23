@@ -1,6 +1,8 @@
 import { CORE_CHARACTERS } from '$lib/core/characters';
 import { addShare } from '$lib/core/meeting';
-import { buildHeatherCrisisPrompt, buildMarcusCrisisPrompt } from '$lib/core/prompt-templates';
+import { initializeMeetingPhase } from '$lib/core/ritual-orchestration';
+import { buildMarcusCrisisPrompt } from '$lib/core/prompt-templates';
+import { MeetingPhase, type MeetingPhaseState } from '$lib/core/types';
 import { SeamErrorCodes, err, ok, type SeamErrorCode, type SeamResult } from '$lib/core/seam';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
@@ -15,6 +17,32 @@ interface CrisisResourcesPayload {
 	sticky: true;
 	title: string;
 	lines: string[];
+}
+
+function enterCrisisMode(current: MeetingPhaseState): MeetingPhaseState {
+	return {
+		...current,
+		currentPhase: MeetingPhase.CRISIS_MODE,
+		phaseStartedAt: new Date()
+	};
+}
+
+async function getCurrentPhaseState(meetingId: string, locals: App.Locals): Promise<MeetingPhaseState> {
+	let phaseState = initializeMeetingPhase();
+	const persistedPhaseState = await locals.seams.database.getMeetingPhase(meetingId);
+	if (persistedPhaseState.ok && persistedPhaseState.value) {
+		phaseState = persistedPhaseState.value;
+	} else if (!persistedPhaseState.ok) {
+		console.warn(`[crisis] getMeetingPhase failed for meeting=${meetingId}: ${persistedPhaseState.error.message}`);
+	}
+	return phaseState;
+}
+
+async function persistPhaseState(meetingId: string, phaseState: MeetingPhaseState, locals: App.Locals) {
+	const updateResult = await locals.seams.database.updateMeetingPhase(meetingId, phaseState);
+	if (!updateResult.ok) {
+		console.error(`[crisis] Failed to persist phase state for meeting=${meetingId}: ${updateResult.error.message}`);
+	}
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -92,78 +120,59 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 	}
 
 	const input = inputResult.value;
-	const marcus = CORE_CHARACTERS.find((character) => character.id === 'marcus');
-	const heather = CORE_CHARACTERS.find((character) => character.id === 'heather');
-	if (!marcus || !heather) {
-		return json(err(SeamErrorCodes.NOT_FOUND, 'Required crisis characters are unavailable'), { status: 404 });
+	let phaseState = await getCurrentPhaseState(meetingId, locals);
+	if (phaseState.currentPhase === MeetingPhase.POST_MEETING) {
+		return json(err(SeamErrorCodes.INPUT_INVALID, 'Meeting is already closed'), { status: 409 });
+	}
+	if (phaseState.currentPhase !== MeetingPhase.CRISIS_MODE) {
+		phaseState = enterCrisisMode(phaseState);
+		await persistPhaseState(meetingId, phaseState, locals);
+	}
+
+	const designatedCharacter = CORE_CHARACTERS.find((character) => character.id === 'marcus') ?? CORE_CHARACTERS[0];
+	if (!designatedCharacter) {
+		return json(err(SeamErrorCodes.NOT_FOUND, 'Crisis responder is unavailable'), { status: 404 });
 	}
 
 	await wait(2000);
 
-	const marcusGeneration = await locals.seams.grokAi.generateShare({
+	const generation = await locals.seams.grokAi.generateShare({
 		meetingId,
-		characterId: marcus.id,
+		characterId: designatedCharacter.id,
 		prompt: buildMarcusCrisisPrompt(input.userName, input.userText),
 		contextMessages: [{ role: 'user', content: input.userText }]
 	});
-	if (!marcusGeneration.ok) {
-		return json(marcusGeneration, { status: toStatus(marcusGeneration.error.code) });
+	if (!generation.ok) {
+		return json(generation, { status: toStatus(generation.error.code) });
 	}
 
-	const marcusShare = await addShare(
+	const crisisShare = await addShare(
 		{ database: locals.seams.database, grokAi: locals.seams.grokAi },
 		{
 			meetingId,
-			characterId: marcus.id,
+			characterId: designatedCharacter.id,
 			isUserShare: false,
-			content: marcusGeneration.value.shareText.trim(),
+			content: generation.value.shareText.trim(),
 			sequenceOrder: input.sequenceOrder,
 			interactionType: 'respond_to',
 			significanceScore: 10
 		}
 	);
-	if (!marcusShare.ok) {
-		return json(marcusShare, { status: toStatus(marcusShare.error.code) });
-	}
-
-	const heatherGeneration = await locals.seams.grokAi.generateShare({
-		meetingId,
-		characterId: heather.id,
-		prompt: buildHeatherCrisisPrompt(input.userName, input.userText),
-		contextMessages: [
-			{ role: 'user', content: input.userText },
-			{ role: 'assistant', content: marcusShare.value.content }
-		]
-	});
-	if (!heatherGeneration.ok) {
-		return json(heatherGeneration, { status: toStatus(heatherGeneration.error.code) });
-	}
-
-	const heatherShare = await addShare(
-		{ database: locals.seams.database, grokAi: locals.seams.grokAi },
-		{
-			meetingId,
-			characterId: heather.id,
-			isUserShare: false,
-			content: heatherGeneration.value.shareText.trim(),
-			sequenceOrder: input.sequenceOrder + 1,
-			interactionType: 'respond_to',
-			significanceScore: 10
-		}
-	);
-	if (!heatherShare.ok) {
-		return json(heatherShare, { status: toStatus(heatherShare.error.code) });
+	if (!crisisShare.ok) {
+		return json(crisisShare, { status: toStatus(crisisShare.error.code) });
 	}
 
 	return json(
 		ok({
-			shares: [marcusShare.value, heatherShare.value],
+			shares: [crisisShare.value],
+			phaseState,
 			resources: {
 				sticky: true,
 				title: "If you're in crisis",
 				lines: [
-					'988 - Suicide & Crisis Lifeline',
-					'1-800-662-4357 - SAMHSA National Helpline',
+					'Call or text 988 - Suicide & Crisis Lifeline',
+					'Text HOME to 741741 - Crisis Text Line',
+					'If you are in immediate danger, call 911.',
 					'You can stay here with us.'
 				]
 			} satisfies CrisisResourcesPayload

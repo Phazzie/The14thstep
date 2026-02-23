@@ -1,5 +1,6 @@
 import { SeamErrorCodes, err, ok, type SeamResult } from '$lib/core/seam';
 import { CORE_CHARACTERS } from '$lib/core/characters';
+import { MeetingPhase, type MeetingPhaseState } from '$lib/core/types';
 import {
 	type CallbackRecord,
 	type DatabasePort,
@@ -51,6 +52,8 @@ interface CharacterMaps {
 	dbIdByDomainId: Map<string, string>;
 	domainIdByDbId: Map<string, string>;
 }
+
+const MEETING_PHASE_VALUES = new Set<MeetingPhase>(Object.values(MeetingPhase));
 
 function isObject(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null;
@@ -169,6 +172,79 @@ function mapMeetingRecordRow(row: unknown): MeetingRecord {
 		startedAt: asString(record.started_at) ?? '',
 		endedAt: asNullableString(record.ended_at) ?? null
 	};
+}
+
+function isMeetingPhase(value: unknown): value is MeetingPhase {
+	return typeof value === 'string' && MEETING_PHASE_VALUES.has(value as MeetingPhase);
+}
+
+function mapMeetingPhaseStateValue(value: unknown): MeetingPhaseState | null {
+	if (!isObject(value)) return null;
+	if (!isMeetingPhase(value.currentPhase)) return null;
+
+	let phaseStartedAt: Date;
+	if (value.phaseStartedAt instanceof Date) {
+		if (!Number.isFinite(value.phaseStartedAt.getTime())) return null;
+		phaseStartedAt = value.phaseStartedAt;
+	} else if (typeof value.phaseStartedAt === 'string') {
+		const timestamp = Date.parse(value.phaseStartedAt);
+		if (!Number.isFinite(timestamp)) return null;
+		phaseStartedAt = new Date(timestamp);
+	} else if (value.phaseStartedAt === null || value.phaseStartedAt === undefined) {
+		phaseStartedAt = new Date();
+	} else {
+		return null;
+	}
+
+	if (!Array.isArray(value.charactersSpokenThisRound)) return null;
+	if (!value.charactersSpokenThisRound.every((characterId) => isNonEmptyString(characterId))) return null;
+
+	const userHasSharedInRound = asBoolean(value.userHasSharedInRound);
+	if (userHasSharedInRound === undefined) return null;
+
+	let roundNumber: number | undefined;
+	if (value.roundNumber !== undefined && value.roundNumber !== null) {
+		const parsedRoundNumber = asNumber(value.roundNumber);
+		if (
+			parsedRoundNumber === undefined ||
+			!Number.isInteger(parsedRoundNumber) ||
+			parsedRoundNumber < 1
+		) {
+			return null;
+		}
+		roundNumber = parsedRoundNumber;
+	}
+
+	return {
+		currentPhase: value.currentPhase,
+		phaseStartedAt,
+		roundNumber,
+		charactersSpokenThisRound: [...value.charactersSpokenThisRound],
+		userHasSharedInRound
+	};
+}
+
+function serializeMeetingPhaseState(
+	phaseState: MeetingPhaseState
+): SeamResult<{
+	currentPhase: MeetingPhase;
+	phaseStartedAt: string;
+	roundNumber?: number;
+	charactersSpokenThisRound: string[];
+	userHasSharedInRound: boolean;
+}> {
+	const parsed = mapMeetingPhaseStateValue(phaseState);
+	if (!parsed) {
+		return err(SeamErrorCodes.INPUT_INVALID, 'Invalid MeetingPhaseState payload');
+	}
+
+	return ok({
+		currentPhase: parsed.currentPhase,
+		phaseStartedAt: parsed.phaseStartedAt.toISOString(),
+		...(parsed.roundNumber !== undefined ? { roundNumber: parsed.roundNumber } : {}),
+		charactersSpokenThisRound: parsed.charactersSpokenThisRound,
+		userHasSharedInRound: parsed.userHasSharedInRound
+	});
 }
 
 function mapShareRecordRow(row: unknown): ShareRecord {
@@ -517,6 +593,66 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 			return ok(shares);
 		},
 
+		async updateMeetingPhase(meetingId, phaseState) {
+			if (!isNonEmptyString(meetingId)) {
+				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid meetingId');
+			}
+
+			const serializedPhaseState = serializeMeetingPhaseState(phaseState);
+			if (!serializedPhaseState.ok) return serializedPhaseState;
+
+			const response = (await supabase
+				.from('meetings')
+				.update({
+					phase_state: serializedPhaseState.value
+				})
+				.eq('id', meetingId)
+				.select('id')
+				.maybeSingle()) as QueryResponseLike;
+
+			if (response.error) return mapUpstreamError('updateMeetingPhase', response);
+			if (response.data === null) {
+				return err(SeamErrorCodes.NOT_FOUND, 'updateMeetingPhase record not found', {
+					method: 'updateMeetingPhase',
+					provider: 'supabase'
+				});
+			}
+
+			return ok(undefined);
+		},
+
+		async getMeetingPhase(meetingId) {
+			if (!isNonEmptyString(meetingId)) {
+				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid meetingId');
+			}
+
+			const response = (await supabase
+				.from('meetings')
+				.select('phase_state')
+				.eq('id', meetingId)
+				.maybeSingle()) as QueryResponseLike;
+
+			if (response.error) return mapUpstreamError('getMeetingPhase', response);
+			if (response.data === null) {
+				return ok(null);
+			}
+			if (!isObject(response.data)) {
+				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'getMeetingPhase response is not an object');
+			}
+
+			const rawPhaseState = response.data.phase_state;
+			if (rawPhaseState === null || rawPhaseState === undefined) {
+				return ok(null);
+			}
+
+			const phaseStateResult = mapMeetingPhaseStateValue(rawPhaseState);
+			if (!phaseStateResult) {
+				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'getMeetingPhase response violates MeetingPhaseState');
+			}
+
+			return ok(phaseStateResult);
+		},
+
 		async createCallback(input) {
 			if (!validateCreateCallbackInput(input)) {
 				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid createCallback input');
@@ -562,14 +698,16 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 			const resolvedCharacterId = await resolveDbCharacterId('getActiveCallbacks', input.characterId);
 			if (!resolvedCharacterId.ok) return resolvedCharacterId;
 
-			const response = (await supabase
+			const callbacksQuery = supabase
 				.from('callbacks')
 				.select(
 					'id, origin_share_id, character_id, original_text, callback_type, scope, potential_score, times_referenced, last_referenced_at, status, parent_callback_id, shares!inner(meeting_id)'
 				)
 				.in('status', ['active', 'stale', 'retired', 'legend'])
-				.or(`character_id.eq.${resolvedCharacterId.value},scope.eq.room`)
-				.eq('shares.meeting_id', input.meetingId)
+				.or(`character_id.eq.${resolvedCharacterId.value},scope.eq.room`);
+			const callbacksScopedQuery =
+				input.scopeToMeeting === false ? callbacksQuery : callbacksQuery.eq('shares.meeting_id', input.meetingId);
+			const response = (await callbacksScopedQuery
 				.order('potential_score', { ascending: false })
 				.order('times_referenced', { ascending: false })
 				.limit(30)) as QueryResponseLike<unknown[]>;

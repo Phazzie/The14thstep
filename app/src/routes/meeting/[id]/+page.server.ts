@@ -1,5 +1,7 @@
 import { CORE_CHARACTERS } from '$lib/core/characters';
 import { detectCrisisContent, isMeetingInCrisis } from '$lib/core/crisis-engine';
+import { initializeMeetingPhase } from '$lib/core/ritual-orchestration';
+import type { MeetingPhaseState } from '$lib/core/types';
 import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 
@@ -28,6 +30,17 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
 	const initialCrisisMode = crisisFromSetup || crisisFromShares;
 	const shouldTriggerInitialCrisisSupport = crisisFromSetup && !crisisFromShares;
 
+	const persistedPhaseState = await locals.seams.database.getMeetingPhase(meetingId);
+	if (!persistedPhaseState.ok) {
+		console.warn(
+			`[meeting page] getMeetingPhase failed for meeting=${meetingId}: ${persistedPhaseState.error.message}`
+		);
+	}
+	const phaseState: MeetingPhaseState =
+		persistedPhaseState.ok && persistedPhaseState.value
+			? persistedPhaseState.value
+			: initializeMeetingPhase();
+
 	return {
 		meetingId,
 		userId: locals.userId,
@@ -38,6 +51,7 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
 		initialCrisisMode,
 		shouldTriggerInitialCrisisSupport,
 		listeningOnly,
+		phaseState,
 		characters: CORE_CHARACTERS.map((character) => ({
 			id: character.id,
 			name: character.name,

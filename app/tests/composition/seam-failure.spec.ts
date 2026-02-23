@@ -21,6 +21,8 @@ vi.mock('$lib/server/seams/database/adapter', () => ({
 			getHeavyMemory: async () => err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, 'db unavailable'),
 			getShareById: async () => err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, 'db unavailable'),
 			getMeetingShares: async () => err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, 'db unavailable'),
+			getMeetingPhase: async () => err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, 'db unavailable'),
+			updateMeetingPhase: async () => err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, 'db unavailable'),
 			createCallback: async () => err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, 'db unavailable'),
 			getActiveCallbacks: async () => err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, 'db unavailable'),
 			markCallbackReferenced: async () =>
@@ -104,6 +106,8 @@ describe('composition: seam failure injection', () => {
 				seams: {
 					database: {
 						getMeetingShares: async () => ok([]),
+						getMeetingPhase: async () => ok(null),
+						updateMeetingPhase: async () => ok(undefined),
 						getHeavyMemory: async () => ok([]),
 						getActiveCallbacks: async () => ok([])
 					} as never,

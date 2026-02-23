@@ -23,12 +23,20 @@ function makeCallback(overrides: Partial<CallbackRecord> = {}): CallbackRecord {
 describe('runCallbackLifecycleWorkflow', () => {
 	it('retires callbacks when inactivity crosses threshold', async () => {
 		const updates: Array<{ id: string; status?: string }> = [];
+		const getActiveCallbacks = async (input: {
+			characterId: string;
+			meetingId: string;
+			scopeToMeeting?: boolean;
+		}) => {
+			void input;
+			return ok([makeCallback()]);
+		};
 		const result = await runCallbackLifecycleWorkflow({
 			meetingId: 'meeting-1',
 			userId: 'user-1',
 			presentCharacterIds: ['marcus'],
 			database: {
-				getActiveCallbacks: async () => ok([makeCallback()]),
+				getActiveCallbacks,
 				getMeetingCountAfterDate: async () => ok(20),
 				updateCallback: async (input) => {
 					updates.push({ id: input.id, status: input.updates.status });
@@ -43,6 +51,26 @@ describe('runCallbackLifecycleWorkflow', () => {
 			expect(result.value.evaluated).toBe(1);
 		}
 		expect(updates).toEqual([{ id: 'cb-1', status: 'retired' }]);
+	});
+
+	it('requests unscoped callbacks for lifecycle evaluation', async () => {
+		const calls: Array<{ characterId: string; meetingId: string; scopeToMeeting?: boolean }> = [];
+		const result = await runCallbackLifecycleWorkflow({
+			meetingId: 'meeting-99',
+			userId: 'user-1',
+			presentCharacterIds: ['marcus'],
+			database: {
+				getActiveCallbacks: async (input) => {
+					calls.push(input);
+					return ok([makeCallback()]);
+				},
+				getMeetingCountAfterDate: async () => ok(0),
+				updateCallback: async (input) => ok(makeCallback({ id: input.id }))
+			}
+		});
+
+		expect(result.ok).toBe(true);
+		expect(calls).toEqual([{ characterId: 'marcus', meetingId: 'meeting-99', scopeToMeeting: false }]);
 	});
 
 	it('deduplicates room callbacks returned from multiple characters', async () => {

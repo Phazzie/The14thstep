@@ -3,7 +3,11 @@ import { err, ok, type SeamResult } from '$lib/core/seam';
 import type { CallbackRecord, CallbackStatus } from '$lib/seams/database/contract';
 
 interface CallbackLifecycleWorkflowDatabasePort {
-	getActiveCallbacks(input: { characterId: string; meetingId: string }): Promise<SeamResult<CallbackRecord[]>>;
+	getActiveCallbacks(input: {
+		characterId: string;
+		meetingId: string;
+		scopeToMeeting?: boolean;
+	}): Promise<SeamResult<CallbackRecord[]>>;
 	updateCallback(input: {
 		id: string;
 		updates: {
@@ -38,7 +42,8 @@ export async function runCallbackLifecycleWorkflow(
 	for (const characterId of presentCharacterIds) {
 		const callbacksResult = await input.database.getActiveCallbacks({
 			characterId,
-			meetingId: input.meetingId
+			meetingId: input.meetingId,
+			scopeToMeeting: false
 		});
 		if (!callbacksResult.ok) {
 			return err(callbacksResult.error.code, callbacksResult.error.message, callbacksResult.error.details);

@@ -2,6 +2,33 @@
 
 This file captures practical lessons we want future work to reuse.
 
+## 2026-02-21
+
+### Process
+
+- **Autonomous agent work can outpace documentation**: Previous Codex session implemented M11-17 fully but did not update ExecPlan Progress checkboxes. Always verify codebase state against plan checkboxes before starting new work.
+- **Specification documents separate from ExecPlans can create hidden requirements**: The Writing Engine spec defined M11-19 requirements but wasn't explicitly linked from ExecPlan milestone descriptions. Cross-reference specs explicitly in milestone text.
+- **Haiku Explore agents excel at codebase audit**: Using Haiku with `subagent_type=Explore` to verify milestone status before execution prevented duplicate implementation work.
+
+### Technical
+
+- **Voice example fields are highest-leverage prompt improvement**: `voiceExamples` as required 3-tuple correlates with quality improvements. Never make optional or allow placeholder text.
+- **Quality validator scores generated but not enforced**: `voiceConsistency` and `authenticity` scores (0-10) are generated but only `pass` boolean used in retry logic. Numeric scores exist but discarded.
+- **Voice pipeline retry attempts vs candidate generation are different patterns**: Current 3 retry attempts (same prompt) != M13's 7 candidate generations (generate-multiple-then-select pattern).
+- **Meeting ritual prompts vs runtime orchestration**: Prompt templates can exist without being wired into meeting flow. Check both prompt existence AND runtime invocation.
+- **Integration analysis prevents costly rework**: Identifying 65% merge conflict probability before parallel execution saved ~20k tokens of rework. Always analyze shared files before spawning parallel agents.
+
+### Architecture
+
+- **Narrative context caching prevents duplicate generation calls**: M14 `meetingNarrativeContextCache` + in-flight deduplication means multiple characters don't regenerate identical context. Apply to other meeting-scoped expensive operations.
+- **Crisis detection precedence matters**: Crisis state must be meeting-scoped, not share-scoped, to prevent state drift across character turns.
+
+### Counterintuitive
+
+- **More complete implementation can look "incomplete" in tracking**: M11-17 fully implemented but marked incomplete in ExecPlan creates false signal that misdirects effort.
+- **3 attempts != 7 candidates**: Retry logic feels similar to candidate generation but these are architecturally different patterns with different quality outcomes.
+- **Prompt existence != runtime behavior**: Beautifully crafted unused prompt templates provide zero user value. Always verify call sites.
+
 ## 2026-02-20
 
 ### Process
