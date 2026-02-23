@@ -278,6 +278,19 @@ async function readSseEvents(response: Response): Promise<Array<{ event: string;
 	}
 }
 
+function isObject(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null;
+}
+
+function readPersistedPhase(events: Array<{ event: string; data: unknown }>): string | undefined {
+	const persisted = events.find((event) => event.event === 'persisted');
+	if (!persisted || !isObject(persisted.data)) return undefined;
+	const value = persisted.data.value;
+	if (!isObject(value) || !isObject(value.phaseState)) return undefined;
+	const currentPhase = value.phaseState.currentPhase;
+	return typeof currentPhase === 'string' ? currentPhase : undefined;
+}
+
 async function requestCharacterShare(input: {
 	meetingId: string;
 	database: DatabasePort;
@@ -358,8 +371,7 @@ describe('meeting ritual phase route integration (server routes + in-memory seam
 			sequenceOrder: 0,
 			characterId: 'marcus'
 		});
-		let persisted = events.find((e) => e.event === 'persisted');
-		expect(persisted?.data.value.phaseState.currentPhase).toBe('empty_chair');
+			expect(readPersistedPhase(events)).toBe('empty_chair');
 
 		// EMPTY_CHAIR -> INTRODUCTIONS
 		events = await requestCharacterShare({
@@ -369,8 +381,7 @@ describe('meeting ritual phase route integration (server routes + in-memory seam
 			sequenceOrder: 1,
 			characterId: 'heather'
 		});
-		persisted = events.find((e) => e.event === 'persisted');
-		expect(persisted?.data.value.phaseState.currentPhase).toBe('introductions');
+			expect(readPersistedPhase(events)).toBe('introductions');
 
 		// Introductions needs two speakers in current simplified route logic: user + character
 		let userPayload = await requestUserShare({
@@ -390,8 +401,7 @@ describe('meeting ritual phase route integration (server routes + in-memory seam
 			sequenceOrder: 3,
 			characterId: 'meechie'
 		});
-		persisted = events.find((e) => e.event === 'persisted');
-		expect(persisted?.data.value.phaseState.currentPhase).toBe('topic_selection');
+			expect(readPersistedPhase(events)).toBe('topic_selection');
 
 		// Topic selection -> sharing_round_1 on user input
 		userPayload = await requestUserShare({
@@ -406,22 +416,19 @@ describe('meeting ritual phase route integration (server routes + in-memory seam
 
 		// Advance through sharing rounds with char+user pairs
 		events = await requestCharacterShare({ meetingId, database, grokAi, sequenceOrder: 5, characterId: 'marcus' });
-		persisted = events.find((e) => e.event === 'persisted');
-		expect(persisted?.data.value.phaseState.currentPhase).toBe('sharing_round_1');
+			expect(readPersistedPhase(events)).toBe('sharing_round_1');
 
 		userPayload = await requestUserShare({ meetingId, database, grokAi, sequenceOrder: 6, content: 'still here' });
 		expect(userPayload.value.phaseState.currentPhase).toBe('sharing_round_2');
 
 		events = await requestCharacterShare({ meetingId, database, grokAi, sequenceOrder: 7, characterId: 'heather' });
-		persisted = events.find((e) => e.event === 'persisted');
-		expect(persisted?.data.value.phaseState.currentPhase).toBe('sharing_round_2');
+			expect(readPersistedPhase(events)).toBe('sharing_round_2');
 
 		userPayload = await requestUserShare({ meetingId, database, grokAi, sequenceOrder: 8, content: 'still staying' });
 		expect(userPayload.value.phaseState.currentPhase).toBe('sharing_round_3');
 
 		events = await requestCharacterShare({ meetingId, database, grokAi, sequenceOrder: 9, characterId: 'gemini' });
-		persisted = events.find((e) => e.event === 'persisted');
-		expect(persisted?.data.value.phaseState.currentPhase).toBe('sharing_round_3');
+			expect(readPersistedPhase(events)).toBe('sharing_round_3');
 
 		userPayload = await requestUserShare({ meetingId, database, grokAi, sequenceOrder: 10, content: 'closing out' });
 		expect(userPayload.value.phaseState.currentPhase).toBe('closing');
