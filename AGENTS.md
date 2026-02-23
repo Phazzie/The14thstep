@@ -125,3 +125,14 @@ This section adds concrete examples for rules that can be interpreted multiple w
 
 - App implementation rules: `app/AGENTS.md`
 - ExecPlan authoring and maintenance rules: `plans/AGENTS.md`
+
+## Subagent usage (Codex)
+
+- `explorer` subagents are best for fast codebase reconnaissance: finding files, line numbers, existing helpers, and summarizing what is already implemented.
+- Use `explorer` before manual searching when a task starts with "where is X?" or "what already exists?".
+- `worker` subagents are for implementation work (editing files, fixing tests, scoped refactors). Assign clear ownership (specific files or one subsystem).
+- Use `worker` only for non-overlapping edits. Do not run multiple workers on the same files at the same time.
+- Default subagents are general-purpose and useful for small, self-contained tasks that do not need deep repo expertise or broad code search.
+- Prefer one precise subagent task over a vague multi-step prompt. Ask for outputs with file paths and line numbers.
+- For parallel work, split by independent scope (for example: route audit vs adapter audit), then merge results in the main agent.
+- Main agent remains responsible for final integration, conflict resolution, verification, and user-facing summary.

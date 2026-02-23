@@ -49,3 +49,20 @@
 - Treated character slug-to-UUID mapping readiness as an operational requirement: production checks must confirm six core `public.characters` rows exist before declaring deploy health.
 - Hardened trust boundaries by using persisted meeting shares (not client-provided transcript snippets) for share-context and close-summary generation paths.
 - Scoped callback retrieval to the current meeting via `callbacks.origin_share_id -> shares.meeting_id` to prevent cross-meeting callback leakage.
+
+## 2026-02-22
+
+- Adopted a server/DB-first ritual phase source-of-truth strategy for M18 route integration; routes persist and reload `MeetingPhaseState`, while the client consumes phase snapshots for visibility/sync without becoming authoritative.
+- Added command/test hang guardrails to active execution workflow: stop silent runs early, log the stall, and switch to narrower fallback verification instead of waiting indefinitely.
+- Chose a practical close-route phase behavior: force `CLOSING` on explicit close requests, then persist `POST_MEETING` on successful completion (with tests), rather than blocking close based on current ritual phase.
+- Kept intro-order enforcement as warning-first during integration completion; strict blocking remains a follow-up decision pending broader ritual progression validation.
+- Added runtime narrative-field validation for character profiles with fail-fast enforcement for core characters and warning-level logging for sparse runtime-selected characters.
+
+## 2026-02-23
+
+- Kept the M18 intro progression route semantics on the simplified speaker-count threshold for this ship and documented the mismatch with core `areIntroductionsComplete(...)` as follow-up hardening, rather than changing behavior late in release closeout.
+- Restored upstream error semantics in share generation: when no candidate can be generated at all (for example, repeated rate limits), the route now emits the upstream seam error instead of falling back to a quiet placeholder share.
+- Retained fallback share behavior only for repeated low-quality/validator-rejected candidates, with explicit client-facing `fallbackUsed` signaling and regression coverage.
+- Renamed route-test helper export in `app/src/routes/meeting/[id]/share/+server.ts` to `_generateValidatedShare` to comply with SvelteKit endpoint export validation rules while preserving direct route-module test coverage.
+- Increased Playwright `webServer.timeout` from `180000` to `300000` after measuring local `npm run build` wall time (~2m12s) and confirming the previous timeout created false e2e startup failures in this workspace.
+- Accepted a local closeout exception for `npm run check` root-cause diagnosis (silent `svelte-check` stall) while still requiring fallback verification lanes (`tsc`, contracts/core/composition tests, build, and Playwright e2e) to pass and be documented.

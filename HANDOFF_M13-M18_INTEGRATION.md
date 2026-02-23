@@ -1,4 +1,7 @@
 # Handoff: M13-M18 Route Integration Complete
+
+> Update (2026-02-22): This integration handoff is partially stale. M18 phase persistence and route wiring have advanced beyond the state described here (including database phase read/write seam methods and additional route integrations). Use this doc for context, but confirm current implementation in `app/src/routes/meeting/[id]/*`.
+
 **From**: Claude Haiku (Session 2026-02-21)
 **To**: Codex (Next Execution Phase)
 **Date**: 2026-02-21 07:20 UTC
