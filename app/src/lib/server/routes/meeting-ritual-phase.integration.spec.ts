@@ -1,18 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { ok, type SeamResult } from '$lib/core/seam';
+import type { MeetingPhaseState } from '$lib/core/types';
 import type { CallbackRecord, DatabasePort, MeetingRecord, ShareRecord, UserProfile } from '$lib/seams/database/contract';
 import { load as loadMeetingPage } from '../../../routes/meeting/[id]/+page.server';
 import { GET as getCharacterShare } from '../../../routes/meeting/[id]/share/+server';
 import { POST as postUserShare } from '../../../routes/meeting/[id]/user-share/+server';
 import { POST as postClose } from '../../../routes/meeting/[id]/close/+server';
-
-type PhaseState = {
-	currentPhase: string;
-	phaseStartedAt: Date;
-	roundNumber?: number;
-	charactersSpokenThisRound: string[];
-	userHasSharedInRound: boolean;
-};
 
 function makeShareRecord(input: {
 	id: string;
@@ -29,9 +22,11 @@ function makeShareRecord(input: {
 	};
 }
 
-function createInMemoryDatabase(meetingId: string): DatabasePort & { state: { phaseState: PhaseState | null } } {
+function createInMemoryDatabase(
+	meetingId: string
+): DatabasePort & { state: { phaseState: MeetingPhaseState | null } } {
 	const state = {
-		phaseState: null as PhaseState | null,
+		phaseState: null as MeetingPhaseState | null,
 		shares: [] as ShareRecord[],
 		callbacks: [] as CallbackRecord[],
 		meeting: {
@@ -97,12 +92,12 @@ function createInMemoryDatabase(meetingId: string): DatabasePort & { state: { ph
 		},
 		async updateMeetingPhase(id, phaseState) {
 			if (id !== meetingId) throw new Error(`unexpected meeting id ${id}`);
-			state.phaseState = phaseState as unknown as PhaseState;
+			state.phaseState = phaseState;
 			return ok(undefined);
 		},
 		async getMeetingPhase(id) {
 			if (id !== meetingId) return ok(null);
-			return ok(state.phaseState as any);
+			return ok(state.phaseState);
 		},
 		async createCallback(input) {
 			const callback: CallbackRecord = {
@@ -150,7 +145,7 @@ function createInMemoryDatabase(meetingId: string): DatabasePort & { state: { ph
 					potentialScore: 1,
 					timesReferenced: input.updates.timesReferenced ?? 0,
 					lastReferencedAt: input.updates.lastReferencedAt ?? null,
-					status: (input.updates.status as any) ?? 'active',
+					status: input.updates.status ?? 'active',
 					parentCallbackId: null
 				});
 			}
@@ -158,8 +153,8 @@ function createInMemoryDatabase(meetingId: string): DatabasePort & { state: { ph
 				...existing,
 				timesReferenced: input.updates.timesReferenced ?? existing.timesReferenced,
 				lastReferencedAt: input.updates.lastReferencedAt ?? existing.lastReferencedAt,
-				status: (input.updates.status as any) ?? existing.status,
-				scope: (input.updates.scope as any) ?? existing.scope
+				status: input.updates.status ?? existing.status,
+				scope: input.updates.scope ?? existing.scope
 			});
 		},
 		async getMeetingCountAfterDate() {
@@ -221,7 +216,7 @@ function createGrokStub() {
 	};
 }
 
-async function readSseEvents(response: Response): Promise<Array<{ event: string; data: any }>> {
+async function readSseEvents(response: Response): Promise<Array<{ event: string; data: unknown }>> {
 	const body = response.body;
 	if (!body) {
 		throw new Error('Expected response body for SSE stream');
@@ -229,7 +224,7 @@ async function readSseEvents(response: Response): Promise<Array<{ event: string;
 
 	const reader = body.getReader();
 	const decoder = new TextDecoder();
-	const events: Array<{ event: string; data: any }> = [];
+	const events: Array<{ event: string; data: unknown }> = [];
 	let buffer = '';
 	const startedAt = Date.now();
 

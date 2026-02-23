@@ -23,8 +23,7 @@ import {
 	buildRitualOpeningPrompt,
 	buildRitualIntroPrompt,
 	buildRitualReadingPrompt,
-	buildRitualClosingPrompt,
-	buildEmptyChairPrompt
+	buildRitualClosingPrompt
 } from '$lib/core/prompt-templates';
 import type { MeetingPhaseState } from '$lib/core/types';
 import { MeetingPhase } from '$lib/core/types';
@@ -563,10 +562,14 @@ function createShareStream(
 				}
 
 				let currentPhaseState = input.phaseState ?? initializeMeetingPhase();
+				let phaseLoaded = !!input.phaseState;
 				if (!input.phaseState) {
 					const persistedPhaseStateResult = await locals.seams.database.getMeetingPhase(meetingId);
 					if (persistedPhaseStateResult.ok && persistedPhaseStateResult.value) {
 						currentPhaseState = persistedPhaseStateResult.value;
+						phaseLoaded = true;
+					} else if (persistedPhaseStateResult.ok) {
+						phaseLoaded = true;
 					} else if (!persistedPhaseStateResult.ok) {
 						console.warn(
 							`[share] getMeetingPhase failed for meeting=${meetingId}: ${persistedPhaseStateResult.error.message}`
@@ -743,13 +746,19 @@ function createShareStream(
 					}
 				}
 
-				const updateMeetingPhaseResult = await locals.seams.database.updateMeetingPhase(
-					meetingId,
-					phaseStateToPersist
-				);
-				if (!updateMeetingPhaseResult.ok) {
-					console.error(
-						`[share] Failed to persist phase state for meeting=${meetingId}: ${updateMeetingPhaseResult.error.message}`
+				if (phaseLoaded) {
+					const updateMeetingPhaseResult = await locals.seams.database.updateMeetingPhase(
+						meetingId,
+						phaseStateToPersist
+					);
+					if (!updateMeetingPhaseResult.ok) {
+						console.error(
+							`[share] Failed to persist phase state for meeting=${meetingId}: ${updateMeetingPhaseResult.error.message}`
+						);
+					}
+				} else {
+					console.warn(
+						`[share] Skipping phase persistence because phase state could not be loaded for meeting=${meetingId}`
 					);
 				}
 

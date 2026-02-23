@@ -7,7 +7,7 @@ import {
 } from './voice-pipeline';
 import { SeamErrorCodes } from './seam';
 import type { CharacterProfile, VoiceCandidate } from './types';
-import type { GrokAiPort, GenerateShareInput, GenerateShareOutput } from '$lib/seams/grok-ai/contract';
+import type { GrokAiPort, GenerateShareInput } from '$lib/seams/grok-ai/contract';
 import type { MeetingNarrativeContext } from './narrative-context';
 import type { MeetingPromptContext } from './prompt-templates';
 
@@ -62,6 +62,8 @@ const mockGrokAi: GrokAiPort = {
 };
 
 describe('voice-pipeline', () => {
+	const generateShareMock = vi.mocked(mockGrokAi.generateShare);
+
 	beforeEach(() => {
 		vi.clearAllMocks();
 	});
@@ -71,7 +73,7 @@ describe('voice-pipeline', () => {
 			const candidateTexts = Array.from({ length: 7 }, (_, i) => `Candidate ${i + 1} response`);
 
 			// Mock candidate generation
-			(mockGrokAi.generateShare as any).mockImplementation((input: GenerateShareInput) => {
+			generateShareMock.mockImplementation((input: GenerateShareInput) => {
 				if (input.characterId === mockCharacter.id && !input.prompt.includes('Evaluate')) {
 					return Promise.resolve({
 						ok: true,
@@ -129,7 +131,7 @@ describe('voice-pipeline', () => {
 
 		it('returns error when no candidates pass quality thresholds', async () => {
 			// Mock all candidates failing quality check
-			(mockGrokAi.generateShare as any).mockImplementation(() =>
+			generateShareMock.mockImplementation(() =>
 				Promise.resolve({
 					ok: true,
 					value: {
@@ -161,7 +163,7 @@ describe('voice-pipeline', () => {
 		});
 
 		it('returns error when grok-ai fails to generate any candidates', async () => {
-			(mockGrokAi.generateShare as any).mockImplementation(() =>
+			generateShareMock.mockImplementation(() =>
 				Promise.resolve({
 					ok: false,
 					error: {
@@ -189,7 +191,7 @@ describe('voice-pipeline', () => {
 
 	describe('scoreCandidateVoice', () => {
 		it('scores a candidate with 4 quality axes', async () => {
-			(mockGrokAi.generateShare as any).mockResolvedValue({
+			generateShareMock.mockResolvedValue({
 				ok: true,
 				value: {
 					shareText: JSON.stringify({
@@ -219,7 +221,7 @@ describe('voice-pipeline', () => {
 		});
 
 		it('detects therapy-speak in candidates', async () => {
-			(mockGrokAi.generateShare as any).mockResolvedValue({
+			generateShareMock.mockResolvedValue({
 				ok: true,
 				value: {
 					shareText: JSON.stringify({
@@ -255,7 +257,7 @@ describe('voice-pipeline', () => {
 		});
 
 		it('handles grok-ai errors gracefully', async () => {
-			(mockGrokAi.generateShare as any).mockResolvedValue({
+			generateShareMock.mockResolvedValue({
 				ok: false,
 				error: {
 					code: SeamErrorCodes.RATE_LIMITED,
