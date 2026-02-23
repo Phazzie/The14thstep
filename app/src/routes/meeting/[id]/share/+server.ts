@@ -13,6 +13,7 @@ import {
 	selectPromptForPhase,
 	INTRO_ORDER,
 	initializeMeetingPhase,
+	isRoundComplete,
 	recordCharacterSpoke,
 	transitionToNextPhase
 } from '$lib/core/ritual-orchestration';
@@ -133,6 +134,48 @@ function normalizePromptScalar(value: string, maxLength = 160): string {
 	return compact.slice(0, maxLength);
 }
 
+function revivePhaseState(value: unknown): MeetingPhaseState | null {
+	if (!isObject(value)) return null;
+	if (typeof value.currentPhase !== 'string') return null;
+	if (!Object.values(MeetingPhase).includes(value.currentPhase as MeetingPhase)) return null;
+
+	const rawPhaseStartedAt = value.phaseStartedAt;
+	let phaseStartedAt: Date;
+	if (rawPhaseStartedAt instanceof Date) {
+		phaseStartedAt = rawPhaseStartedAt;
+	} else if (typeof rawPhaseStartedAt === 'string') {
+		const parsed = new Date(rawPhaseStartedAt);
+		if (!Number.isFinite(parsed.getTime())) return null;
+		phaseStartedAt = parsed;
+	} else {
+		return null;
+	}
+
+	if (!Array.isArray(value.charactersSpokenThisRound)) return null;
+	const charactersSpokenThisRound = value.charactersSpokenThisRound.filter(
+		(entry): entry is string => typeof entry === 'string'
+	);
+	if (charactersSpokenThisRound.length !== value.charactersSpokenThisRound.length) return null;
+
+	if (typeof value.userHasSharedInRound !== 'boolean') return null;
+
+	let roundNumber: number | undefined;
+	if (value.roundNumber !== undefined) {
+		if (typeof value.roundNumber !== 'number' || !Number.isInteger(value.roundNumber) || value.roundNumber < 0) {
+			return null;
+		}
+		roundNumber = value.roundNumber;
+	}
+
+	return {
+		currentPhase: value.currentPhase as MeetingPhase,
+		phaseStartedAt,
+		roundNumber,
+		charactersSpokenThisRound,
+		userHasSharedInRound: value.userHasSharedInRound
+	};
+}
+
 async function parseBodyRequest(request: Request): Promise<SeamResult<ShareStreamRequest>> {
 	let body: unknown;
 	try {
@@ -170,6 +213,11 @@ async function parseBodyRequest(request: Request): Promise<SeamResult<ShareStrea
 	if (body.phaseState !== undefined && !isObject(body.phaseState)) {
 		return err(SeamErrorCodes.INPUT_INVALID, 'phaseState must be an object when provided');
 	}
+	const revivedPhaseState: MeetingPhaseState | undefined =
+		body.phaseState !== undefined ? (revivePhaseState(body.phaseState as unknown) ?? undefined) : undefined;
+	if (body.phaseState !== undefined && !revivedPhaseState) {
+		return err(SeamErrorCodes.INPUT_INVALID, 'phaseState is invalid');
+	}
 
 	return ok({
 		topic: normalizePromptScalar(body.topic),
@@ -179,7 +227,7 @@ async function parseBodyRequest(request: Request): Promise<SeamResult<ShareStrea
 		interactionType: body.interactionType,
 		userName: body.userName ? normalizePromptScalar(body.userName, 80) : undefined,
 		userMood: body.userMood ? normalizePromptScalar(body.userMood, 80) : undefined,
-		phaseState: body.phaseState as MeetingPhaseState | undefined
+		phaseState: revivedPhaseState
 	});
 }
 
@@ -370,7 +418,7 @@ function mapRecentSharesFromMeeting(
 
 function buildPhaseAwarePrompt(
 	character: (typeof CORE_CHARACTERS)[number],
-	currentPhase: string,
+	currentPhase: MeetingPhase,
 	userName: string,
 	userMood: string,
 	topic: string,
@@ -380,7 +428,7 @@ function buildPhaseAwarePrompt(
 	continuityLines?: string[]
 ): string {
 	// Select prompt type based on phase
-	const promptType = selectPromptForPhase(currentPhase as any, character);
+	const promptType = selectPromptForPhase(currentPhase, character);
 
 	switch (promptType) {
 		case 'opening':
@@ -678,7 +726,7 @@ function createShareStream(
 					(currentPhase === MeetingPhase.SHARING_ROUND_1 ||
 						currentPhase === MeetingPhase.SHARING_ROUND_2 ||
 						currentPhase === MeetingPhase.SHARING_ROUND_3) &&
-					speakerCount >= 2
+					isRoundComplete(phaseStateAfterShare)
 				) {
 					transitionTrigger = 'round_complete';
 				}
@@ -817,10 +865,17 @@ async function handleShareRequest(
 		return json(meetingSharesResult, { status: toStatus(meetingSharesResult.error.code) });
 	}
 	const persistedPhaseStateResult = await locals.seams.database.getMeetingPhase(meetingId);
-	if (persistedPhaseStateResult.ok && persistedPhaseStateResult.value?.currentPhase === MeetingPhase.CRISIS_MODE) {
-		return json(err(SeamErrorCodes.INPUT_INVALID, 'Character shares are paused during crisis mode'), {
-			status: 409
-		});
+	if (persistedPhaseStateResult.ok && persistedPhaseStateResult.value) {
+		if (persistedPhaseStateResult.value.currentPhase === MeetingPhase.CRISIS_MODE) {
+			return json(err(SeamErrorCodes.INPUT_INVALID, 'Character shares are paused during crisis mode'), {
+				status: 409
+			});
+		}
+		if (persistedPhaseStateResult.value.currentPhase === MeetingPhase.POST_MEETING) {
+			return json(err(SeamErrorCodes.INPUT_INVALID, 'Character shares are unavailable after the meeting closes'), {
+				status: 409
+			});
+		}
 	}
 	if (!persistedPhaseStateResult.ok) {
 		console.warn(

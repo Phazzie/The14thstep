@@ -89,6 +89,11 @@ describe('POST /meeting/[id]/close', () => {
 		expect(updateMeetingPhase.mock.calls[0][1].currentPhase).toBe('closing');
 		expect(updateMeetingPhase.mock.calls[1][1].currentPhase).toBe('post_meeting');
 		expect(completeMeeting).toHaveBeenCalledTimes(1);
+		expect(completeMeeting.mock.calls[0][0].notableMoments.characterThreads).toEqual(
+			expect.objectContaining({
+				marcus: expect.any(String)
+			})
+		);
 
 		const payload = await response.json();
 		expect(payload.ok).toBe(true);

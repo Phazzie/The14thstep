@@ -131,4 +131,45 @@ describe('POST /meeting/[id]/share', () => {
 		expect(payload.ok).toBe(false);
 		expect(payload.error.message).toContain('paused during crisis mode');
 	});
+
+	it('returns 409 when persisted ritual phase state is post_meeting', async () => {
+		const request = new Request('http://localhost/meeting/meeting-1/share', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				topic: 'staying sober today',
+				sequenceOrder: 0,
+				crisisMode: false
+			})
+		});
+
+		const response = await POST({
+			params: { id: 'meeting-1' },
+			request,
+			locals: {
+				userId: null,
+				seams: {
+					database: {
+						getMeetingPhase: async () => ({
+							ok: true,
+							value: {
+								currentPhase: 'post_meeting',
+								phaseStartedAt: new Date('2026-02-22T00:00:00.000Z'),
+								charactersSpokenThisRound: [],
+								userHasSharedInRound: false
+							}
+						}),
+						getMeetingShares: async () => ({ ok: true, value: [] })
+					} as never,
+					grokAi: {} as never,
+					auth: {} as never
+				}
+			}
+		} as never);
+
+		expect(response.status).toBe(409);
+		const payload = await response.json();
+		expect(payload.ok).toBe(false);
+		expect(payload.error.message).toContain('after the meeting closes');
+	});
 });

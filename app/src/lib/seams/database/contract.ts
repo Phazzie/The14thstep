@@ -69,7 +69,7 @@ export interface CreateCallbackInput {
 export interface CompleteMeetingInput {
 	meetingId: string;
 	summary: string;
-	notableMoments?: Record<string, string>;
+	notableMoments?: Record<string, unknown>;
 }
 
 export interface UpdateCallbackInput {
@@ -277,8 +277,7 @@ export function validateCompleteMeetingInput(value: unknown): value is CompleteM
 	if (!isObject(value)) return false;
 	if (!isNonEmptyString(value.meetingId) || !isNonEmptyString(value.summary)) return false;
 	if (value.notableMoments === undefined) return true;
-	if (!isObject(value.notableMoments)) return false;
-	return Object.values(value.notableMoments).every((item) => typeof item === 'string');
+	return isObject(value.notableMoments);
 }
 
 export function validateUpdateCallbackInput(value: unknown): value is UpdateCallbackInput {

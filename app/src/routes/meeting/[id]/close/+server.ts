@@ -305,7 +305,7 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 					...characterMemorySummaries,
 					userMemory: extractedMemory.userMemory || result.value.summary.trim(),
 					highMoment: extractedMemory.highMoment || result.value.summary.trim(),
-					characterThreads: JSON.stringify(characterMemorySummaries)
+					characterThreads: characterMemorySummaries
 				}
 			: characterMemorySummaries;
 

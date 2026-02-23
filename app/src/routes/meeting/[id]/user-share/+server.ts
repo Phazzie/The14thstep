@@ -7,6 +7,7 @@ import {
 } from '$lib/core/meeting';
 import {
 	initializeMeetingPhase,
+	isRoundComplete,
 	recordUserShared,
 	transitionToNextPhase
 } from '$lib/core/ritual-orchestration';
@@ -33,11 +34,18 @@ interface UserShareRequest {
 	isFirstUserShare?: boolean;
 }
 
-async function getCurrentPhaseState(meetingId: string, locals: App.Locals): Promise<MeetingPhaseState> {
+async function getCurrentPhaseState(
+	meetingId: string,
+	locals: App.Locals
+): Promise<{ phaseState: MeetingPhaseState; phaseLoaded: boolean }> {
 	let phaseState = initializeMeetingPhase();
+	let phaseLoaded = false;
 	const persistedPhaseState = await locals.seams.database.getMeetingPhase(meetingId);
-	if (persistedPhaseState.ok && persistedPhaseState.value) {
-		phaseState = persistedPhaseState.value;
+	if (persistedPhaseState.ok) {
+		phaseLoaded = true;
+		if (persistedPhaseState.value) {
+			phaseState = persistedPhaseState.value;
+		}
 	} else if (!persistedPhaseState.ok) {
 		console.warn(`[user-share] getMeetingPhase failed for meeting=${meetingId}: ${persistedPhaseState.error.message}`);
 	}
@@ -53,7 +61,7 @@ async function getCurrentPhaseState(meetingId: string, locals: App.Locals): Prom
 		}
 	}
 
-	return phaseState;
+	return { phaseState, phaseLoaded };
 }
 
 async function persistPhaseState(meetingId: string, phaseState: MeetingPhaseState, locals: App.Locals) {
@@ -201,6 +209,13 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 
 	const input = inputResult.value;
 	const interactionType = input.interactionType ?? 'standard';
+	const { phaseState: currentPhaseState, phaseLoaded } = await getCurrentPhaseState(meetingId, locals);
+	if (phaseLoaded && currentPhaseState.currentPhase === MeetingPhase.POST_MEETING) {
+		return json(err(SeamErrorCodes.INPUT_INVALID, 'User shares are unavailable after the meeting closes'), {
+			status: 409
+		});
+	}
+
 	const crisis = await detectCrisisWithAi({
 		meetingId,
 		content: input.content,
@@ -210,11 +225,11 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 	const significanceScore = crisis
 		? 10
 		: scoreSignificance({
-			content: input.content,
-			interactionType,
-			isUserShare: true,
-			isFirstUserShare: input.isFirstUserShare
-		});
+				content: input.content,
+				interactionType,
+				isUserShare: true,
+				isFirstUserShare: input.isFirstUserShare
+			});
 
 	const result = await addShare(
 		{
@@ -237,7 +252,6 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 		return json(result, { status: toStatus(result.error.code) });
 	}
 
-	const currentPhaseState = await getCurrentPhaseState(meetingId, locals);
 	const currentPhase = currentPhaseState.currentPhase;
 	let phaseStateAfterUserShare = currentPhaseState;
 
@@ -263,7 +277,7 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 		(currentPhase === MeetingPhase.SHARING_ROUND_1 ||
 			currentPhase === MeetingPhase.SHARING_ROUND_2 ||
 			currentPhase === MeetingPhase.SHARING_ROUND_3) &&
-		speakerCount >= 2
+		isRoundComplete(phaseStateAfterUserShare)
 	) {
 		transitionTrigger = 'round_complete';
 	}
@@ -280,7 +294,11 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 		}
 	}
 
-	await persistPhaseState(meetingId, phaseStateToPersist, locals);
+	if (phaseLoaded) {
+		await persistPhaseState(meetingId, phaseStateToPersist, locals);
+	} else {
+		console.warn(`[user-share] Skipping phase persistence because phase state could not be loaded for meeting=${meetingId}`);
+	}
 
 	return json(
 		ok({
