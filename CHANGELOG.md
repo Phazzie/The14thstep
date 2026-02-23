@@ -2,6 +2,37 @@
 
 All notable changes to this repository are documented in this file.
 
+## [2026-02-23]
+
+### Changed
+
+- `app/src/routes/meeting/[id]/share/+server.ts` now preserves upstream seam errors (for example `RATE_LIMITED`) when no candidate can be generated at all, instead of collapsing that path into a quiet fallback share.
+- `app/src/routes/meeting/[id]/share/+server.ts` test helper export renamed to `_generateValidatedShare` so the endpoint remains valid under SvelteKit route-export rules.
+- `app/playwright.config.ts` `webServer.timeout` increased from `180000` to `300000` after measuring local `npm run build` runtime (~2m12s) and seeing false e2e startup timeouts.
+- `app/src/routes/meeting/[id]/+page.svelte` ritual phase snapshot initialization now uses an effect-based sync to avoid Svelte's `state_referenced_locally` warning.
+
+### Added
+
+- End-to-end route-handler ritual phase integration proof in `app/src/lib/server/routes/meeting-ritual-phase.integration.spec.ts` (share/user-share/close progression + reload restore).
+- M19 release evidence dossier: `M19_RELEASE_EVIDENCE.md`
+- M11-19 final review dossier: `M11-19_FINAL_REVIEW.md`
+
+### Fixed
+
+- Composition seam-failure test stubs now include M18 phase seam methods (`getMeetingPhase`, `updateMeetingPhase`) so `npm run verify:composition` covers current route behavior correctly.
+- Playwright browser flow startup no longer fails on SvelteKit endpoint export validation caused by non-route export in `share/+server.ts`.
+
+### Verified
+
+- `npx tsc --noEmit -p tsconfig.json`
+- `npm run verify:contracts`
+- `npm run verify:core`
+- `npm run verify:composition`
+- `npx vitest run --project server src/lib/server/routes/meeting-ritual-phase.integration.spec.ts`
+- `time npm run build` (`~2m12s` local workspace)
+- `npm run test:e2e` (2 Playwright browser flows passing)
+- `npm run check` remains a documented local silent-stall issue and was bounded-stopped per hang guardrails
+
 ## [2026-02-21]
 
 ### Discovered
@@ -25,6 +56,37 @@ All notable changes to this repository are documented in this file.
 - ExecPlan Progress checkboxes for M11-19 not updated despite M11-17 completion
 - Integration analysis identified 65% merge conflict risk if M13/M18 executed in parallel
 - Phased serial execution plan adopted to reduce conflict risk to ~15%
+
+## [2026-02-22]
+
+### Changed
+
+- M18 phase persistence wiring extended beyond the original handoff state:
+  - `app/src/routes/meeting/[id]/user-share/+server.ts` now loads/tracks/persists ritual phase state and advances topic/round transitions.
+  - `app/src/routes/meeting/[id]/crisis/+server.ts` now persists `CRISIS_MODE` on crisis entry and returns phase snapshots.
+  - `app/src/routes/meeting/[id]/close/+server.ts` now persists ritual phase transitions through `CLOSING` to `POST_MEETING` and logs extraction/fallback timing.
+  - `app/src/routes/meeting/[id]/+page.svelte` now consumes and displays ritual phase snapshots from server responses (DB-first sync model).
+- `app/src/routes/meeting/[id]/share/+server.ts` now emits persisted ritual phase snapshots in SSE `persisted` / `done` events.
+- `app/src/lib/core/characters.ts` now exports runtime narrative-field validation, enforces core character narrative completeness at module load, and is used by the share route for warning-level validation on sparse profiles.
+- Handoff docs now include dated warnings when their M18 route-completion status is stale:
+  - `HANDOFF_CODEX_FINAL_M11-19.md`
+  - `HANDOFF_M13-M18_INTEGRATION.md`
+
+### Added
+
+- Route/server regression coverage for new M18 phase wiring:
+  - `app/src/lib/server/routes/meeting-close.spec.ts`
+  - expanded assertions in `meeting-user-share.spec.ts`, `meeting-crisis.spec.ts`, and `meeting-page-load.spec.ts`
+- Adapter seam coverage for M18 phase persistence methods in `app/src/lib/server/seams/database/adapter.spec.ts`
+- Character validation tests in `app/src/lib/core/characters.spec.ts`
+
+### Verified
+
+- `npx tsc --noEmit -p tsconfig.json`
+- Route server specs for page-load/share/user-share/crisis/close
+- `app/src/lib/server/seams/database/adapter.spec.ts`
+- `app/src/lib/core/characters.spec.ts`
+- `npm run check` remains unreliable in this environment (silent/stalling `svelte-check`); bounded-stop fallback verification path used
 
 ## [2026-02-20]
 

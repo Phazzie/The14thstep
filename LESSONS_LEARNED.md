@@ -29,6 +29,34 @@ This file captures practical lessons we want future work to reuse.
 - **3 attempts != 7 candidates**: Retry logic feels similar to candidate generation but these are architecturally different patterns with different quality outcomes.
 - **Prompt existence != runtime behavior**: Beautifully crafted unused prompt templates provide zero user value. Always verify call sites.
 
+## 2026-02-22
+
+### Process
+
+- **Silent test/check runs need explicit stop rules**: In this workspace, valid commands (especially Vitest and `npm run check`) can stay silent long enough to waste time. Time-box silent runs, confirm liveness with `ps`, then stop and fall back to narrower verification if needed.
+- **In-process review beats end-only review**: Logging route-cluster checkpoints while coding made it easier to catch missing test stubs and update the scope checklist before drift set in.
+- **Selective subagent use is higher ROI than blanket subagent use**: Explorers were useful for audits, but tightly coupled route/state-machine work moved faster and more reliably in a single main-agent pass.
+
+### Technical
+
+- **M18 phase persistence touches many "small" test doubles**: Adding database seam methods (`getMeetingPhase`, `updateMeetingPhase`) requires a broad update sweep across hooks, mocks, composition tests, and route specs.
+- **DB-first ritual phase sync can coexist with a separate UI mode state**: The meeting UI can keep local view-state (`sharing/closing/reflection`) while consuming ritual phase snapshots for correctness/debugging, as long as the server remains the source of truth.
+- **Close route needs explicit phase semantics, not just summary completion**: Forcing `CLOSING` then persisting `POST_MEETING` on successful close keeps ritual state consistent even when the user closes from an unexpected current phase.
+
+## 2026-02-23
+
+### Process
+
+- **A long-running e2e attempt can still be valuable if you wait for the real failure**: The first Playwright run looked like another hang, but waiting long enough surfaced a genuine SvelteKit export-validation bug and then a web-server timeout constraint.
+- **Run broad verification after “targeted green”**: `verify:composition` caught a stale seam stub and an error-semantics regression that targeted route tests did not expose.
+- **Document accepted blockers explicitly in the evidence file**: Treating `npm run check` diagnosis as a named deferred item kept the closeout honest without blocking all other high-signal verification.
+
+### Technical
+
+- **SvelteKit route modules allow underscore-prefixed helper exports for tests, but not arbitrary named exports**: Route-adjacent test helpers must use `_` prefixes (or move to separate modules) to avoid build/e2e failures.
+- **Fallback generation should not erase upstream error semantics**: A quiet fallback is appropriate for repeated low-quality candidates, but repeated upstream failures (for example rate limits) should still surface as upstream errors.
+- **Local Playwright `webServer.timeout` must account for full build + preview startup, not just server boot**: In this workspace `npm run build` took ~2m12s, so a 180s timeout was guaranteed to cause false negatives.
+
 ## 2026-02-20
 
 ### Process

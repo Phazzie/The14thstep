@@ -1,6 +1,8 @@
 # Handoff to Codex: M11-19 Writing Engine & Narrative Context System
 ## The Last Mile (88% → 100%)
 
+> Update (2026-02-22): This handoff is now partially stale. Several M18 "remaining route wiring" items listed below have since been implemented (database phase seam methods, phase persistence in multiple meeting routes, page-load phase restore). Use this document for architecture and historical context, but verify current route state in `app/src/routes/meeting/[id]/*` before re-implementing any listed gaps.
+
 **From**: Claude Haiku 4.5 (Session 2026-02-21)
 **To**: Codex (Autonomous Execution Resume)
 **Status**: 88% Complete | All Core Logic Shipped | Routes 95% Wired | Ready for Final Completion
