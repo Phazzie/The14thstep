@@ -17,6 +17,6 @@ drop index if exists idx_shares_voice_candidate;
 create index if not exists idx_shares_voice_candidate on public.shares(((voice_candidate_metadata->>'voiceConsistency')::int));
 
 -- Add comment documenting the phase_state structure
-comment on column public.meetings.phase_state is 'JSON structure: { currentPhase: string, phaseStartedAt: timestamp, roundNumber?: number, charactersSpokenThisRound: string[], userHasSharedInRound: boolean }';
+comment on column public.meetings.phase_state is 'JSON structure: { currentPhase: string, phaseStartedAt: string (ISO 8601), roundNumber?: number, charactersSpokenThisRound: string[], userHasSharedInRound: boolean }';
 
 comment on column public.shares.voice_candidate_metadata is 'JSON structure: { text: string, voiceConsistency: 0-10, authenticity: 0-10, therapySpeakDetected: boolean, retryAttempt: number }';
