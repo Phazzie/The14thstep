@@ -1,4 +1,4 @@
-import type { CoreCharacterProfile } from './types';
+import type { CharacterProfile, CoreCharacterProfile } from './types';
 
 const defaultStatus = 'active' as const;
 
@@ -206,3 +206,45 @@ export const VISITOR_CLEAN_TIMES = [
 	'9 months reality hitting',
 	'relapsed 11 days back'
 ] as const;
+
+function isNonEmptyString(value: unknown): value is string {
+	return typeof value === 'string' && value.trim().length > 0;
+}
+
+function hasValidVoiceExamples(value: unknown): value is [string, string, string] {
+	return Array.isArray(value) && value.length === 3 && value.every((example) => isNonEmptyString(example));
+}
+
+export function validateCharacterNarrativeFields(character: CharacterProfile): {
+	ok: boolean;
+	missingFields: string[];
+} {
+	const missingFields: string[] = [];
+
+	if (!hasValidVoiceExamples(character.voiceExamples)) missingFields.push('voiceExamples');
+	if (!isNonEmptyString(character.lie)) missingFields.push('lie');
+	if (!isNonEmptyString(character.discomfortRegister)) missingFields.push('discomfortRegister');
+	if (!isNonEmptyString(character.programRelationship)) missingFields.push('programRelationship');
+	if (!isNonEmptyString(character.lostThing)) missingFields.push('lostThing');
+	if (!(character.cleanTimeStart instanceof Date) || !Number.isFinite(character.cleanTimeStart.getTime())) {
+		missingFields.push('cleanTimeStart');
+	}
+
+	return {
+		ok: missingFields.length === 0,
+		missingFields
+	};
+}
+
+function assertCoreCharacterNarrativeFields() {
+	for (const character of CORE_CHARACTERS) {
+		const validation = validateCharacterNarrativeFields(character);
+		if (!validation.ok) {
+			throw new Error(
+				`Core character ${character.id} is missing required narrative fields: ${validation.missingFields.join(', ')}`
+			);
+		}
+	}
+}
+
+assertCoreCharacterNarrativeFields();

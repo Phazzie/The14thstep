@@ -22,6 +22,7 @@ describe('POST /meeting/[id]/user-share', () => {
 				createdAt: '2026-02-19T00:00:00.000Z'
 			}
 		}));
+		const updateMeetingPhase = vi.fn().mockResolvedValue({ ok: true, value: undefined });
 
 		const request = new Request('http://localhost/meeting/meeting-1/user-share', {
 			method: 'POST',
@@ -38,7 +39,11 @@ describe('POST /meeting/[id]/user-share', () => {
 			locals: {
 				seams: {
 					grokAi: { generateShare } as never,
-					database: { appendShare } as never,
+					database: {
+						appendShare,
+						getMeetingPhase: async () => ({ ok: true, value: null }),
+						updateMeetingPhase
+					} as never,
 					auth: {} as never
 				}
 			}
@@ -47,10 +52,12 @@ describe('POST /meeting/[id]/user-share', () => {
 		expect(response.status).toBe(200);
 		expect(generateShare.mock.calls[0][0].characterId).toBe('crisis-triage');
 		expect(appendShare.mock.calls[0][0].significanceScore).toBe(10);
+		expect(updateMeetingPhase).toHaveBeenCalledTimes(1);
 
 		const payload = await response.json();
 		expect(payload.ok).toBe(true);
 		expect(payload.value.crisis).toBe(true);
+		expect(payload.value.phaseState.currentPhase).toBe('opening');
 	});
 
 	it('falls back to crisis=true on ambiguous AI JSON parse', async () => {
@@ -71,6 +78,7 @@ describe('POST /meeting/[id]/user-share', () => {
 				createdAt: '2026-02-19T00:00:01.000Z'
 			}
 		}));
+		const updateMeetingPhase = vi.fn().mockResolvedValue({ ok: true, value: undefined });
 
 		const request = new Request('http://localhost/meeting/meeting-1/user-share', {
 			method: 'POST',
@@ -87,7 +95,11 @@ describe('POST /meeting/[id]/user-share', () => {
 			locals: {
 				seams: {
 					grokAi: { generateShare } as never,
-					database: { appendShare } as never,
+					database: {
+						appendShare,
+						getMeetingPhase: async () => ({ ok: true, value: null }),
+						updateMeetingPhase
+					} as never,
 					auth: {} as never
 				}
 			}
@@ -95,9 +107,11 @@ describe('POST /meeting/[id]/user-share', () => {
 
 		expect(response.status).toBe(200);
 		expect(appendShare.mock.calls[0][0].significanceScore).toBe(10);
+		expect(updateMeetingPhase).toHaveBeenCalledTimes(1);
 
 		const payload = await response.json();
 		expect(payload.ok).toBe(true);
 		expect(payload.value.crisis).toBe(true);
+		expect(payload.value.phaseState.currentPhase).toBe('opening');
 	});
 });

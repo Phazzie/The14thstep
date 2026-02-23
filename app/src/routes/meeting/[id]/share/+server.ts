@@ -1,4 +1,4 @@
-import { CORE_CHARACTERS } from '$lib/core/characters';
+import { CORE_CHARACTERS, validateCharacterNarrativeFields } from '$lib/core/characters';
 import { shouldIncludeCallback } from '$lib/core/callback-engine';
 import { applyReferenceLifecycle } from '$lib/core/callback-lifecycle';
 import { isMeetingInCrisis } from '$lib/core/crisis-engine';
@@ -11,7 +11,9 @@ import {
 } from '$lib/core/narrative-context';
 import {
 	selectPromptForPhase,
+	INTRO_ORDER,
 	initializeMeetingPhase,
+	recordCharacterSpoke,
 	transitionToNextPhase
 } from '$lib/core/ritual-orchestration';
 import {
@@ -223,7 +225,7 @@ function pickCharacter(characterId: string | undefined, sequenceOrder: number) {
 	return CORE_CHARACTERS[sequenceOrder % CORE_CHARACTERS.length];
 }
 
-async function generateValidatedShare(input: {
+export async function _generateValidatedShare(input: {
 	meetingId: string;
 	character: (typeof CORE_CHARACTERS)[number];
 	prompt: string;
@@ -233,7 +235,7 @@ async function generateValidatedShare(input: {
 	userMood: string;
 	recentShares: Array<{ speaker: string; content: string }>;
 	grokAi: App.Locals['seams']['grokAi'];
-}): Promise<SeamResult<{ shareText: string; attempts: number }>> {
+}): Promise<SeamResult<{ shareText: string; attempts: number; fallbackUsed: boolean }>> {
 	const attemptScores: Array<{
 		attempt: number;
 		validatorPass: boolean | null;
@@ -241,6 +243,8 @@ async function generateValidatedShare(input: {
 		authenticity: number | null;
 		note: string;
 	}> = [];
+	let lastUpstreamError: { code: SeamErrorCode; message: string; details?: Record<string, unknown> } | null = null;
+	let hadGeneratedCandidate = false;
 
 	for (let attempt = 1; attempt <= 3; attempt += 1) {
 		const generation = await input.grokAi.generateShare({
@@ -250,6 +254,7 @@ async function generateValidatedShare(input: {
 			contextMessages: input.contextMessages
 		});
 		if (!generation.ok) {
+			lastUpstreamError = generation.error;
 			attemptScores.push({
 				attempt,
 				validatorPass: null,
@@ -271,6 +276,7 @@ async function generateValidatedShare(input: {
 			});
 			continue;
 		}
+		hadGeneratedCandidate = true;
 
 		const qualityPrompt = buildQualityValidationPrompt(
 			input.character,
@@ -290,6 +296,7 @@ async function generateValidatedShare(input: {
 			contextMessages: [{ role: 'assistant', content: candidate }]
 		});
 		if (!quality.ok) {
+			lastUpstreamError = quality.error;
 			attemptScores.push({
 				attempt,
 				validatorPass: null,
@@ -321,7 +328,7 @@ async function generateValidatedShare(input: {
 		});
 
 		if (passesQualityValidationThresholds(parsed)) {
-			return ok({ shareText: candidate, attempts: attempt });
+			return ok({ shareText: candidate, attempts: attempt, fallbackUsed: false });
 		}
 	}
 
@@ -330,9 +337,14 @@ async function generateValidatedShare(input: {
 		attemptScores
 	);
 
+	if (!hadGeneratedCandidate && lastUpstreamError) {
+		return err(lastUpstreamError.code, lastUpstreamError.message, lastUpstreamError.details);
+	}
+
 	return ok({
 		shareText: `${input.character.name} is quiet tonight.`,
-		attempts: 3
+		attempts: 3,
+		fallbackUsed: true
 	});
 }
 
@@ -495,9 +507,46 @@ function createShareStream(
 					grokAi: locals.seams.grokAi
 				});
 				const mergedContinuityLines = [narrativeContext.contextLine, ...(continuityLines ?? [])].slice(0, 5);
+				const narrativeFieldValidation = validateCharacterNarrativeFields(selectedCharacter);
+				if (!narrativeFieldValidation.ok) {
+					console.warn(
+						`[share] Character ${selectedCharacter.id} missing narrative fields: ${narrativeFieldValidation.missingFields.join(', ')}`
+					);
+				}
+
+				let currentPhaseState = input.phaseState ?? initializeMeetingPhase();
+				if (!input.phaseState) {
+					const persistedPhaseStateResult = await locals.seams.database.getMeetingPhase(meetingId);
+					if (persistedPhaseStateResult.ok && persistedPhaseStateResult.value) {
+						currentPhaseState = persistedPhaseStateResult.value;
+					} else if (!persistedPhaseStateResult.ok) {
+						console.warn(
+							`[share] getMeetingPhase failed for meeting=${meetingId}: ${persistedPhaseStateResult.error.message}`
+						);
+					}
+				}
+				if (currentPhaseState.currentPhase === MeetingPhase.SETUP) {
+					const meetingStartTransition = transitionToNextPhase(currentPhaseState, 'meeting_start');
+					if (meetingStartTransition.ok) {
+						currentPhaseState = meetingStartTransition.value;
+					} else {
+						console.warn(
+							`[share] meeting_start transition failed for meeting=${meetingId}: ${meetingStartTransition.error.message}`
+						);
+					}
+				}
 
 				// Build phase-aware prompt
-				const currentPhase = input.phaseState?.currentPhase ?? MeetingPhase.SHARING_ROUND_1;
+				const currentPhase = currentPhaseState.currentPhase;
+				if (currentPhase === MeetingPhase.INTRODUCTIONS) {
+					const introIndex = currentPhaseState.charactersSpokenThisRound.length;
+					const expectedCharacterId = INTRO_ORDER[introIndex];
+					if (expectedCharacterId && selectedCharacter.id !== expectedCharacterId) {
+						console.warn(
+							`[share] Intro order violation in meeting=${meetingId}: expected ${expectedCharacterId}, got ${selectedCharacter.id}`
+						);
+					}
+				}
 				const prompt = buildPhaseAwarePrompt(
 					selectedCharacter,
 					currentPhase,
@@ -525,7 +574,7 @@ function createShareStream(
 					})
 				);
 
-				const generated = await generateValidatedShare({
+				const generated = await _generateValidatedShare({
 					meetingId,
 					character: selectedCharacter,
 					prompt,
@@ -596,6 +645,66 @@ function createShareStream(
 					return;
 				}
 
+				let phaseStateAfterShare = currentPhaseState;
+				const recordCharacterResult = recordCharacterSpoke(currentPhaseState, selectedCharacter.id);
+				if (recordCharacterResult.ok) {
+					phaseStateAfterShare = recordCharacterResult.value;
+				} else {
+					console.warn(
+						`[share] recordCharacterSpoke failed for meeting=${meetingId}: ${recordCharacterResult.error.message}`
+					);
+				}
+
+				const speakerCount =
+					phaseStateAfterShare.charactersSpokenThisRound.length +
+					(phaseStateAfterShare.userHasSharedInRound ? 1 : 0);
+				let transitionTrigger:
+					| 'share_complete'
+					| 'round_complete'
+					| 'user_input'
+					| 'meeting_start'
+					| null = null;
+
+				if (
+					currentPhase === MeetingPhase.OPENING ||
+					currentPhase === MeetingPhase.EMPTY_CHAIR ||
+					currentPhase === MeetingPhase.CLOSING ||
+					currentPhase === MeetingPhase.CRISIS_MODE
+				) {
+					transitionTrigger = 'share_complete';
+				} else if (currentPhase === MeetingPhase.INTRODUCTIONS && speakerCount >= 2) {
+					transitionTrigger = 'round_complete';
+				} else if (
+					(currentPhase === MeetingPhase.SHARING_ROUND_1 ||
+						currentPhase === MeetingPhase.SHARING_ROUND_2 ||
+						currentPhase === MeetingPhase.SHARING_ROUND_3) &&
+					speakerCount >= 2
+				) {
+					transitionTrigger = 'round_complete';
+				}
+
+				let phaseStateToPersist = phaseStateAfterShare;
+				if (transitionTrigger) {
+					const transitionResult = transitionToNextPhase(phaseStateAfterShare, transitionTrigger);
+					if (transitionResult.ok) {
+						phaseStateToPersist = transitionResult.value;
+					} else {
+						console.warn(
+							`[share] transitionToNextPhase failed for meeting=${meetingId}: ${transitionResult.error.message}`
+						);
+					}
+				}
+
+				const updateMeetingPhaseResult = await locals.seams.database.updateMeetingPhase(
+					meetingId,
+					phaseStateToPersist
+				);
+				if (!updateMeetingPhaseResult.ok) {
+					console.error(
+						`[share] Failed to persist phase state for meeting=${meetingId}: ${updateMeetingPhaseResult.error.message}`
+					);
+				}
+
 				const callbackLifecycleWarnings: string[] = [];
 				for (const callback of selectedCallbacks) {
 					const lifecycle = applyReferenceLifecycle({
@@ -644,6 +753,11 @@ function createShareStream(
 						ok: true,
 						value: {
 							share: saved.value,
+							phaseState: phaseStateToPersist,
+							generation: {
+								attempts: generated.value.attempts,
+								fallbackUsed: generated.value.fallbackUsed
+							},
 							callbacksUsed: selectedCallbacks,
 								character: {
 									id: selectedCharacter.id,
@@ -659,7 +773,8 @@ function createShareStream(
 						ok: true,
 						value: {
 							meetingId,
-							characterId: selectedCharacter.id
+							characterId: selectedCharacter.id,
+							phaseState: phaseStateToPersist
 						}
 					})
 				);
@@ -700,6 +815,17 @@ async function handleShareRequest(
 	const meetingSharesResult = await locals.seams.database.getMeetingShares(meetingId);
 	if (!meetingSharesResult.ok) {
 		return json(meetingSharesResult, { status: toStatus(meetingSharesResult.error.code) });
+	}
+	const persistedPhaseStateResult = await locals.seams.database.getMeetingPhase(meetingId);
+	if (persistedPhaseStateResult.ok && persistedPhaseStateResult.value?.currentPhase === MeetingPhase.CRISIS_MODE) {
+		return json(err(SeamErrorCodes.INPUT_INVALID, 'Character shares are paused during crisis mode'), {
+			status: 409
+		});
+	}
+	if (!persistedPhaseStateResult.ok) {
+		console.warn(
+			`[share] getMeetingPhase pre-check failed for meeting=${meetingId}: ${persistedPhaseStateResult.error.message}`
+		);
 	}
 
 	const persistedCrisisMode = isMeetingInCrisis({

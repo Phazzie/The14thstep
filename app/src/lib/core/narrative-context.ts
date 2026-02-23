@@ -145,7 +145,12 @@ export function parseQualityValidation(raw: string): QualityValidationResult | n
 }
 
 export function passesQualityValidationThresholds(input: QualityValidationResult): boolean {
-	return input.pass && input.voiceConsistency >= QUALITY_MIN_SCORE && input.authenticity >= QUALITY_MIN_SCORE;
+	return (
+		input.pass &&
+		!input.therapySpeakDetected &&
+		input.voiceConsistency >= QUALITY_MIN_SCORE &&
+		input.authenticity >= QUALITY_MIN_SCORE
+	);
 }
 
 export async function getMeetingNarrativeContext(

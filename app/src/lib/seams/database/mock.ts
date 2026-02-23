@@ -185,6 +185,20 @@ export function createDatabaseMock(options: DatabaseMockOptions = {}): DatabaseP
 			return ok(fixtures.getMeetingShares);
 		},
 
+		async updateMeetingPhase(meetingId) {
+			if (typeof meetingId !== 'string' || meetingId.trim().length === 0) {
+				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid meetingId');
+			}
+			return ok(undefined);
+		},
+
+		async getMeetingPhase(meetingId) {
+			if (typeof meetingId !== 'string' || meetingId.trim().length === 0) {
+				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid meetingId');
+			}
+			return ok(null);
+		},
+
 		async createCallback(input: CreateCallbackInput) {
 			if (!validateCreateCallbackInput(input)) {
 				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid createCallback input');

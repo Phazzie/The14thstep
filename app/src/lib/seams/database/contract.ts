@@ -1,3 +1,4 @@
+import type { MeetingPhaseState } from '$lib/core/types';
 import { SeamErrorCodes, type SeamErrorCode, type SeamResult } from '$lib/core/seam';
 
 export interface UserProfile {
@@ -95,10 +96,13 @@ export interface DatabasePort {
 	getHeavyMemory(userId: string): Promise<SeamResult<ShareRecord[]>>;
 	getShareById(shareId: string): Promise<SeamResult<ShareRecord>>;
 	getMeetingShares(meetingId: string): Promise<SeamResult<ShareRecord[]>>;
+	updateMeetingPhase(meetingId: string, phaseState: MeetingPhaseState): Promise<SeamResult<void>>;
+	getMeetingPhase(meetingId: string): Promise<SeamResult<MeetingPhaseState | null>>;
 	createCallback(input: CreateCallbackInput): Promise<SeamResult<CallbackRecord>>;
 	getActiveCallbacks(input: {
 		characterId: string;
 		meetingId: string;
+		scopeToMeeting?: boolean;
 	}): Promise<SeamResult<CallbackRecord[]>>;
 	markCallbackReferenced(callbackId: string): Promise<SeamResult<CallbackRecord>>;
 	completeMeeting(input: CompleteMeetingInput): Promise<SeamResult<MeetingRecord>>;

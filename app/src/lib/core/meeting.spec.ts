@@ -63,6 +63,8 @@ function createDeps(overrides: Partial<MeetingWorkflowDeps> = {}): MeetingWorkfl
 				createdAt: '2026-02-16T00:01:00.000Z'
 			}),
 		getMeetingShares: async () => ok<ShareRecord[]>([]),
+		updateMeetingPhase: async () => ok(undefined),
+		getMeetingPhase: async () => ok(null),
 		createCallback: async () =>
 			ok({
 				id: 'callback-1',

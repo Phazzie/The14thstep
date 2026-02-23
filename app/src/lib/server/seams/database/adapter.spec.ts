@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { SeamErrorCodes } from '$lib/core/seam';
 import { CORE_CHARACTERS } from '$lib/core/characters';
+import { MeetingPhase } from '$lib/core/types';
 import type { ServiceRoleSupabaseClient } from '$lib/server/supabase';
 import { createDatabaseAdapter } from './adapter';
 
@@ -23,6 +24,8 @@ interface MockResponses {
 	userMaybeSingle?: QueryResponse;
 	meetingSingle?: QueryResponse;
 	meetingUpdateSingle?: QueryResponse;
+	meetingPhaseMaybeSingle?: QueryResponse;
+	meetingPhaseUpdateMaybeSingle?: QueryResponse;
 	meetingCountSelect?: QueryResponse;
 	shareSingle?: QueryResponse;
 	heavyMemorySelect?: QueryResponse;
@@ -71,6 +74,7 @@ function defaultCharacterRows(): Array<{ id: string; name: string }> {
 
 function createHarness(responses: MockResponses = {}) {
 	const meetingInsertSpy = vi.fn();
+	const meetingUpdateSpy = vi.fn();
 	const shareInsertSpy = vi.fn();
 
 	const userMaybeSingle = responses.userMaybeSingle ?? { data: null, error: null, status: 200 };
@@ -85,6 +89,12 @@ function createHarness(responses: MockResponses = {}) {
 		error: null,
 		status: 200,
 		count: 0
+	};
+	const meetingPhaseMaybeSingle = responses.meetingPhaseMaybeSingle ?? { data: null, error: null, status: 200 };
+	const meetingPhaseUpdateMaybeSingle = responses.meetingPhaseUpdateMaybeSingle ?? {
+		data: { id: 'meeting-1' },
+		error: null,
+		status: 200
 	};
 	const shareSingle = responses.shareSingle ?? { data: null, error: null, status: 200 };
 	const heavyMemorySelect = responses.heavyMemorySelect ?? { data: [], error: null, status: 200 };
@@ -114,16 +124,21 @@ function createHarness(responses: MockResponses = {}) {
 							})
 						};
 					},
-					update: () => ({
-						eq: () => ({
-							select: () => ({
-								single: async () => meetingUpdateSingle
+					update: (payload: unknown) => {
+						meetingUpdateSpy(payload);
+						return {
+							eq: () => ({
+								select: () => ({
+									single: async () => meetingUpdateSingle,
+									maybeSingle: async () => meetingPhaseUpdateMaybeSingle
+								})
 							})
-						})
-					}),
+						};
+					},
 					select: () => ({
 						eq: () => ({
-							gt: async () => meetingCountSelect
+							gt: async () => meetingCountSelect,
+							maybeSingle: async () => meetingPhaseMaybeSingle
 						})
 					})
 				};
@@ -222,6 +237,7 @@ function createHarness(responses: MockResponses = {}) {
 	return {
 		adapter: createDatabaseAdapter({ supabase }),
 		meetingInsertSpy,
+		meetingUpdateSpy,
 		shareInsertSpy
 	};
 }
@@ -466,6 +482,104 @@ describe('database supabase adapter', () => {
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(result.value).toBe(18);
+		}
+	});
+
+	it('updates meeting phase_state with serialized ISO timestamp', async () => {
+		const { adapter, meetingUpdateSpy } = createHarness({
+			meetingPhaseUpdateMaybeSingle: {
+				data: { id: 'meeting-1' },
+				error: null,
+				status: 200
+			}
+		});
+		const phaseStartedAt = new Date('2026-02-22T22:00:00.000Z');
+
+		const result = await adapter.updateMeetingPhase('meeting-1', {
+			currentPhase: MeetingPhase.SHARING_ROUND_1,
+			phaseStartedAt,
+			roundNumber: 1,
+			charactersSpokenThisRound: ['marcus'],
+			userHasSharedInRound: false
+		});
+
+		expect(result.ok).toBe(true);
+		expect(meetingUpdateSpy).toHaveBeenCalled();
+		expect(meetingUpdateSpy.mock.calls[0][0]).toEqual({
+			phase_state: {
+				currentPhase: 'sharing_round_1',
+				phaseStartedAt: phaseStartedAt.toISOString(),
+				roundNumber: 1,
+				charactersSpokenThisRound: ['marcus'],
+				userHasSharedInRound: false
+			}
+		});
+	});
+
+	it('loads meeting phase_state and maps phaseStartedAt to Date', async () => {
+		const { adapter } = createHarness({
+			meetingPhaseMaybeSingle: {
+				data: {
+					phase_state: {
+						currentPhase: 'crisis_mode',
+						phaseStartedAt: '2026-02-22T22:05:00.000Z',
+						roundNumber: 2,
+						charactersSpokenThisRound: ['marcus'],
+						userHasSharedInRound: true
+					}
+				},
+				error: null,
+				status: 200
+			}
+		});
+
+		const result = await adapter.getMeetingPhase('meeting-1');
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value?.currentPhase).toBe(MeetingPhase.CRISIS_MODE);
+			expect(result.value?.phaseStartedAt).toBeInstanceOf(Date);
+			expect(result.value?.phaseStartedAt.toISOString()).toBe('2026-02-22T22:05:00.000Z');
+			expect(result.value?.userHasSharedInRound).toBe(true);
+		}
+	});
+
+	it('returns CONTRACT_VIOLATION for malformed meeting phase_state payload', async () => {
+		const { adapter } = createHarness({
+			meetingPhaseMaybeSingle: {
+				data: {
+					phase_state: {
+						currentPhase: 'not_a_real_phase',
+						phaseStartedAt: '2026-02-22T22:05:00.000Z',
+						charactersSpokenThisRound: [],
+						userHasSharedInRound: false
+					}
+				},
+				error: null,
+				status: 200
+			}
+		});
+
+		const result = await adapter.getMeetingPhase('meeting-1');
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe(SeamErrorCodes.CONTRACT_VIOLATION);
+		}
+	});
+
+	it('returns ok(null) when meeting phase_state is absent', async () => {
+		const { adapter } = createHarness({
+			meetingPhaseMaybeSingle: {
+				data: { phase_state: null },
+				error: null,
+				status: 200
+			}
+		});
+
+		const result = await adapter.getMeetingPhase('meeting-1');
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value).toBeNull();
 		}
 	});
 

@@ -33,6 +33,15 @@ describe('narrative-context quality parsing', () => {
 		expect(parsed && passesQualityValidationThresholds(parsed)).toBe(false);
 	});
 
+	it('fails thresholds when therapy speak is detected even if pass and scores are high', () => {
+		const parsed = parseQualityValidation(
+			'{"pass":true,"voiceConsistency":9,"authenticity":9,"therapySpeakDetected":true}'
+		);
+
+		expect(parsed).not.toBeNull();
+		expect(parsed && passesQualityValidationThresholds(parsed)).toBe(false);
+	});
+
 	it('returns null for malformed validator payloads', () => {
 		expect(parseQualityValidation('not-json')).toBeNull();
 		expect(parseQualityValidation('{"pass":true}')).toBeNull();

@@ -1,8 +1,10 @@
 import { CORE_CHARACTERS } from '$lib/core/characters';
 import { closeMeeting } from '$lib/core/meeting';
+import { initializeMeetingPhase, transitionToNextPhase } from '$lib/core/ritual-orchestration';
 import { buildPostMeetingMemoryExtractionPrompt } from '$lib/core/prompt-templates';
 import { runCallbackLifecycleWorkflow } from '$lib/core/callback-lifecycle-workflow';
 import { scanForCallbacks } from '$lib/core/callback-scanner';
+import { MeetingPhase, type MeetingPhaseState } from '$lib/core/types';
 import { SeamErrorCodes, err, ok, type SeamErrorCode, type SeamResult } from '$lib/core/seam';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
@@ -15,6 +17,47 @@ interface ExtractedMeetingMemory {
 	userMemory: string;
 	highMoment: string;
 	characterThreads: Record<string, string>;
+}
+
+function toClosingPhaseState(current: MeetingPhaseState): MeetingPhaseState {
+	return {
+		currentPhase: MeetingPhase.CLOSING,
+		phaseStartedAt: new Date(),
+		roundNumber: undefined,
+		charactersSpokenThisRound: [],
+		userHasSharedInRound: false
+	};
+}
+
+function toPostMeetingPhaseState(current: MeetingPhaseState): MeetingPhaseState {
+	const transitioned = transitionToNextPhase(toClosingPhaseState(current), 'share_complete');
+	if (transitioned.ok) return transitioned.value;
+
+	return {
+		currentPhase: MeetingPhase.POST_MEETING,
+		phaseStartedAt: new Date(),
+		roundNumber: undefined,
+		charactersSpokenThisRound: [],
+		userHasSharedInRound: false
+	};
+}
+
+async function getCurrentPhaseState(meetingId: string, locals: App.Locals): Promise<MeetingPhaseState> {
+	let phaseState = initializeMeetingPhase();
+	const persistedPhaseState = await locals.seams.database.getMeetingPhase(meetingId);
+	if (persistedPhaseState.ok && persistedPhaseState.value) {
+		phaseState = persistedPhaseState.value;
+	} else if (!persistedPhaseState.ok) {
+		console.warn(`[close] getMeetingPhase failed for meeting=${meetingId}: ${persistedPhaseState.error.message}`);
+	}
+	return phaseState;
+}
+
+async function persistPhaseState(meetingId: string, phaseState: MeetingPhaseState, locals: App.Locals) {
+	const updateResult = await locals.seams.database.updateMeetingPhase(meetingId, phaseState);
+	if (!updateResult.ok) {
+		console.error(`[close] Failed to persist phase state for meeting=${meetingId}: ${updateResult.error.message}`);
+	}
 }
 
 function speakerNameForShare(characterId: string | null): string {
@@ -186,6 +229,19 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 	if (!sharesResult.ok) {
 		return json(sharesResult, { status: toStatus(sharesResult.error.code) });
 	}
+	const currentPhaseState = await getCurrentPhaseState(meetingId, locals);
+	const closingPhaseState =
+		currentPhaseState.currentPhase === MeetingPhase.POST_MEETING
+			? currentPhaseState
+			: toClosingPhaseState(currentPhaseState);
+	if (closingPhaseState.currentPhase !== MeetingPhase.POST_MEETING) {
+		if (currentPhaseState.currentPhase !== MeetingPhase.CLOSING) {
+			console.info(
+				`[close] forcing phase to closing for meeting=${meetingId} from ${currentPhaseState.currentPhase}`
+			);
+		}
+		await persistPhaseState(meetingId, closingPhaseState, locals);
+	}
 	const persistedLastShares = sharesResult.value.slice(-12).map((share) => ({
 		speakerName: speakerNameForShare(share.characterId),
 		content: share.content
@@ -207,14 +263,24 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 		return json(result, { status: toStatus(result.error.code) });
 	}
 
+	const extractionStartedAt = Date.now();
 	const extractedMemory = await extractPostMeetingMemory({
 		meetingId,
 		topic: input.topic,
 		lastShares: persistedLastShares,
 		grokAi: locals.seams.grokAi
 	});
+	const extractionDurationMs = Date.now() - extractionStartedAt;
 	const extractedCharacterCount = Object.keys(extractedMemory?.characterThreads ?? {}).length;
 	const shouldBuildFallbackCharacterSummaries = extractedCharacterCount < CORE_CHARACTERS.slice(0, 6).length;
+	if (extractedMemory) {
+		console.info(
+			`[close] memory extraction parsed for meeting=${meetingId} in ${extractionDurationMs}ms (characters=${extractedCharacterCount})`
+		);
+	} else {
+		console.warn(`[close] memory extraction failed/invalid for meeting=${meetingId} after ${extractionDurationMs}ms`);
+	}
+	const fallbackStartedAt = Date.now();
 	const fallbackCharacterMemorySummaries = shouldBuildFallbackCharacterSummaries
 		? await buildCharacterMemorySummaries({
 				meetingId,
@@ -223,6 +289,12 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 				grokAi: locals.seams.grokAi
 			})
 		: {};
+	const fallbackDurationMs = Date.now() - fallbackStartedAt;
+	if (shouldBuildFallbackCharacterSummaries) {
+		console.info(
+			`[close] fallback character summaries used for meeting=${meetingId} in ${fallbackDurationMs}ms (generated=${Object.keys(fallbackCharacterMemorySummaries).length})`
+		);
+	}
 	const characterMemorySummaries = {
 		...fallbackCharacterMemorySummaries,
 		...(extractedMemory?.characterThreads ?? {})
@@ -245,6 +317,8 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 	if (!completeMeetingResult.ok) {
 		return json(completeMeetingResult, { status: toStatus(completeMeetingResult.error.code) });
 	}
+	const postMeetingPhaseState = toPostMeetingPhaseState(closingPhaseState);
+	await persistPhaseState(meetingId, postMeetingPhaseState, locals);
 
 	let callbackScan: { detected: number; saved: number; skipped: number; failed: number } | null = null;
 	let callbackScanError: string | null = null;
@@ -298,6 +372,7 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 	return json(
 		ok({
 			...result.value,
+			phaseState: postMeetingPhaseState,
 			characterMemorySummaries,
 			completedMeeting: completeMeetingResult.value,
 			callbackScan,

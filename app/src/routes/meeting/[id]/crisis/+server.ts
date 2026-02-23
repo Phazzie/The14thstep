@@ -1,6 +1,8 @@
 import { CORE_CHARACTERS } from '$lib/core/characters';
 import { addShare } from '$lib/core/meeting';
+import { initializeMeetingPhase } from '$lib/core/ritual-orchestration';
 import { buildMarcusCrisisPrompt } from '$lib/core/prompt-templates';
+import { MeetingPhase, type MeetingPhaseState } from '$lib/core/types';
 import { SeamErrorCodes, err, ok, type SeamErrorCode, type SeamResult } from '$lib/core/seam';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
@@ -15,6 +17,32 @@ interface CrisisResourcesPayload {
 	sticky: true;
 	title: string;
 	lines: string[];
+}
+
+function enterCrisisMode(current: MeetingPhaseState): MeetingPhaseState {
+	return {
+		...current,
+		currentPhase: MeetingPhase.CRISIS_MODE,
+		phaseStartedAt: new Date()
+	};
+}
+
+async function getCurrentPhaseState(meetingId: string, locals: App.Locals): Promise<MeetingPhaseState> {
+	let phaseState = initializeMeetingPhase();
+	const persistedPhaseState = await locals.seams.database.getMeetingPhase(meetingId);
+	if (persistedPhaseState.ok && persistedPhaseState.value) {
+		phaseState = persistedPhaseState.value;
+	} else if (!persistedPhaseState.ok) {
+		console.warn(`[crisis] getMeetingPhase failed for meeting=${meetingId}: ${persistedPhaseState.error.message}`);
+	}
+	return phaseState;
+}
+
+async function persistPhaseState(meetingId: string, phaseState: MeetingPhaseState, locals: App.Locals) {
+	const updateResult = await locals.seams.database.updateMeetingPhase(meetingId, phaseState);
+	if (!updateResult.ok) {
+		console.error(`[crisis] Failed to persist phase state for meeting=${meetingId}: ${updateResult.error.message}`);
+	}
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -92,6 +120,15 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 	}
 
 	const input = inputResult.value;
+	let phaseState = await getCurrentPhaseState(meetingId, locals);
+	if (phaseState.currentPhase === MeetingPhase.POST_MEETING) {
+		return json(err(SeamErrorCodes.INPUT_INVALID, 'Meeting is already closed'), { status: 409 });
+	}
+	if (phaseState.currentPhase !== MeetingPhase.CRISIS_MODE) {
+		phaseState = enterCrisisMode(phaseState);
+		await persistPhaseState(meetingId, phaseState, locals);
+	}
+
 	const designatedCharacter = CORE_CHARACTERS.find((character) => character.id === 'marcus') ?? CORE_CHARACTERS[0];
 	if (!designatedCharacter) {
 		return json(err(SeamErrorCodes.NOT_FOUND, 'Crisis responder is unavailable'), { status: 404 });
@@ -128,6 +165,7 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 	return json(
 		ok({
 			shares: [crisisShare.value],
+			phaseState,
 			resources: {
 				sticky: true,
 				title: "If you're in crisis",

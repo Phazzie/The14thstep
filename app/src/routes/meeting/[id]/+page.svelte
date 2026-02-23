@@ -32,12 +32,14 @@
 	interface CloseSummaryValue {
 		meetingId: string;
 		summary: string;
+		phaseState?: RitualPhaseStateSnapshot;
 	}
 
 	interface UserShareValue {
 		share: ShareRecord;
 		crisis: boolean;
 		heavy: boolean;
+		phaseState?: RitualPhaseStateSnapshot;
 	}
 
 	interface ExpandShareValue {
@@ -47,11 +49,20 @@
 
 	interface CrisisResponseValue {
 		shares: ShareRecord[];
+		phaseState?: RitualPhaseStateSnapshot;
 		resources: {
 			sticky: boolean;
 			title: string;
 			lines: string[];
 		};
+	}
+
+	interface RitualPhaseStateSnapshot {
+		currentPhase: string;
+		phaseStartedAt: string | Date | null;
+		roundNumber?: number;
+		charactersSpokenThisRound: string[];
+		userHasSharedInRound: boolean;
 	}
 
 	type MeetingPhase = 'sharing' | 'closing' | 'reflection';
@@ -93,6 +104,7 @@
 	let setupCrisisSupportRequested = $state(false);
 	let activeCharacterId = $state<string | null>(null);
 	let meetingPhase = $state<MeetingPhase>('sharing');
+	let ritualPhaseState = $state<RitualPhaseStateSnapshot | null>(null);
 	let transcriptContainer: HTMLDivElement | null = null;
 
 	$effect(() => {
@@ -100,6 +112,13 @@
 		if (!selectedCharacterId) selectedCharacterId = data.characters[0]?.id ?? 'marcus';
 		if (!userName) userName = initialUserName;
 		if (userMood === 'present') userMood = initialMood;
+	});
+
+	$effect(() => {
+		const serverPhaseState = (data.phaseState as unknown as RitualPhaseStateSnapshot | undefined) ?? null;
+		if (!ritualPhaseState && serverPhaseState) {
+			ritualPhaseState = serverPhaseState;
+		}
 	});
 
 	$effect(() => {
@@ -198,6 +217,7 @@
 			upsertShare(payload.value.share);
 			crisisMode = payload.value.crisis;
 			heavyMode = payload.value.heavy;
+			if (payload.value.phaseState) ritualPhaseState = payload.value.phaseState;
 			userShareText = '';
 			statusLine = crisisMode
 				? 'Crisis mode detected. The room will stay with you.'
@@ -296,12 +316,21 @@
 		});
 
 		eventSource.addEventListener('persisted', (event) => {
-			const parsed = parseSeamResult<{ share?: ShareRecord }>(
+			const parsed = parseSeamResult<{
+				share?: ShareRecord;
+				phaseState?: RitualPhaseStateSnapshot;
+				generation?: { attempts?: number; fallbackUsed?: boolean };
+			}>(
 				JSON.parse((event as MessageEvent<string>).data)
 			);
+			if (parsed?.ok) {
+				if (parsed.value.phaseState) ritualPhaseState = parsed.value.phaseState;
+			}
 			if (parsed?.ok && isRecord(parsed.value.share)) {
 				upsertShare(parsed.value.share as ShareRecord);
-				statusLine = 'Character share generated and saved.';
+				statusLine = parsed.value.generation?.fallbackUsed
+					? 'Character share saved (safe fallback used).'
+					: 'Character share generated and saved.';
 				streamingDraft = '';
 			}
 		});
@@ -362,6 +391,7 @@
 			for (const share of payload.value.shares) {
 				upsertShare(share);
 			}
+			if (payload.value.phaseState) ritualPhaseState = payload.value.phaseState;
 			if (payload.value.resources?.sticky) {
 				crisisResources = {
 					title: payload.value.resources.title,
@@ -410,6 +440,7 @@
 			}
 
 			summaryText = payload.value.summary;
+			if (payload.value.phaseState) ritualPhaseState = payload.value.phaseState;
 			meetingPhase = 'reflection';
 			statusLine = 'Close summary ready.';
 		} catch (cause) {
@@ -426,6 +457,7 @@
 		<header class="space-y-2">
 			<h1 class="text-2xl font-bold text-amber-200">Meeting Room</h1>
 			<p class="text-sm text-gray-300">Meeting ID: <code>{data.meetingId}</code></p>
+			<p class="text-xs text-gray-400">Ritual phase: {ritualPhaseState?.currentPhase ?? 'unknown'}</p>
 			<p class="text-sm text-gray-300">
 				{userName} · {data.initialCleanTime ?? 'clean time not set'}
 			</p>

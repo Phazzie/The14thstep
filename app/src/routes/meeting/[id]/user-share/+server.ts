@@ -5,7 +5,13 @@ import {
 	scoreSignificance,
 	type ShareInteractionType
 } from '$lib/core/meeting';
+import {
+	initializeMeetingPhase,
+	recordUserShared,
+	transitionToNextPhase
+} from '$lib/core/ritual-orchestration';
 import { buildCrisisTriagePrompt } from '$lib/core/prompt-templates';
+import { MeetingPhase, type MeetingPhaseState } from '$lib/core/types';
 import { SeamErrorCodes, err, ok, type SeamErrorCode, type SeamResult } from '$lib/core/seam';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
@@ -25,6 +31,36 @@ interface UserShareRequest {
 	sequenceOrder: number;
 	interactionType?: ShareInteractionType;
 	isFirstUserShare?: boolean;
+}
+
+async function getCurrentPhaseState(meetingId: string, locals: App.Locals): Promise<MeetingPhaseState> {
+	let phaseState = initializeMeetingPhase();
+	const persistedPhaseState = await locals.seams.database.getMeetingPhase(meetingId);
+	if (persistedPhaseState.ok && persistedPhaseState.value) {
+		phaseState = persistedPhaseState.value;
+	} else if (!persistedPhaseState.ok) {
+		console.warn(`[user-share] getMeetingPhase failed for meeting=${meetingId}: ${persistedPhaseState.error.message}`);
+	}
+
+	if (phaseState.currentPhase === MeetingPhase.SETUP) {
+		const meetingStartTransition = transitionToNextPhase(phaseState, 'meeting_start');
+		if (meetingStartTransition.ok) {
+			phaseState = meetingStartTransition.value;
+		} else {
+			console.warn(
+				`[user-share] meeting_start transition failed for meeting=${meetingId}: ${meetingStartTransition.error.message}`
+			);
+		}
+	}
+
+	return phaseState;
+}
+
+async function persistPhaseState(meetingId: string, phaseState: MeetingPhaseState, locals: App.Locals) {
+	const updateResult = await locals.seams.database.updateMeetingPhase(meetingId, phaseState);
+	if (!updateResult.ok) {
+		console.error(`[user-share] Failed to persist phase state for meeting=${meetingId}: ${updateResult.error.message}`);
+	}
 }
 
 interface CrisisTriageParse {
@@ -201,11 +237,57 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 		return json(result, { status: toStatus(result.error.code) });
 	}
 
+	const currentPhaseState = await getCurrentPhaseState(meetingId, locals);
+	const currentPhase = currentPhaseState.currentPhase;
+	let phaseStateAfterUserShare = currentPhaseState;
+
+	const recordUserResult = recordUserShared(currentPhaseState);
+	if (recordUserResult.ok) {
+		phaseStateAfterUserShare = recordUserResult.value;
+	} else {
+		console.warn(
+			`[user-share] recordUserShared failed for meeting=${meetingId}: ${recordUserResult.error.message}`
+		);
+	}
+
+	const speakerCount =
+		phaseStateAfterUserShare.charactersSpokenThisRound.length +
+		(phaseStateAfterUserShare.userHasSharedInRound ? 1 : 0);
+	let transitionTrigger: 'share_complete' | 'round_complete' | 'user_input' | 'meeting_start' | null = null;
+
+	if (currentPhase === MeetingPhase.TOPIC_SELECTION) {
+		transitionTrigger = 'user_input';
+	} else if (currentPhase === MeetingPhase.INTRODUCTIONS && speakerCount >= 2) {
+		transitionTrigger = 'round_complete';
+	} else if (
+		(currentPhase === MeetingPhase.SHARING_ROUND_1 ||
+			currentPhase === MeetingPhase.SHARING_ROUND_2 ||
+			currentPhase === MeetingPhase.SHARING_ROUND_3) &&
+		speakerCount >= 2
+	) {
+		transitionTrigger = 'round_complete';
+	}
+
+	let phaseStateToPersist = phaseStateAfterUserShare;
+	if (transitionTrigger) {
+		const transitionResult = transitionToNextPhase(phaseStateAfterUserShare, transitionTrigger);
+		if (transitionResult.ok) {
+			phaseStateToPersist = transitionResult.value;
+		} else {
+			console.warn(
+				`[user-share] transitionToNextPhase failed for meeting=${meetingId}: ${transitionResult.error.message}`
+			);
+		}
+	}
+
+	await persistPhaseState(meetingId, phaseStateToPersist, locals);
+
 	return json(
 		ok({
 			share: result.value,
 			crisis,
-			heavy
+			heavy,
+			phaseState: phaseStateToPersist
 		}),
 		{ status: 200 }
 	);
