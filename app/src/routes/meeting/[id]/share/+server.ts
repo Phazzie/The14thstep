@@ -593,9 +593,17 @@ function createShareStream(
 					const introIndex = currentPhaseState.charactersSpokenThisRound.length;
 					const expectedCharacterId = INTRO_ORDER[introIndex];
 					if (expectedCharacterId && selectedCharacter.id !== expectedCharacterId) {
-						console.warn(
-							`[share] Intro order violation in meeting=${meetingId}: expected ${expectedCharacterId}, got ${selectedCharacter.id}`
+						controller.enqueue(
+							sseChunk(
+								'error',
+								err(
+									SeamErrorCodes.INPUT_INVALID,
+									`Intro order violation: expected ${expectedCharacterId}, got ${selectedCharacter.id}`
+								)
+							)
 						);
+						controller.close();
+						return;
 					}
 				}
 				const prompt = buildPhaseAwarePrompt(
@@ -719,10 +727,19 @@ function createShareStream(
 				if (
 					currentPhase === MeetingPhase.OPENING ||
 					currentPhase === MeetingPhase.EMPTY_CHAIR ||
-					currentPhase === MeetingPhase.CLOSING ||
 					currentPhase === MeetingPhase.CRISIS_MODE
 				) {
 					transitionTrigger = 'share_complete';
+				} else if (currentPhase === MeetingPhase.CLOSING) {
+					const sharesForCrisisCheck = [
+						...recentShares.map((s) => ({ content: s.content, significanceScore: 0 })),
+						{ content: fullText, significanceScore }
+					];
+					if ((input.crisisMode) || isMeetingInCrisis({ shares: sharesForCrisisCheck })) {
+						transitionTrigger = 'user_input';
+					} else {
+						transitionTrigger = 'share_complete';
+					}
 				} else if (currentPhase === MeetingPhase.INTRODUCTIONS && speakerCount >= 2) {
 					transitionTrigger = 'round_complete';
 				} else if (
@@ -747,10 +764,18 @@ function createShareStream(
 				}
 
 				if (phaseLoaded) {
-					const updateMeetingPhaseResult = await locals.seams.database.updateMeetingPhase(
+					let updateMeetingPhaseResult = await locals.seams.database.updateMeetingPhase(
 						meetingId,
 						phaseStateToPersist
 					);
+					if (!updateMeetingPhaseResult.ok) {
+						await wait(100);
+						updateMeetingPhaseResult = await locals.seams.database.updateMeetingPhase(
+							meetingId,
+							phaseStateToPersist
+						);
+					}
+
 					if (!updateMeetingPhaseResult.ok) {
 						console.error(
 							`[share] Failed to persist phase state for meeting=${meetingId}: ${updateMeetingPhaseResult.error.message}`
@@ -899,13 +924,25 @@ async function handleShareRequest(
 		}))
 	});
 	if (persistedCrisisMode || input.crisisMode) {
-		return json(err(SeamErrorCodes.INPUT_INVALID, 'Character shares are paused during crisis mode'), {
-			status: 409
-		});
+		const currentPhase =
+			persistedPhaseStateResult.ok && persistedPhaseStateResult.value
+				? persistedPhaseStateResult.value.currentPhase
+				: undefined;
+
+		if (currentPhase !== MeetingPhase.CLOSING) {
+			return json(err(SeamErrorCodes.INPUT_INVALID, 'Character shares are paused during crisis mode'), {
+				status: 409
+			});
+		}
 	}
 
 	const recentShares = mapRecentSharesFromMeeting(meetingSharesResult.value, input.userName ?? 'User');
-	return createShareStream(meetingId, input, recentShares, locals);
+	return createShareStream(
+		meetingId,
+		{ ...input, crisisMode: persistedCrisisMode || input.crisisMode },
+		recentShares,
+		locals
+	);
 }
 
 export const POST: RequestHandler = async ({ params, locals, request }) => {

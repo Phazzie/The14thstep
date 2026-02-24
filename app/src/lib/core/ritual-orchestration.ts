@@ -134,6 +134,8 @@ export function transitionToNextPhase(
 		case MeetingPhaseEnum.CLOSING:
 			if (transitionTrigger === 'share_complete') {
 				nextPhase = MeetingPhaseEnum.POST_MEETING;
+			} else if (transitionTrigger === 'user_input') {
+				nextPhase = MeetingPhaseEnum.CRISIS_MODE;
 			}
 			break;
 
