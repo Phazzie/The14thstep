@@ -76,6 +76,11 @@ Observed Playwright results:
   - route-handler integration proof with in-memory database seam
   - browser e2e user flows passing
 
+3. Phase-state migration rollout lock sensitivity is operational (documented strategy)
+- `app/supabase/migrations/20260221_000002_add_meeting_phase_state.sql` uses standard index DDL on `public.shares`
+- Use low-traffic / maintenance-window rollout by default, or split/manual concurrent index DDL if production traffic requires it
+- See `app/supabase/migrations/README.md` (post-ship hardening issue `#16`)
+
 ## Release Readiness Assessment
 
 - Core functionality (M11-M19 active paths): Verified

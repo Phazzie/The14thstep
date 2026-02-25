@@ -609,6 +609,21 @@ describe('database supabase adapter', () => {
 		}
 	});
 
+	it('returns NOT_FOUND when getMeetingPhase meeting row is missing', async () => {
+		const { adapter } = createHarness({
+			meetingPhaseMaybeSingle: {
+				data: null,
+				error: null,
+				status: 200
+			}
+		});
+		const result = await adapter.getMeetingPhase('missing-meeting');
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe(SeamErrorCodes.NOT_FOUND);
+		}
+	});
+
 	it('ensureUserProfile inserts missing profile row', async () => {
 		const { adapter, userInsertSpy } = createHarness({
 			userMaybeSingle: { data: null, error: null, status: 200 },
@@ -719,7 +734,6 @@ describe('database supabase adapter', () => {
 		expect(userUpdateSpy).toHaveBeenCalledWith({ is_anonymous: false });
 		expect(result.ok).toBe(true);
 	});
-
 	it('loads active callbacks scoped to the meeting and maps character ids', async () => {
 		const marcusDbId = '00000000-0000-4000-8000-000000000001';
 		const { adapter } = createHarness({
