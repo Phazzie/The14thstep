@@ -74,7 +74,9 @@ function isRateLimited(error: unknown): boolean {
 }
 
 function isProductionRuntime(env: NodeJS.ProcessEnv = process.env): boolean {
-	return (env.NODE_ENV ?? '').trim() === 'production' || (env.VERCEL_ENV ?? '').trim() === 'production';
+	const vercelEnv = (env.VERCEL_ENV ?? '').trim();
+	if (vercelEnv) return vercelEnv === 'production';
+	return (env.NODE_ENV ?? '').trim() === 'production';
 }
 
 function resolveCanonicalOrigin(url: URL, env: NodeJS.ProcessEnv = process.env): string | null {
