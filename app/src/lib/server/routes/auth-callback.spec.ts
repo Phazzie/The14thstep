@@ -149,5 +149,67 @@ describe('auth callback route', () => {
 
 		expect(calls.delete).toEqual(expect.arrayContaining(['sb-access-token', 'sb-refresh-token', 'app-session-kind']));
 	});
-});
 
+	it('falls back to token_hash verification when code exchange fails', async () => {
+		const authClient = createAuthClientStub();
+		authClient.auth.exchangeCodeForSession.mockResolvedValue({
+			data: { session: null, user: null },
+			error: { status: 400, code: 'bad_code' }
+		});
+		authClient.auth.verifyOtp.mockResolvedValue({
+			data: {
+				session: {
+					access_token: 'access',
+					refresh_token: 'refresh',
+					user: { id: 'user-1', email: 'john@example.com', user_metadata: {} }
+				},
+				user: { id: 'user-1', email: 'john@example.com', user_metadata: {} }
+			},
+			error: null
+		});
+		createClientMock.mockReturnValue(authClient as never);
+
+		const { cookies } = createCookieJar();
+		const ensureUserProfile = vi.fn(async () =>
+			ok({
+				id: 'user-1',
+				displayName: 'john',
+				cleanTime: null,
+				meetingCount: 0,
+				firstMeetingAt: null,
+				lastMeetingAt: null
+			})
+		);
+
+		await expect(
+			GET({
+				url: new URL('http://localhost/auth/callback?code=abc123&token_hash=t1&type=magiclink'),
+				cookies,
+				locals: { seams: { database: { ensureUserProfile } } }
+			} as never)
+		).rejects.toSatisfy((error: unknown) => {
+			expectRedirectLike(error, 303, '/?auth=signed-in');
+			return true;
+		});
+
+		expect(authClient.auth.verifyOtp).toHaveBeenCalledWith({ token_hash: 't1', type: 'magiclink' });
+	});
+
+	it('redirects auth-failed when callback externals throw', async () => {
+		const authClient = createAuthClientStub();
+		authClient.auth.exchangeCodeForSession.mockRejectedValue(new Error('boom'));
+		createClientMock.mockReturnValue(authClient as never);
+
+		const { cookies } = createCookieJar();
+		await expect(
+			GET({
+				url: new URL('http://localhost/auth/callback?code=abc123'),
+				cookies,
+				locals: { seams: { database: { ensureUserProfile: vi.fn() } } }
+			} as never)
+		).rejects.toSatisfy((error: unknown) => {
+			expectRedirectLike(error, 303, '/?auth=auth-failed');
+			return true;
+		});
+	});
+});

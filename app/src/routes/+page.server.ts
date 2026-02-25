@@ -65,6 +65,39 @@ function isRateLimited(error: unknown): boolean {
 	return record.status === 429 || record.code === 'over_request_rate_limit';
 }
 
+function isProductionRuntime(env: NodeJS.ProcessEnv = process.env): boolean {
+	return (env.NODE_ENV ?? '').trim() === 'production' || (env.VERCEL_ENV ?? '').trim() === 'production';
+}
+
+function resolveCanonicalOrigin(url: URL, env: NodeJS.ProcessEnv = process.env): string | null {
+	const configured =
+		env.CANONICAL_ORIGIN?.trim() ??
+		env.PUBLIC_APP_ORIGIN?.trim() ??
+		env.PUBLIC_SITE_URL?.trim() ??
+		'';
+	if (configured) {
+		try {
+			return new URL(configured).origin;
+		} catch {
+			console.warn('invalid canonical origin config', { configured });
+			return null;
+		}
+	}
+
+	if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+		return url.origin;
+	}
+
+	if (!isProductionRuntime(env)) {
+		return url.origin;
+	}
+
+	console.warn('missing canonical origin in production for magic link redirect', {
+		origin: url.origin
+	});
+	return null;
+}
+
 async function ensureProfileBootstrap(
 	locals: App.Locals,
 	input: { id: string; displayName: string; cleanTime?: string | null; isAnonymous: boolean }
@@ -139,10 +172,18 @@ export const actions: Actions = {
 			});
 		}
 
+		const redirectOrigin = resolveCanonicalOrigin(url);
+		if (!redirectOrigin) {
+			return fail(500, {
+				authMessage: "Couldn't send a sign-in link right now. Try again.",
+				authEmail: email
+			});
+		}
+
 		const sendResult = await authClient.auth.signInWithOtp({
 			email,
 			options: {
-				emailRedirectTo: `${url.origin}/auth/callback`
+				emailRedirectTo: `${redirectOrigin}/auth/callback`
 			}
 		});
 
@@ -225,7 +266,7 @@ export const actions: Actions = {
 		const mind = asTrimmedString(formData.get('mind'));
 		const submittedUserId = asTrimmedString(formData.get('userId'));
 		const listeningOnly = formData.get('listeningOnly') === 'on';
-		const probeUserId = process.env.PROBE_USER_ID?.trim() || '';
+		const probeUserId = isProductionRuntime() ? '' : process.env.PROBE_USER_ID?.trim() || '';
 		const userId = locals.userId ?? probeUserId;
 
 		const values = {

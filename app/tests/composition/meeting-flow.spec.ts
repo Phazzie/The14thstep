@@ -65,10 +65,6 @@ function createInMemoryDatabase(userId: string): { state: InMemoryState; databas
 		async ensureUserProfile(input) {
 			const existing = state.users.find((entry) => entry.id === input.id);
 			if (existing) {
-				if (existing.displayName.trim().length === 0) existing.displayName = input.displayName;
-				if (existing.cleanTime === null && input.cleanTime !== undefined) {
-					existing.cleanTime = input.cleanTime;
-				}
 				return ok(existing);
 			}
 			const created = {

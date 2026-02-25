@@ -503,13 +503,40 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 				if (asString(insertResponse.error.code) === '23505') {
 					const retryReadResponse = (await supabase
 						.from('users')
-						.select('id, display_name, clean_time, meeting_count, first_meeting_at, last_meeting_at')
+						.select('id, display_name, clean_time, meeting_count, first_meeting_at, last_meeting_at, is_anonymous')
 						.eq('id', input.id)
 						.maybeSingle()) as QueryResponseLike;
 					if (retryReadResponse.error) return mapUpstreamError('ensureUserProfile', retryReadResponse);
 					if (retryReadResponse.data === null) {
 						return err(SeamErrorCodes.CONTRACT_VIOLATION, 'ensureUserProfile race retry missing row');
 					}
+
+					const retryIsAnonymous = mapIsAnonymousRowValue(retryReadResponse.data);
+					if (retryIsAnonymous === null) {
+						return err(
+							SeamErrorCodes.CONTRACT_VIOLATION,
+							'ensureUserProfile race retry missing is_anonymous flag'
+						);
+					}
+					if (retryIsAnonymous && !input.isAnonymous) {
+						const updateResponse = (await supabase
+							.from('users')
+							.update({ is_anonymous: false })
+							.eq('id', input.id)
+							.select('id, display_name, clean_time, meeting_count, first_meeting_at, last_meeting_at')
+							.single()) as QueryResponseLike;
+
+						if (updateResponse.error) return mapUpstreamError('ensureUserProfile', updateResponse);
+						const updatedProfile = mapUserProfileRow(updateResponse.data);
+						if (!validateUserProfile(updatedProfile)) {
+							return err(
+								SeamErrorCodes.CONTRACT_VIOLATION,
+								'ensureUserProfile race retry updated row violates UserProfile'
+							);
+						}
+						return ok(updatedProfile);
+					}
+
 					const retriedProfile = mapUserProfileRow(retryReadResponse.data);
 					if (!validateUserProfile(retriedProfile)) {
 						return err(

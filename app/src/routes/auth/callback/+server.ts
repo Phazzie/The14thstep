@@ -59,37 +59,52 @@ export const GET: RequestHandler = async ({ url, cookies, locals }) => {
 	let user: User | null = null;
 
 	if (code) {
-		const exchange = await authClient.auth.exchangeCodeForSession(code);
-		if (exchange.error) {
-			console.warn('auth callback code exchange failed', {
-				status: exchange.error.status ?? null,
-				code: exchange.error.code ?? null
+		try {
+			const exchange = await authClient.auth.exchangeCodeForSession(code);
+			if (!exchange.error) {
+				session = exchange.data.session;
+				user = exchange.data.user ?? exchange.data.session?.user ?? null;
+			} else {
+				console.warn('auth callback code exchange failed', {
+					status: exchange.error.status ?? null,
+					code: exchange.error.code ?? null
+				});
+			}
+		} catch (error) {
+			console.warn('auth callback code exchange threw', {
+				error: error instanceof Error ? error.message : String(error)
 			});
-			return toRedirect('auth-failed');
 		}
-		session = exchange.data.session;
-		user = exchange.data.user ?? exchange.data.session?.user ?? null;
-	} else if (tokenHash) {
+	}
+
+	if (!session && tokenHash) {
 		const otpType = toEmailOtpType(rawType);
 		if (!otpType) {
 			console.warn('auth callback token_hash missing/invalid type', { type: rawType ?? null });
 			return toRedirect('auth-failed');
 		}
 
-		const verify = await authClient.auth.verifyOtp({
-			token_hash: tokenHash,
-			type: otpType
-		});
-		if (verify.error) {
-			console.warn('auth callback otp verify failed', {
-				status: verify.error.status ?? null,
-				code: verify.error.code ?? null
+		try {
+			const verify = await authClient.auth.verifyOtp({
+				token_hash: tokenHash,
+				type: otpType
+			});
+			if (verify.error) {
+				console.warn('auth callback otp verify failed', {
+					status: verify.error.status ?? null,
+					code: verify.error.code ?? null
+				});
+				return toRedirect('auth-failed');
+			}
+			session = verify.data.session;
+			user = verify.data.user ?? verify.data.session?.user ?? null;
+		} catch (error) {
+			console.warn('auth callback otp verify threw', {
+				error: error instanceof Error ? error.message : String(error)
 			});
 			return toRedirect('auth-failed');
 		}
-		session = verify.data.session;
-		user = verify.data.user ?? verify.data.session?.user ?? null;
-	} else {
+	} else if (!session && !code) {
 		console.warn('auth callback missing completion params');
 		return toRedirect('auth-failed');
 	}
@@ -102,12 +117,21 @@ export const GET: RequestHandler = async ({ url, cookies, locals }) => {
 	setSupabaseSessionCookies(cookies, session);
 	setSessionKindCookie(cookies, 'member');
 
-	const profileResult = await locals.seams.database.ensureUserProfile({
-		id: user.id,
-		displayName: resolveDisplayNameFromAuthUser(user),
-		cleanTime: null,
-		isAnonymous: false
-	});
+	let profileResult;
+	try {
+		profileResult = await locals.seams.database.ensureUserProfile({
+			id: user.id,
+			displayName: resolveDisplayNameFromAuthUser(user),
+			cleanTime: null,
+			isAnonymous: false
+		});
+	} catch (error) {
+		console.warn('auth callback profile bootstrap threw', {
+			error: error instanceof Error ? error.message : String(error)
+		});
+		clearAllAuthCookies(cookies);
+		return toRedirect('auth-failed');
+	}
 
 	if (!profileResult.ok) {
 		console.warn('auth callback profile bootstrap failed', { code: profileResult.error.code });

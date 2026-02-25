@@ -66,6 +66,11 @@ beforeEach(() => {
 	vi.clearAllMocks();
 	process.env.SUPABASE_URL = 'https://example.supabase.co';
 	process.env.SUPABASE_ANON_KEY = 'anon-key';
+	delete process.env.CANONICAL_ORIGIN;
+	delete process.env.PUBLIC_APP_ORIGIN;
+	delete process.env.PUBLIC_SITE_URL;
+	delete process.env.NODE_ENV;
+	delete process.env.VERCEL_ENV;
 	delete process.env.PROBE_USER_ID;
 });
 
@@ -138,6 +143,26 @@ describe('landing auth route actions', () => {
 			authEmail: 'person@example.com'
 		});
 		expect(authClient.auth.signInWithOtp).toHaveBeenCalled();
+	});
+
+	it('sendMagicLink prefers canonical origin for callback redirect when configured', async () => {
+		process.env.CANONICAL_ORIGIN = 'https://14thstep.com';
+		const authClient = createAuthClientStub();
+		authClient.auth.signInWithOtp.mockResolvedValue({ data: {}, error: null });
+		createClientMock.mockReturnValue(authClient as never);
+
+		await actions.sendMagicLink?.({
+			request: makeRequest({ magicEmail: 'person@example.com' }),
+			url: new URL('https://weird-proxy.example/')
+		} as never);
+
+		expect(authClient.auth.signInWithOtp).toHaveBeenCalledWith(
+			expect.objectContaining({
+				options: expect.objectContaining({
+					emailRedirectTo: 'https://14thstep.com/auth/callback'
+				})
+			})
+		);
 	});
 
 	it('signIn clears cookies and fails when profile bootstrap fails', async () => {
@@ -224,5 +249,26 @@ describe('landing auth route actions', () => {
 			expect.objectContaining({ id: 'user-1', isAnonymous: true, displayName: 'Guest' })
 		);
 	});
-});
 
+	it('join ignores PROBE_USER_ID in production', async () => {
+		process.env.PROBE_USER_ID = 'probe-user';
+		process.env.NODE_ENV = 'production';
+
+		const result = await actions.join?.({
+			request: makeRequest({
+				userName: 'Sarah',
+				cleanTime: '19 days',
+				mood: 'anxious',
+				mind: 'Trying not to run',
+				listeningOnly: ''
+			}),
+			cookies: createCookieJar().cookies,
+			locals: { seams: { database: {}, grokAi: {} } }
+		} as never);
+
+		expect(result).toMatchObject({
+			status: 400,
+			data: { message: 'Continue as guest or sign in before starting a meeting.' }
+		});
+	});
+});
