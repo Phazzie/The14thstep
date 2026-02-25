@@ -4,7 +4,6 @@ on:
   pull_request_review:
     types:
       - submitted
-      - edited
   workflow_dispatch:
     inputs:
       pr_number:
@@ -20,6 +19,9 @@ jobs:
   triage-review-feedback:
     name: Triage Bot Review Feedback (Informational)
     runs-on: ubuntu-latest
+    concurrency:
+      group: ci-triage-${{ github.event.pull_request.number || inputs.pr_number || github.run_id }}
+      cancel-in-progress: true
     # Starter triage pipeline only: informational summary + artifact.
     # This is not the final Codex-decider system and should not block PRs.
     steps:
@@ -49,4 +51,3 @@ jobs:
           name: ci-triage-summary-pr-${{ inputs.pr_number || github.event.pull_request.number || 'unknown' }}
           path: artifacts/ci-triage-summary.json
           if-no-files-found: warn
-

@@ -91,12 +91,12 @@ function repoParts(repo) {
 function summarizeText(text, max = 180) {
   const normalized = String(text || "").replace(/\s+/g, " ").trim();
   if (!normalized) return "(no text)";
-  return normalized.length > max ? `${normalized.slice(0, max - 1)}...` : normalized;
+  if (max <= 3) return normalized.slice(0, Math.max(0, max));
+  return normalized.length > max ? `${normalized.slice(0, max - 3)}...` : normalized;
 }
 
 function scoreBucket(text, kind = "comment") {
   const body = String(text || "");
-  const lower = body.toLowerCase();
   const reasons = [];
   let fixNowScore = 0;
   let makeIssueScore = 0;
@@ -121,12 +121,9 @@ function scoreBucket(text, kind = "comment") {
     }
   }
 
-  if (kind === "review" && !lower.trim()) {
+  if (kind === "review" && !body.trim()) {
     ignoreScore += 1.5;
     reasons.push("empty review body");
-  }
-  if (/\bsecurity\b/i.test(body) || /\bdata loss\b/i.test(body)) {
-    fixNowScore += 2;
   }
   if (/\bquestion\b/i.test(body) || /\bclarify\b/i.test(body)) {
     makeIssueScore += 0.75;
@@ -233,7 +230,25 @@ async function fetchPaginatedJson({ url, headers }) {
     pageUrl.searchParams.set("per_page", "100");
     pageUrl.searchParams.set("page", String(page));
 
-    const res = await fetch(pageUrl, { headers });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    let res;
+    try {
+      res = await fetch(pageUrl, { headers, signal: controller.signal });
+    } catch (error) {
+      clearTimeout(timeoutId);
+      const message =
+        error instanceof Error ? `${error.name}: ${error.message}` : summarizeText(String(error), 300);
+      return {
+        ok: false,
+        status: 408,
+        statusText: "Request failed",
+        url: pageUrl.toString(),
+        bodySnippet: summarizeText(message, 300),
+        items,
+      };
+    }
+    clearTimeout(timeoutId);
     if (!res.ok) {
       const text = await res.text().catch(() => "");
       return {
@@ -504,4 +519,3 @@ main().catch(async (error) => {
   printSummary(fallbackSummary);
   process.exitCode = 0;
 });
-
