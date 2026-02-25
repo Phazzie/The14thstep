@@ -18,9 +18,9 @@ describe('meeting page server load', () => {
 		} as never);
 
 		expect((result as { initialCrisisMode: boolean }).initialCrisisMode).toBe(true);
-		expect((result as { shouldTriggerInitialCrisisSupport: boolean }).shouldTriggerInitialCrisisSupport).toBe(
-			true
-		);
+		expect(
+			(result as { shouldTriggerInitialCrisisSupport: boolean }).shouldTriggerInitialCrisisSupport
+		).toBe(true);
 	});
 
 	it('keeps initial crisis mode false for non-crisis setup text', async () => {
@@ -35,7 +35,9 @@ describe('meeting page server load', () => {
 					}
 				}
 			},
-			url: new URL('http://localhost/meeting/meeting-1?mind=Staying%20for%20the%20next%2024%20hours')
+			url: new URL(
+				'http://localhost/meeting/meeting-1?mind=Staying%20for%20the%20next%2024%20hours'
+			)
 		} as never);
 
 		expect((result as { initialCrisisMode: boolean }).initialCrisisMode).toBe(false);
@@ -72,9 +74,9 @@ describe('meeting page server load', () => {
 		} as never);
 
 		expect((result as { initialCrisisMode: boolean }).initialCrisisMode).toBe(true);
-		expect((result as { shouldTriggerInitialCrisisSupport: boolean }).shouldTriggerInitialCrisisSupport).toBe(
-			false
-		);
+		expect(
+			(result as { shouldTriggerInitialCrisisSupport: boolean }).shouldTriggerInitialCrisisSupport
+		).toBe(false);
 	});
 
 	it('returns persisted ritual phase state when available', async () => {
@@ -101,9 +103,11 @@ describe('meeting page server load', () => {
 			url: new URL('http://localhost/meeting/meeting-1?mind=staying%20present')
 		} as never);
 
-		expect((result as { phaseState: { currentPhase: string } }).phaseState.currentPhase).toBe('crisis_mode');
-		expect((result as { phaseState: { userHasSharedInRound: boolean } }).phaseState.userHasSharedInRound).toBe(
-			true
+		expect((result as { phaseState: { currentPhase: string } }).phaseState.currentPhase).toBe(
+			'crisis_mode'
 		);
+		expect(
+			(result as { phaseState: { userHasSharedInRound: boolean } }).phaseState.userHasSharedInRound
+		).toBe(true);
 	});
 });

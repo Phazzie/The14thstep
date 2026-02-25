@@ -47,7 +47,8 @@ interface CharacterProfileBase {
 	lastSeenAt: string | null;
 }
 
-export interface CharacterProfile extends CharacterProfileBase, Partial<CharacterNarrativeProfile> {}
+export interface CharacterProfile
+	extends CharacterProfileBase, Partial<CharacterNarrativeProfile> {}
 
 export type CoreCharacterProfile = CharacterProfile & CharacterNarrativeProfile & { tier: 'core' };
 

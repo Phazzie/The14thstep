@@ -1,6 +1,6 @@
 {
-  "probedAt": "2026-02-19T13:20:00.000Z",
-  "environment": "local",
-  "probe": "auth-session",
-  "notes": "Auth seam fixture freshness marker for verify pipeline."
+	"probedAt": "2026-02-19T13:20:00.000Z",
+	"environment": "local",
+	"probe": "auth-session",
+	"notes": "Auth seam fixture freshness marker for verify pipeline."
 }

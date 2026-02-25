@@ -23,7 +23,11 @@ function toSeamErrorCode(value: unknown): SeamErrorCode {
 	return SeamErrorCodes.UNEXPECTED;
 }
 
-function parseFaultFixture(): { code: SeamErrorCode; message: string; details?: Record<string, unknown> } {
+function parseFaultFixture(): {
+	code: SeamErrorCode;
+	message: string;
+	details?: Record<string, unknown>;
+} {
 	const fixture = faultFixture as Record<string, unknown>;
 	return {
 		code: toSeamErrorCode(fixture.code),
@@ -31,9 +35,10 @@ function parseFaultFixture(): { code: SeamErrorCode; message: string; details?: 
 			typeof fixture.message === 'string' && fixture.message.trim().length > 0
 				? fixture.message
 				: 'Unknown auth mock failure',
-		details: typeof fixture.details === 'object' && fixture.details !== null
-			? (fixture.details as Record<string, unknown>)
-			: undefined
+		details:
+			typeof fixture.details === 'object' && fixture.details !== null
+				? (fixture.details as Record<string, unknown>)
+				: undefined
 	};
 }
 

@@ -16,25 +16,31 @@ Implemented the pure-logic state machine that orchestrates the complete meeting 
 **Primary Exports:**
 
 #### Initialization
+
 - `initializeMeetingPhase(): MeetingPhaseState` - Starts meeting in SETUP phase with clean state
 
 #### Phase Transitions
+
 - `transitionToNextPhase(currentState, trigger): SeamResult<MeetingPhaseState>` - Deterministic state machine
 - `isValidTransition(from, to): boolean` - Validates legal transitions
 
 #### Prompt Selection
+
 - `selectPromptForPhase(phase, character): 'opening' | 'intro' | 'share' | 'closing' | 'reading'` - Maps phases to prompt types
 
 #### User Input
+
 - `requiresUserInput(phase): boolean` - True for TOPIC_SELECTION and all SHARING_ROUNDs
 
 #### Speaker Tracking
+
 - `recordCharacterSpoke(state, characterId): SeamResult<MeetingPhaseState>` - Prevents duplicate speakers
 - `recordUserShared(state): SeamResult<MeetingPhaseState>` - One share per round
 - `isRoundComplete(state): boolean` - Complete when 2 speakers done
 - `areIntroductionsComplete(state, visitorCount): boolean` - 6 core + visitors + user
 
 #### Constants
+
 - `INTRO_ORDER: string[]` - Canonical order: Marcus → Heather → Meechie → Gemini → Gypsy → Chrystal
 
 ### Phase Sequence
@@ -48,12 +54,12 @@ SHARING_ROUND_1 → SHARING_ROUND_2 → SHARING_ROUND_3 → CLOSING → POST_MEE
 
 ### Transition Triggers
 
-| Trigger | Meaning |
-|---------|---------|
-| `meeting_start` | Initial transition from SETUP |
-| `share_complete` | Character or user finished sharing |
-| `round_complete` | Sharing round finished (2 speakers) |
-| `user_input` | User selected topic or provided input |
+| Trigger          | Meaning                               |
+| ---------------- | ------------------------------------- |
+| `meeting_start`  | Initial transition from SETUP         |
+| `share_complete` | Character or user finished sharing    |
+| `round_complete` | Sharing round finished (2 speakers)   |
+| `user_input`     | User selected topic or provided input |
 
 ### State Transitions (All 10 Phases Covered)
 
@@ -131,6 +137,7 @@ Guidelines:
 
 **Purpose**: Close meeting with confidentiality reminder
 **Required Elements**:
+
 - Thank user by name
 - Reference meeting themes
 - Plain-language confidentiality reminder: "what is said here stays here"
@@ -160,12 +167,12 @@ Extracted and exported style rules:
 
 ```typescript
 STYLE_CONSTITUTION = [
-  "- Sound like a real person in a recovery room, never like a clinician.",
-  "- Use concrete lived details over abstract advice.",
-  "- Keep emotional honesty high and motivational slogans low.",
-  "- Speak in natural conversational rhythm, not polished essay prose.",
-  "- Hold accountability and compassion together without preaching."
-]
+	'- Sound like a real person in a recovery room, never like a clinician.',
+	'- Use concrete lived details over abstract advice.',
+	'- Keep emotional honesty high and motivational slogans low.',
+	'- Speak in natural conversational rhythm, not polished essay prose.',
+	'- Hold accountability and compassion together without preaching.'
+];
 ```
 
 Used in all ritual prompt templates and referenced throughout.
@@ -175,10 +182,12 @@ Used in all ritual prompt templates and referenced throughout.
 ### Test Coverage: 43 test cases
 
 #### Phase Initialization (2 tests)
+
 - Initializes to SETUP phase
 - Has undefined round number initially
 
 #### Valid Transitions (8 tests)
+
 - SETUP → OPENING ✓
 - SETUP → CRISIS_MODE ✓
 - SETUP → CLOSING ✗
@@ -187,6 +196,7 @@ Used in all ritual prompt templates and referenced throughout.
 - Invalid backward transitions ✗
 
 #### Full Sequence Transitions (5 tests)
+
 - SETUP → OPENING on meeting_start
 - Complete flow through all 10 phases
 - Invalid trigger rejection
@@ -194,6 +204,7 @@ Used in all ritual prompt templates and referenced throughout.
 - Prevention of transition from POST_MEETING
 
 #### Prompt Template Selection (7 tests)
+
 - OPENING → 'opening'
 - EMPTY_CHAIR → 'reading'
 - INTRODUCTIONS → 'intro'
@@ -203,6 +214,7 @@ Used in all ritual prompt templates and referenced throughout.
 - CRISIS_MODE → 'share'
 
 #### User Input Requirements (6 tests)
+
 - TOPIC_SELECTION requires input ✓
 - All SHARING_ROUNDs require input ✓
 - OPENING, EMPTY_CHAIR don't require input ✓
@@ -210,35 +222,42 @@ Used in all ritual prompt templates and referenced throughout.
 - CLOSING, POST_MEETING don't require input ✓
 
 #### Speaker Tracking (6 tests)
+
 - Add character to spoken list
 - Prevent duplicate speakers in same round
 - Allow multiple different speakers
 
 #### User Sharing (3 tests)
+
 - Mark user as shared
 - Prevent user from sharing twice in same round
 
 #### Round Completion (5 tests)
+
 - Return false with no speakers
 - Return false with only 1 speaker
 - Return true with 2 characters
 - Return true with 1 character + user
 
 #### Introductions Completion (4 tests)
+
 - Return false initially
 - Require at least 6 core characters
 - Return true with all required speakers
 - Allow custom visitor count
 
 #### INTRO_ORDER (2 tests)
+
 - Canonical order verified: marcus, heather, meechie, gemini, gypsy, chrystal
 - Exactly 6 core characters
 
 #### Crisis Mode (1 test)
+
 - Can interrupt from any phase to CRISIS_MODE
 - Preserves round tracking when entering crisis
 
 #### Prompt Template Tests (6 additional tests in prompt-templates.spec.ts)
+
 - buildRitualOpeningPrompt includes character voice and empty chair
 - buildRitualIntroPrompt handles first-timer context
 - buildRitualReadingPrompt avoids "polished inspiration"
@@ -258,13 +277,13 @@ Used in all ritual prompt templates and referenced throughout.
 
 ## Files Modified
 
-| File | Changes | Lines |
-|------|---------|-------|
-| `src/lib/core/ritual-orchestration.ts` | NEW | 316 |
-| `src/lib/core/ritual-orchestration.spec.ts` | NEW | 548 |
-| `src/lib/core/prompt-templates.ts` | +5 functions | +92 |
-| `src/lib/core/prompt-templates.spec.ts` | +6 tests | +61 |
-| `src/lib/core/style-constitution.ts` | NEW | 8 |
+| File                                        | Changes      | Lines |
+| ------------------------------------------- | ------------ | ----- |
+| `src/lib/core/ritual-orchestration.ts`      | NEW          | 316   |
+| `src/lib/core/ritual-orchestration.spec.ts` | NEW          | 548   |
+| `src/lib/core/prompt-templates.ts`          | +5 functions | +92   |
+| `src/lib/core/prompt-templates.spec.ts`     | +6 tests     | +61   |
+| `src/lib/core/style-constitution.ts`        | NEW          | 8     |
 
 **Total additions**: ~1,025 lines
 
@@ -280,6 +299,7 @@ Used in all ritual prompt templates and referenced throughout.
 ## Next Steps
 
 **Phase 2c** will integrate ritual orchestration into actual route handlers:
+
 - Route: `/meeting/[id]` transitions through phases
 - Route: `/meeting/[id]/share` handles character shares
 - Route: `/meeting/[id]/user-share` tracks user input

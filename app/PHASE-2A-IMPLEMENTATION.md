@@ -12,16 +12,17 @@ Core implementation of the voice candidate pipeline:
 
 ```typescript
 export async function generateVoiceCandidates(
-  character: CharacterProfile,
-  topic: string,
-  narrativeContext: MeetingNarrativeContext,
-  context: MeetingPromptContext,
-  grokAi: GrokAiPort,
-  candidateCount: number = 7
-): Promise<SeamResult<GenerateShareWithCandidates>>
+	character: CharacterProfile,
+	topic: string,
+	narrativeContext: MeetingNarrativeContext,
+	context: MeetingPromptContext,
+	grokAi: GrokAiPort,
+	candidateCount: number = 7
+): Promise<SeamResult<GenerateShareWithCandidates>>;
 ```
 
 **Behavior:**
+
 - Generates 7 independent candidates in parallel
 - Each candidate gets a unique variation instruction to encourage diverse perspectives
 - Scores each candidate on 4 quality axes:
@@ -35,6 +36,7 @@ export async function generateVoiceCandidates(
 - Returns error if ALL candidates fail quality thresholds (properly skips character turn)
 
 **Key Features:**
+
 - Parallel generation for performance
 - Graceful handling of partial failures (up to 7 candidates can fail, need at least 1)
 - Logging of candidate generation metadata
@@ -70,6 +72,7 @@ Comprehensive test coverage:
    - Selects first candidate when scores are tied
 
 **Mock Data:**
+
 - Complete mock character with narrative profile fields
 - Mock narrative context with room frame and emotional undercurrent
 - Mock meeting context with topic and recent shares
@@ -79,10 +82,12 @@ Comprehensive test coverage:
 ### `/src/lib/core/prompt-templates.ts`
 
 Added:
+
 1. Import: `import type { MeetingNarrativeContext } from './narrative-context';`
 2. Function: `buildVoiceCandidatePrompt()`
 
 **Prompt Design:**
+
 - Includes character's voiceExamples prominently
 - Includes character's lie field for internal logic
 - Includes narrative context (room frame, emotional undercurrent)
@@ -114,6 +119,7 @@ Added:
 ### Quality Thresholds
 
 Respects thresholds from M15:
+
 - voiceConsistency >= 6 (0-10 scale)
 - authenticity >= 6 (0-10 scale)
 - therapySpeakDetected === false
@@ -121,11 +127,13 @@ Respects thresholds from M15:
 ### Selection Strategy
 
 Combines scores to select best candidate:
+
 ```typescript
-bestScore = voiceConsistency + authenticity  // max 20 points
+bestScore = voiceConsistency + authenticity; // max 20 points
 ```
 
 This balances two critical factors:
+
 - **Voice Consistency**: How well it matches character's established voice
 - **Authenticity**: How genuine and non-clinical the response sounds
 
@@ -165,16 +173,19 @@ Note: Pre-existing error in ritual-orchestration.ts (unrelated to this phase)
 ## Ready for Commit
 
 Files to commit:
+
 - `src/lib/core/voice-pipeline.ts` (new)
 - `src/lib/core/voice-pipeline.spec.ts` (new)
 
 Supporting documentation:
+
 - `PHASE-2A-IMPLEMENTATION.md` (this file)
 - `phase-2a-verification.md` (verification checklist)
 
 ## Next Phase: M14 (Ritual Orchestration Integration)
 
 This pipeline is ready to be integrated into:
+
 1. Character share generation workflow
 2. Meeting phase orchestration
 3. Share generation routes

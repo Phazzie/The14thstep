@@ -80,12 +80,22 @@
 
 		{#if step === 1}
 			<label for="userName">Name</label>
-			<input id="userName" type="text" bind:value={userName} placeholder="What should the room call you?" />
+			<input
+				id="userName"
+				type="text"
+				bind:value={userName}
+				placeholder="What should the room call you?"
+			/>
 		{/if}
 
 		{#if step === 2}
 			<label for="cleanTime">Clean Time</label>
-			<input id="cleanTime" type="text" bind:value={cleanTime} placeholder="e.g., 19 days, 2 years" />
+			<input
+				id="cleanTime"
+				type="text"
+				bind:value={cleanTime}
+				placeholder="e.g., 19 days, 2 years"
+			/>
 		{/if}
 
 		{#if step === 3}
@@ -101,7 +111,12 @@
 
 		{#if step === 4}
 			<label for="mind">What's on your mind?</label>
-			<textarea id="mind" rows="4" bind:value={mind} placeholder="What are you bringing into the room?"></textarea>
+			<textarea
+				id="mind"
+				rows="4"
+				bind:value={mind}
+				placeholder="What are you bringing into the room?"
+			></textarea>
 
 			<label for="userId">User ID (optional)</label>
 			<input id="userId" type="text" bind:value={userId} placeholder="Supabase auth user id" />
@@ -197,7 +212,9 @@
 		font-size: 0.95rem;
 		padding: 0.7rem 0.8rem;
 		outline: none;
-		transition: border-color 120ms ease, box-shadow 120ms ease;
+		transition:
+			border-color 120ms ease,
+			box-shadow 120ms ease;
 	}
 
 	.setup-form textarea {
@@ -239,7 +256,10 @@
 		font-weight: 700;
 		letter-spacing: 0.02em;
 		cursor: pointer;
-		transition: transform 120ms ease, filter 120ms ease, opacity 120ms ease;
+		transition:
+			transform 120ms ease,
+			filter 120ms ease,
+			opacity 120ms ease;
 	}
 
 	.actions button:first-child {

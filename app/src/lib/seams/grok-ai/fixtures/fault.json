@@ -1,8 +1,8 @@
 {
-  "code": "UPSTREAM_UNAVAILABLE",
-  "message": "xAI request timed out",
-  "details": {
-    "provider": "xai",
-    "timeoutMs": 30000
-  }
+	"code": "UPSTREAM_UNAVAILABLE",
+	"message": "xAI request timed out",
+	"details": {
+		"provider": "xai",
+		"timeoutMs": 30000
+	}
 }

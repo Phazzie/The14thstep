@@ -118,7 +118,10 @@ async function callResponsesApi(input: {
 function stripCodeFences(value: string): string {
 	const trimmed = value.trim();
 	if (!trimmed.startsWith('```')) return trimmed;
-	return trimmed.replace(/^```(?:json)?\s*/i, '').replace(/```$/, '').trim();
+	return trimmed
+		.replace(/^```(?:json)?\s*/i, '')
+		.replace(/```$/, '')
+		.trim();
 }
 
 function parseValidation(value: string): ValidationResult | null {

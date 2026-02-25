@@ -5,7 +5,9 @@ import { createClockMock } from './mock';
 
 describe('clock seam contract', () => {
 	it('validates clock fixture instants', () => {
-		expect((timestampsFixture as unknown[]).every((instant) => validateClockInstant(instant))).toBe(true);
+		expect((timestampsFixture as unknown[]).every((instant) => validateClockInstant(instant))).toBe(
+			true
+		);
 	});
 
 	it('mock returns deterministic fixture timeline', () => {

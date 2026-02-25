@@ -66,8 +66,12 @@ describe('selectCharacters', () => {
 		});
 
 		expect(selected).toHaveLength(10);
-		expect(selected.filter((character) => character.tier === 'regular' || character.tier === 'pool')).toHaveLength(2);
-		const firstRegular = selected.find((character) => character.tier === 'regular' || character.tier === 'pool');
+		expect(
+			selected.filter((character) => character.tier === 'regular' || character.tier === 'pool')
+		).toHaveLength(2);
+		const firstRegular = selected.find(
+			(character) => character.tier === 'regular' || character.tier === 'pool'
+		);
 		expect(firstRegular?.id).toBe('regular-2');
 	});
 

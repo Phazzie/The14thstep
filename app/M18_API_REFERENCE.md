@@ -1,6 +1,7 @@
 # M18 Ritual Orchestration: API Reference
 
 ## Location
+
 - **Main Module**: `/src/lib/core/ritual-orchestration.ts`
 - **Prompt Templates**: `/src/lib/core/prompt-templates.ts` (5 new functions)
 - **Constants**: `/src/lib/core/style-constitution.ts`
@@ -10,16 +11,16 @@
 
 ```typescript
 import {
-  initializeMeetingPhase,
-  transitionToNextPhase,
-  selectPromptForPhase,
-  requiresUserInput,
-  isValidTransition,
-  recordCharacterSpoke,
-  recordUserShared,
-  isRoundComplete,
-  areIntroductionsComplete,
-  INTRO_ORDER
+	initializeMeetingPhase,
+	transitionToNextPhase,
+	selectPromptForPhase,
+	requiresUserInput,
+	isValidTransition,
+	recordCharacterSpoke,
+	recordUserShared,
+	isRoundComplete,
+	areIntroductionsComplete,
+	INTRO_ORDER
 } from '$lib/core/ritual-orchestration';
 
 import { MeetingPhase, type MeetingPhaseState } from '$lib/core/types';
@@ -33,6 +34,7 @@ import { SeamResult, ok, err, SeamErrorCodes } from '$lib/core/seam';
 **Purpose**: Create initial meeting state
 
 **Returns**:
+
 ```typescript
 {
   currentPhase: MeetingPhase.SETUP,
@@ -44,6 +46,7 @@ import { SeamResult, ok, err, SeamErrorCodes } from '$lib/core/seam';
 ```
 
 **Usage**:
+
 ```typescript
 const state = initializeMeetingPhase();
 // Ready for meeting_start trigger
@@ -56,6 +59,7 @@ const state = initializeMeetingPhase();
 **Purpose**: Move to next phase based on current state and trigger
 
 **Parameters**:
+
 - `currentState: MeetingPhaseState` - Current meeting state
 - `trigger: 'share_complete' | 'user_input' | 'round_complete' | 'meeting_start'`
   - `'meeting_start'` - From SETUP to OPENING
@@ -64,6 +68,7 @@ const state = initializeMeetingPhase();
   - `'user_input'` - User provided required input
 
 **Returns**:
+
 ```typescript
 // Success
 { ok: true, value: newState }
@@ -73,12 +78,13 @@ const state = initializeMeetingPhase();
 ```
 
 **Example**:
+
 ```typescript
 const result = transitionToNextPhase(state, 'meeting_start');
 if (result.ok) {
-  state = result.value; // Now in OPENING phase
+	state = result.value; // Now in OPENING phase
 } else {
-  console.error(result.error.message);
+	console.error(result.error.message);
 }
 ```
 
@@ -89,19 +95,21 @@ if (result.ok) {
 **Purpose**: Get prompt template type for current phase
 
 **Parameters**:
+
 - `phase: MeetingPhase` - Current meeting phase
 - `character: CharacterProfile` - Character (not used in selection, included for future extension)
 
 **Returns**: `'opening' | 'intro' | 'share' | 'closing' | 'reading'`
 
 **Example**:
+
 ```typescript
 const promptType = selectPromptForPhase(MeetingPhase.INTRODUCTIONS, marcus);
 // Returns: 'intro'
 
 // Then call appropriate builder:
 if (promptType === 'intro') {
-  const prompt = buildRitualIntroPrompt(marcus, isFirstTimer);
+	const prompt = buildRitualIntroPrompt(marcus, isFirstTimer);
 }
 ```
 
@@ -112,19 +120,22 @@ if (promptType === 'intro') {
 **Purpose**: Check if phase needs user interaction to proceed
 
 **Parameters**:
+
 - `phase: MeetingPhase` - Phase to check
 
 **Returns**: `boolean` - true if user input required
 
 **Example**:
+
 ```typescript
 if (requiresUserInput(state.currentPhase)) {
-  // Show input UI for user
-  // Display topic selection or sharing prompt
+	// Show input UI for user
+	// Display topic selection or sharing prompt
 }
 ```
 
 **Phases requiring input**:
+
 - `TOPIC_SELECTION`
 - `SHARING_ROUND_1`
 - `SHARING_ROUND_2`
@@ -137,19 +148,21 @@ if (requiresUserInput(state.currentPhase)) {
 **Purpose**: Check if phase transition is allowed
 
 **Parameters**:
+
 - `from: MeetingPhase` - Starting phase
 - `to: MeetingPhase` - Target phase
 
 **Returns**: `boolean` - true if transition allowed
 
 **Example**:
+
 ```typescript
 if (isValidTransition(MeetingPhase.OPENING, MeetingPhase.CLOSING)) {
-  // False - must go through intermediate phases
+	// False - must go through intermediate phases
 }
 
 if (isValidTransition(MeetingPhase.OPENING, MeetingPhase.EMPTY_CHAIR)) {
-  // True - valid transition
+	// True - valid transition
 }
 ```
 
@@ -160,23 +173,26 @@ if (isValidTransition(MeetingPhase.OPENING, MeetingPhase.EMPTY_CHAIR)) {
 **Purpose**: Track character speaking in current round
 
 **Parameters**:
+
 - `state: MeetingPhaseState` - Current state
 - `characterId: string` - Character's ID (e.g., 'marcus', 'heather')
 
 **Returns**: Updated state or error if duplicate
 
 **Example**:
+
 ```typescript
 const result = recordCharacterSpoke(state, 'marcus');
 if (result.ok) {
-  state = result.value;
-  console.log(`${state.charactersSpokenThisRound.length} speakers so far`);
+	state = result.value;
+	console.log(`${state.charactersSpokenThisRound.length} speakers so far`);
 } else {
-  console.error('Marcus already spoke in this round');
+	console.error('Marcus already spoke in this round');
 }
 ```
 
 **Error Cases**:
+
 - Character already in `charactersSpokenThisRound` for current phase
 
 ---
@@ -186,21 +202,24 @@ if (result.ok) {
 **Purpose**: Track user sharing in current round
 
 **Parameters**:
+
 - `state: MeetingPhaseState` - Current state
 
 **Returns**: Updated state or error if already shared
 
 **Example**:
+
 ```typescript
 const result = recordUserShared(state);
 if (result.ok) {
-  state = result.value;
+	state = result.value;
 } else {
-  console.error('User already shared in this round');
+	console.error('User already shared in this round');
 }
 ```
 
 **Error Cases**:
+
 - `userHasSharedInRound` already true
 
 ---
@@ -210,19 +229,22 @@ if (result.ok) {
 **Purpose**: Check if current round has enough speakers (2)
 
 **Parameters**:
+
 - `state: MeetingPhaseState` - Current state
 
 **Returns**: `boolean` - true if 2 total speakers (characters + user)
 
 **Example**:
+
 ```typescript
 if (isRoundComplete(state)) {
-  // Move to next round
-  const result = transitionToNextPhase(state, 'round_complete');
+	// Move to next round
+	const result = transitionToNextPhase(state, 'round_complete');
 }
 ```
 
 **Round Complete When**:
+
 - `charactersSpokenThisRound.length + userBoolean >= 2`
 
 ---
@@ -232,24 +254,27 @@ if (isRoundComplete(state)) {
 **Purpose**: Check if all required characters have introduced
 
 **Parameters**:
+
 - `state: MeetingPhaseState` - Current state
 - `visitorCount?: number` - Random visitors present (default: 2)
 
 **Returns**: `boolean` - true if all required speakers introduced
 
 **Example**:
+
 ```typescript
 const complete = areIntroductionsComplete(state);
 if (complete) {
-  // Proceed to topic selection
-  transitionToNextPhase(state, 'round_complete');
+	// Proceed to topic selection
+	transitionToNextPhase(state, 'round_complete');
 }
 ```
 
 **Required Count**:
+
 - 6 core characters (INTRO_ORDER)
-- + visitor count (default 2)
-- + 1 user
+- - visitor count (default 2)
+- - 1 user
 - **Total**: 9 speakers (by default)
 
 ---
@@ -259,15 +284,17 @@ if (complete) {
 **Purpose**: Canonical intro sequence for core characters
 
 **Value**:
+
 ```typescript
-['marcus', 'heather', 'meechie', 'gemini', 'gypsy', 'chrystal']
+['marcus', 'heather', 'meechie', 'gemini', 'gypsy', 'chrystal'];
 ```
 
 **Usage**:
+
 ```typescript
 for (const characterId of INTRO_ORDER) {
-  // Call character intro in order
-  recordCharacterSpoke(state, characterId);
+	// Call character intro in order
+	recordCharacterSpoke(state, characterId);
 }
 ```
 
@@ -282,14 +309,16 @@ for (const characterId of INTRO_ORDER) {
 **Purpose**: Generate opening prompt for meeting
 
 **Parameters**:
+
 - `userName: string` - User's display name
 - `character: CharacterProfile` - Character opening (Marcus or Heather)
 
 **Returns**: `string` - AI prompt for character
 
 **Example**:
+
 ```typescript
-const marcus = CORE_CHARACTERS.find(c => c.id === 'marcus')!;
+const marcus = CORE_CHARACTERS.find((c) => c.id === 'marcus')!;
 const prompt = buildRitualOpeningPrompt('trap', marcus);
 // Pass to grok-ai service for generation
 ```
@@ -303,14 +332,16 @@ const prompt = buildRitualOpeningPrompt('trap', marcus);
 **Purpose**: Generate intro prompt for character
 
 **Parameters**:
+
 - `character: CharacterProfile` - Character introducing
 - `isFirstTimer: boolean` - Whether user is first-timer
 
 **Returns**: `string` - AI prompt for character
 
 **Example**:
+
 ```typescript
-const heather = CORE_CHARACTERS.find(c => c.id === 'heather')!;
+const heather = CORE_CHARACTERS.find((c) => c.id === 'heather')!;
 const prompt = buildRitualIntroPrompt(heather, true);
 // Character will acknowledge the newcomer
 ```
@@ -324,11 +355,13 @@ const prompt = buildRitualIntroPrompt(heather, true);
 **Purpose**: Generate empty chair reading prompt
 
 **Parameters**:
+
 - `character: CharacterProfile` - Character reading
 
 **Returns**: `string` - AI prompt for character
 
 **Example**:
+
 ```typescript
 const prompt = buildRitualReadingPrompt(marcus);
 // Generates original reading about staying present
@@ -343,6 +376,7 @@ const prompt = buildRitualReadingPrompt(marcus);
 **Purpose**: Generate closing prompt for meeting
 
 **Parameters**:
+
 - `character: CharacterProfile` - Character closing
 - `userName: string` - User's name
 - `meetingSummary: string` - Summary of meeting themes
@@ -350,12 +384,9 @@ const prompt = buildRitualReadingPrompt(marcus);
 **Returns**: `string` - AI prompt for character
 
 **Example**:
+
 ```typescript
-const prompt = buildRitualClosingPrompt(
-  marcus,
-  'trap',
-  'honesty, accountability, staying present'
-);
+const prompt = buildRitualClosingPrompt(marcus, 'trap', 'honesty, accountability, staying present');
 ```
 
 ---
@@ -371,6 +402,7 @@ const prompt = buildRitualClosingPrompt(
 **Returns**: `string` - AI prompt for narrative
 
 **Example**:
+
 ```typescript
 const prompt = buildEmptyChairPrompt();
 // Honors those not physically present
@@ -384,17 +416,17 @@ const prompt = buildEmptyChairPrompt();
 
 ```typescript
 enum MeetingPhase {
-  SETUP = 'setup',
-  OPENING = 'opening',
-  EMPTY_CHAIR = 'empty_chair',
-  INTRODUCTIONS = 'introductions',
-  TOPIC_SELECTION = 'topic_selection',
-  SHARING_ROUND_1 = 'sharing_round_1',
-  SHARING_ROUND_2 = 'sharing_round_2',
-  SHARING_ROUND_3 = 'sharing_round_3',
-  CRISIS_MODE = 'crisis_mode',
-  CLOSING = 'closing',
-  POST_MEETING = 'post_meeting'
+	SETUP = 'setup',
+	OPENING = 'opening',
+	EMPTY_CHAIR = 'empty_chair',
+	INTRODUCTIONS = 'introductions',
+	TOPIC_SELECTION = 'topic_selection',
+	SHARING_ROUND_1 = 'sharing_round_1',
+	SHARING_ROUND_2 = 'sharing_round_2',
+	SHARING_ROUND_3 = 'sharing_round_3',
+	CRISIS_MODE = 'crisis_mode',
+	CLOSING = 'closing',
+	POST_MEETING = 'post_meeting'
 }
 ```
 
@@ -402,11 +434,11 @@ enum MeetingPhase {
 
 ```typescript
 interface MeetingPhaseState {
-  currentPhase: MeetingPhase;
-  phaseStartedAt: Date;
-  roundNumber?: number;
-  charactersSpokenThisRound: string[]; // UUIDs
-  userHasSharedInRound: boolean;
+	currentPhase: MeetingPhase;
+	phaseStartedAt: Date;
+	roundNumber?: number;
+	charactersSpokenThisRound: string[]; // UUIDs
+	userHasSharedInRound: boolean;
 }
 ```
 
@@ -416,14 +448,14 @@ interface MeetingPhaseState {
 
 ```typescript
 import {
-  initializeMeetingPhase,
-  transitionToNextPhase,
-  requiresUserInput,
-  recordCharacterSpoke,
-  recordUserShared,
-  isRoundComplete,
-  selectPromptForPhase,
-  INTRO_ORDER
+	initializeMeetingPhase,
+	transitionToNextPhase,
+	requiresUserInput,
+	recordCharacterSpoke,
+	recordUserShared,
+	isRoundComplete,
+	selectPromptForPhase,
+	INTRO_ORDER
 } from '$lib/core/ritual-orchestration';
 
 // 1. Initialize meeting
@@ -447,20 +479,20 @@ state = result.value;
 
 // 5. Progress through intros
 for (const characterId of INTRO_ORDER) {
-  result = recordCharacterSpoke(state, characterId);
-  state = result.value;
+	result = recordCharacterSpoke(state, characterId);
+	state = result.value;
 }
 
 // 6. Check if intros complete
 if (areIntroductionsComplete(state)) {
-  result = transitionToNextPhase(state, 'round_complete');
-  state = result.value;
-  // state.currentPhase === TOPIC_SELECTION
+	result = transitionToNextPhase(state, 'round_complete');
+	state = result.value;
+	// state.currentPhase === TOPIC_SELECTION
 }
 
 // 7. Require user input
 if (requiresUserInput(state.currentPhase)) {
-  // Show UI for topic selection
+	// Show UI for topic selection
 }
 
 // 8. After user input
@@ -473,16 +505,16 @@ result = recordCharacterSpoke(state, 'heather');
 state = result.value;
 
 if (!isRoundComplete(state)) {
-  result = recordCharacterSpoke(state, 'meechie');
-  state = result.value;
+	result = recordCharacterSpoke(state, 'meechie');
+	state = result.value;
 }
 
 // 10. Round complete
 if (isRoundComplete(state)) {
-  result = transitionToNextPhase(state, 'round_complete');
-  state = result.value;
-  // state.currentPhase === SHARING_ROUND_2
-  // state.charactersSpokenThisRound === [] (reset)
+	result = transitionToNextPhase(state, 'round_complete');
+	state = result.value;
+	// state.currentPhase === SHARING_ROUND_2
+	// state.charactersSpokenThisRound === [] (reset)
 }
 ```
 
@@ -494,22 +526,22 @@ if (isRoundComplete(state)) {
 const result = transitionToNextPhase(state, trigger);
 
 if (result.ok) {
-  // Success - use result.value
-  state = result.value;
+	// Success - use result.value
+	state = result.value;
 } else {
-  // Error - handle gracefully
-  const { code, message, details } = result.error;
+	// Error - handle gracefully
+	const { code, message, details } = result.error;
 
-  switch (code) {
-    case SeamErrorCodes.UNEXPECTED:
-      console.error('Invalid transition:', message);
-      break;
-    case SeamErrorCodes.INPUT_INVALID:
-      console.error('Invalid input:', message);
-      break;
-    default:
-      console.error('Error:', message);
-  }
+	switch (code) {
+		case SeamErrorCodes.UNEXPECTED:
+			console.error('Invalid transition:', message);
+			break;
+		case SeamErrorCodes.INPUT_INVALID:
+			console.error('Invalid input:', message);
+			break;
+		default:
+			console.error('Error:', message);
+	}
 }
 ```
 

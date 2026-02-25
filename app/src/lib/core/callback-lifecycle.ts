@@ -1,4 +1,9 @@
-import type { CallbackRecord, CallbackScope, CallbackStatus, CreateCallbackInput } from '$lib/seams/database/contract';
+import type {
+	CallbackRecord,
+	CallbackScope,
+	CallbackStatus,
+	CreateCallbackInput
+} from '$lib/seams/database/contract';
 
 export const CALLBACK_STALE_THRESHOLD = 12;
 export const CALLBACK_RETIRE_MEETING_GAP = 15;
@@ -58,7 +63,10 @@ function detectMeaningfulEvolution(originalText: string, generatedShareText: str
 	return tokenStats.overlapCount >= 2 && tokenStats.novelCount >= 4;
 }
 
-function nextScopeForReference(callback: CallbackRecord, referencingCharacterId: string): CallbackScope {
+function nextScopeForReference(
+	callback: CallbackRecord,
+	referencingCharacterId: string
+): CallbackScope {
 	if (callback.scope === 'room') return 'room';
 	if (callback.characterId === referencingCharacterId) return callback.scope;
 	return 'room';
@@ -103,7 +111,9 @@ function buildEvolutionCandidate(input: {
 	};
 }
 
-export function applyReferenceLifecycle(input: ApplyReferenceLifecycleInput): ReferenceLifecycleUpdate {
+export function applyReferenceLifecycle(
+	input: ApplyReferenceLifecycleInput
+): ReferenceLifecycleUpdate {
 	const nowIso = input.nowIso ?? new Date().toISOString();
 	const timesReferenced = input.callback.timesReferenced + 1;
 	const nextScope = nextScopeForReference(input.callback, input.referencingCharacterId);

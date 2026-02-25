@@ -40,7 +40,8 @@ const mockCharacter: CharacterProfile = {
 const mockNarrativeContext: MeetingNarrativeContext = {
 	roomFrame: 'The room settles into listening silence.',
 	emotionalUndercurrent: 'The room feels grounded, with people trying to stay honest.',
-	contextLine: 'Room frame: The room settles into listening silence. Undercurrent: The room feels grounded.',
+	contextLine:
+		'Room frame: The room settles into listening silence. Undercurrent: The room feels grounded.',
 	source: 'generated'
 };
 

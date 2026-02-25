@@ -71,10 +71,18 @@ describe('ritual-orchestration', () => {
 		it('follows full ritual sequence', () => {
 			expect(isValidTransition(MeetingPhase.OPENING, MeetingPhase.EMPTY_CHAIR)).toBe(true);
 			expect(isValidTransition(MeetingPhase.EMPTY_CHAIR, MeetingPhase.INTRODUCTIONS)).toBe(true);
-			expect(isValidTransition(MeetingPhase.INTRODUCTIONS, MeetingPhase.TOPIC_SELECTION)).toBe(true);
-			expect(isValidTransition(MeetingPhase.TOPIC_SELECTION, MeetingPhase.SHARING_ROUND_1)).toBe(true);
-			expect(isValidTransition(MeetingPhase.SHARING_ROUND_1, MeetingPhase.SHARING_ROUND_2)).toBe(true);
-			expect(isValidTransition(MeetingPhase.SHARING_ROUND_2, MeetingPhase.SHARING_ROUND_3)).toBe(true);
+			expect(isValidTransition(MeetingPhase.INTRODUCTIONS, MeetingPhase.TOPIC_SELECTION)).toBe(
+				true
+			);
+			expect(isValidTransition(MeetingPhase.TOPIC_SELECTION, MeetingPhase.SHARING_ROUND_1)).toBe(
+				true
+			);
+			expect(isValidTransition(MeetingPhase.SHARING_ROUND_1, MeetingPhase.SHARING_ROUND_2)).toBe(
+				true
+			);
+			expect(isValidTransition(MeetingPhase.SHARING_ROUND_2, MeetingPhase.SHARING_ROUND_3)).toBe(
+				true
+			);
 			expect(isValidTransition(MeetingPhase.SHARING_ROUND_3, MeetingPhase.CLOSING)).toBe(true);
 			expect(isValidTransition(MeetingPhase.CLOSING, MeetingPhase.POST_MEETING)).toBe(true);
 		});
@@ -88,7 +96,9 @@ describe('ritual-orchestration', () => {
 
 		it('denies invalid backward transitions', () => {
 			expect(isValidTransition(MeetingPhase.CLOSING, MeetingPhase.OPENING)).toBe(false);
-			expect(isValidTransition(MeetingPhase.SHARING_ROUND_2, MeetingPhase.INTRODUCTIONS)).toBe(false);
+			expect(isValidTransition(MeetingPhase.SHARING_ROUND_2, MeetingPhase.INTRODUCTIONS)).toBe(
+				false
+			);
 		});
 	});
 
@@ -425,7 +435,10 @@ describe('ritual-orchestration', () => {
 			);
 
 			for (const phase of phases) {
-				const isValidTransitionToCrisis = isValidTransition(phase as MeetingPhase, MeetingPhase.CRISIS_MODE);
+				const isValidTransitionToCrisis = isValidTransition(
+					phase as MeetingPhase,
+					MeetingPhase.CRISIS_MODE
+				);
 				expect(isValidTransitionToCrisis).toBe(true);
 			}
 		});

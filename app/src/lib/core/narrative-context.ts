@@ -41,7 +41,10 @@ function normalizeLine(value: string): string {
 function stripCodeFences(value: string): string {
 	const trimmed = value.trim();
 	if (!trimmed.startsWith('```')) return trimmed;
-	return trimmed.replace(/^```(?:json)?\s*/i, '').replace(/```$/, '').trim();
+	return trimmed
+		.replace(/^```(?:json)?\s*/i, '')
+		.replace(/```$/, '')
+		.trim();
 }
 
 function renderRecentShares(shares: Array<{ speaker: string; content: string }>): string {
@@ -64,7 +67,11 @@ function buildNarrativeContextPrompt(input: MeetingNarrativeContextInput): strin
 	].join('\n\n');
 }
 
-function toContext(roomFrame: string, emotionalUndercurrent: string, source: 'generated' | 'fallback'): MeetingNarrativeContext {
+function toContext(
+	roomFrame: string,
+	emotionalUndercurrent: string,
+	source: 'generated' | 'fallback'
+): MeetingNarrativeContext {
 	const normalizedRoomFrame = normalizeLine(roomFrame);
 	const normalizedUndercurrent = normalizeLine(emotionalUndercurrent);
 	return {
@@ -75,7 +82,9 @@ function toContext(roomFrame: string, emotionalUndercurrent: string, source: 'ge
 	};
 }
 
-function parseNarrativeContext(raw: string): { roomFrame: string; emotionalUndercurrent: string } | null {
+function parseNarrativeContext(
+	raw: string
+): { roomFrame: string; emotionalUndercurrent: string } | null {
 	let parsed: unknown;
 	try {
 		parsed = JSON.parse(stripCodeFences(raw));
@@ -83,7 +92,11 @@ function parseNarrativeContext(raw: string): { roomFrame: string; emotionalUnder
 		return null;
 	}
 
-	if (!isObject(parsed) || typeof parsed.roomFrame !== 'string' || typeof parsed.emotionalUndercurrent !== 'string') {
+	if (
+		!isObject(parsed) ||
+		typeof parsed.roomFrame !== 'string' ||
+		typeof parsed.emotionalUndercurrent !== 'string'
+	) {
 		return null;
 	}
 
@@ -132,7 +145,9 @@ export function parseQualityValidation(raw: string): QualityValidationResult | n
 	}
 
 	const reasons = Array.isArray(parsed.reasons)
-		? parsed.reasons.filter((reason): reason is string => typeof reason === 'string').map(normalizeLine)
+		? parsed.reasons
+				.filter((reason): reason is string => typeof reason === 'string')
+				.map(normalizeLine)
 		: [];
 
 	return {

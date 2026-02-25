@@ -26,43 +26,33 @@
 	</section>
 
 	<section class="main-pane">
-	<section class="account-card">
-		<h2>Account</h2>
-		{#if userId}
-			<p class="meta-line">Signed in as <code>{userId}</code></p>
-			<form method="POST" action="?/signOut" class="auth-form">
-				<button type="submit" class="ghost-btn">
-					Sign Out
-				</button>
-			</form>
-		{:else}
-			<p class="meta-line">Sign in with your Supabase account.</p>
-			{#if form && 'authMessage' in form && form.authMessage}
-				<p class="auth-alert" role="alert">{form.authMessage}</p>
+		<section class="account-card">
+			<h2>Account</h2>
+			{#if userId}
+				<p class="meta-line">Signed in as <code>{userId}</code></p>
+				<form method="POST" action="?/signOut" class="auth-form">
+					<button type="submit" class="ghost-btn"> Sign Out </button>
+				</form>
+			{:else}
+				<p class="meta-line">Sign in with your Supabase account.</p>
+				{#if form && 'authMessage' in form && form.authMessage}
+					<p class="auth-alert" role="alert">{form.authMessage}</p>
+				{/if}
+				<form method="POST" action="?/signIn" class="auth-form auth-grid">
+					<label for="email">Email</label>
+					<input id="email" name="email" type="email" required autocomplete="email" />
+					<label for="password">Password</label>
+					<input
+						id="password"
+						name="password"
+						type="password"
+						required
+						autocomplete="current-password"
+					/>
+					<button type="submit" class="auth-btn"> Sign In </button>
+				</form>
 			{/if}
-			<form method="POST" action="?/signIn" class="auth-form auth-grid">
-				<label for="email">Email</label>
-				<input
-					id="email"
-					name="email"
-					type="email"
-					required
-					autocomplete="email"
-				/>
-				<label for="password">Password</label>
-				<input
-					id="password"
-					name="password"
-					type="password"
-					required
-					autocomplete="current-password"
-				/>
-				<button type="submit" class="auth-btn">
-					Sign In
-				</button>
-			</form>
-		{/if}
-	</section>
+		</section>
 		<SetupFlow {form} />
 	</section>
 </main>

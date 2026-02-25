@@ -88,7 +88,9 @@ export function selectCharacters(input: SelectCharactersInput = {}): SelectedCha
 	const targetSize = clampTargetSize(input.targetSize);
 	const recent = new Set(input.recentMeetingCharacterIds ?? []);
 
-	const available = (input.availableCharacters ?? CORE_CHARACTERS).filter((c) => c.status === 'active');
+	const available = (input.availableCharacters ?? CORE_CHARACTERS).filter(
+		(c) => c.status === 'active'
+	);
 
 	const coreCharacters = available.filter((c) => c.tier === 'core');
 	if (coreCharacters.length < 6) {
@@ -102,12 +104,22 @@ export function selectCharacters(input: SelectCharactersInput = {}): SelectedCha
 	const selectedCore = coreByPriority.slice(0, 6);
 	const nonCore = available.filter((c) => c.tier === 'regular' || c.tier === 'pool');
 
-	const preferred = shuffle(nonCore.filter((c) => !recent.has(c.id)), random);
-	const fallback = shuffle(nonCore.filter((c) => recent.has(c.id)), random);
+	const preferred = shuffle(
+		nonCore.filter((c) => !recent.has(c.id)),
+		random
+	);
+	const fallback = shuffle(
+		nonCore.filter((c) => recent.has(c.id)),
+		random
+	);
 	const neededFromRegular = Math.max(0, targetSize - selectedCore.length - 2);
 	const selectedRegular = [...preferred, ...fallback].slice(0, neededFromRegular);
 
 	const visitors = generateVisitors(random, nowIso);
 
-	return [...selectedCore.map(toSelectedCharacter), ...selectedRegular.map(toSelectedCharacter), ...visitors];
+	return [
+		...selectedCore.map(toSelectedCharacter),
+		...selectedRegular.map(toSelectedCharacter),
+		...visitors
+	];
 }

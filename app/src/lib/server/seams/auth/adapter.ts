@@ -89,7 +89,11 @@ function tryExtractTokenFromCookieValue(cookieValue: string): string | null {
 
 	try {
 		const parsed = JSON.parse(normalized) as unknown;
-		if (Array.isArray(parsed) && typeof parsed[0] === 'string' && validateSessionTokenInput(parsed[0])) {
+		if (
+			Array.isArray(parsed) &&
+			typeof parsed[0] === 'string' &&
+			validateSessionTokenInput(parsed[0])
+		) {
 			return parsed[0];
 		}
 
@@ -287,7 +291,10 @@ export function createAuthAdapter(options: CreateAuthAdapterOptions = {}): AuthP
 
 			const expiresAt = parseJwtExpiresAtIso(sessionToken);
 			if (!expiresAt) {
-				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'Session token is missing a valid expiration');
+				return err(
+					SeamErrorCodes.CONTRACT_VIOLATION,
+					'Session token is missing a valid expiration'
+				);
 			}
 
 			let userResponse: SupabaseGetUserResponseLike;
@@ -313,7 +320,10 @@ export function createAuthAdapter(options: CreateAuthAdapterOptions = {}): AuthP
 			};
 
 			if (!validateAuthSession(session)) {
-				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'Supabase auth response violates AuthSession');
+				return err(
+					SeamErrorCodes.CONTRACT_VIOLATION,
+					'Supabase auth response violates AuthSession'
+				);
 			}
 
 			return ok(session);

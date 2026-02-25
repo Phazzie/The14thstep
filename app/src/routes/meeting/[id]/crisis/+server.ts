@@ -27,21 +27,32 @@ function enterCrisisMode(current: MeetingPhaseState): MeetingPhaseState {
 	};
 }
 
-async function getCurrentPhaseState(meetingId: string, locals: App.Locals): Promise<MeetingPhaseState> {
+async function getCurrentPhaseState(
+	meetingId: string,
+	locals: App.Locals
+): Promise<MeetingPhaseState> {
 	let phaseState = initializeMeetingPhase();
 	const persistedPhaseState = await locals.seams.database.getMeetingPhase(meetingId);
 	if (persistedPhaseState.ok && persistedPhaseState.value) {
 		phaseState = persistedPhaseState.value;
 	} else if (!persistedPhaseState.ok) {
-		console.warn(`[crisis] getMeetingPhase failed for meeting=${meetingId}: ${persistedPhaseState.error.message}`);
+		console.warn(
+			`[crisis] getMeetingPhase failed for meeting=${meetingId}: ${persistedPhaseState.error.message}`
+		);
 	}
 	return phaseState;
 }
 
-async function persistPhaseState(meetingId: string, phaseState: MeetingPhaseState, locals: App.Locals) {
+async function persistPhaseState(
+	meetingId: string,
+	phaseState: MeetingPhaseState,
+	locals: App.Locals
+) {
 	const updateResult = await locals.seams.database.updateMeetingPhase(meetingId, phaseState);
 	if (!updateResult.ok) {
-		console.error(`[crisis] Failed to persist phase state for meeting=${meetingId}: ${updateResult.error.message}`);
+		console.error(
+			`[crisis] Failed to persist phase state for meeting=${meetingId}: ${updateResult.error.message}`
+		);
 	}
 }
 
@@ -97,7 +108,11 @@ async function parseRequest(request: Request): Promise<SeamResult<CrisisRequest>
 	if (body.userName !== undefined && !isNonEmptyString(body.userName)) {
 		return err(SeamErrorCodes.INPUT_INVALID, 'userName must be non-empty when provided');
 	}
-	if (typeof body.sequenceOrder !== 'number' || !Number.isInteger(body.sequenceOrder) || body.sequenceOrder < 0) {
+	if (
+		typeof body.sequenceOrder !== 'number' ||
+		!Number.isInteger(body.sequenceOrder) ||
+		body.sequenceOrder < 0
+	) {
 		return err(SeamErrorCodes.INPUT_INVALID, 'sequenceOrder must be a non-negative integer');
 	}
 
@@ -129,7 +144,8 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 		await persistPhaseState(meetingId, phaseState, locals);
 	}
 
-	const designatedCharacter = CORE_CHARACTERS.find((character) => character.id === 'marcus') ?? CORE_CHARACTERS[0];
+	const designatedCharacter =
+		CORE_CHARACTERS.find((character) => character.id === 'marcus') ?? CORE_CHARACTERS[0];
 	if (!designatedCharacter) {
 		return json(err(SeamErrorCodes.NOT_FOUND, 'Crisis responder is unavailable'), { status: 404 });
 	}

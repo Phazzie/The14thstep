@@ -1,7 +1,7 @@
 export const STARTUP_SAYINGS: readonly string[] = [
 	'A fake meeting with fake people is better than a real meeting with fake people.',
 	'At least we admit the other people are fake.',
-	"It\u2019s a fake meeting\u2026 but it\u2019s better than your other ideas right now.",
+	'It\u2019s a fake meeting\u2026 but it\u2019s better than your other ideas right now.',
 	'Real talk. Fake faces. Zero pretending.',
 	'We\u2019re all bots here \u2014 and we still showed up for you.',
 	'The only meeting that doesn\u2019t smell like regret and burnt coffee.',
@@ -52,7 +52,8 @@ export function pickStartupSaying(seed?: number): string {
 	const raw =
 		typeof seed === 'number' && Number.isFinite(seed)
 			? seed
-			: (globalThis.crypto?.getRandomValues?.(new Uint32Array(1))[0] ?? Math.floor(Math.random() * 1_000_000));
+			: (globalThis.crypto?.getRandomValues?.(new Uint32Array(1))[0] ??
+				Math.floor(Math.random() * 1_000_000));
 	const index = Math.abs(raw) % STARTUP_SAYINGS.length;
 	return STARTUP_SAYINGS[index] ?? STARTUP_SAYINGS[0];
 }

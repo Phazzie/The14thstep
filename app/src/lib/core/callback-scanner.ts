@@ -64,7 +64,7 @@ function buildScannerPrompt(meetingId: string, shares: CompletedShare[]): string
 		'Return JSON array only. No markdown. Each item must include:',
 		'originShareId, characterId, originalText, callbackType, scope, potentialScore.',
 		`Allowed callbackType values: ${CALLBACK_TYPES.join(', ')}`,
-		"Allowed scope values: character, room. potentialScore must be integer 1-10.",
+		'Allowed scope values: character, room. potentialScore must be integer 1-10.',
 		`Shares:\n${serializedShares}`
 	].join('\n\n');
 }
@@ -72,7 +72,10 @@ function buildScannerPrompt(meetingId: string, shares: CompletedShare[]): string
 function stripCodeFences(text: string): string {
 	const trimmed = text.trim();
 	if (!trimmed.startsWith('```')) return trimmed;
-	return trimmed.replace(/^```(?:json)?\s*/i, '').replace(/```$/, '').trim();
+	return trimmed
+		.replace(/^```(?:json)?\s*/i, '')
+		.replace(/```$/, '')
+		.trim();
 }
 
 function parseCandidates(rawText: string): CallbackCandidate[] | null {
@@ -136,7 +139,10 @@ export async function scanForCallbacks(
 
 	const parsed = parseCandidates(response.value.shareText);
 	if (!parsed) {
-		return err(SeamErrorCodes.CONTRACT_VIOLATION, 'Callback scanner response is not valid JSON array');
+		return err(
+			SeamErrorCodes.CONTRACT_VIOLATION,
+			'Callback scanner response is not valid JSON array'
+		);
 	}
 
 	let saved = 0;

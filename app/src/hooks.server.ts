@@ -63,7 +63,9 @@ function buildSeamBundle(): {
 		database = createDatabaseAdapter();
 	} catch (error) {
 		const message =
-			error instanceof Error ? `Database adapter unavailable: ${error.message}` : 'Database adapter unavailable';
+			error instanceof Error
+				? `Database adapter unavailable: ${error.message}`
+				: 'Database adapter unavailable';
 		database = createUnavailableDatabaseAdapter(message);
 	}
 

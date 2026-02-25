@@ -1,6 +1,9 @@
 import { SeamErrorCodes, err, ok } from '$lib/core/seam';
 import type { GenerateShareOutput, GrokAiPort, GrokMessage } from '$lib/seams/grok-ai/contract';
-import { validateGenerateShareInput, validateGenerateShareOutput } from '$lib/seams/grok-ai/contract';
+import {
+	validateGenerateShareInput,
+	validateGenerateShareOutput
+} from '$lib/seams/grok-ai/contract';
 
 interface XaiContentItem {
 	type?: string;
@@ -46,7 +49,10 @@ function isNonEmptyString(value: unknown): value is string {
 	return typeof value === 'string' && value.trim().length > 0;
 }
 
-function toInputMessage(message: GrokMessage): { role: GrokMessage['role']; content: Array<{ type: 'input_text'; text: string }> } {
+function toInputMessage(message: GrokMessage): {
+	role: GrokMessage['role'];
+	content: Array<{ type: 'input_text'; text: string }>;
+} {
 	return {
 		role: message.role,
 		content: [{ type: 'input_text', text: message.content }]

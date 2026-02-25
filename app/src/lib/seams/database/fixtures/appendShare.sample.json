@@ -1,10 +1,10 @@
 {
-  "id": "6eaf7ef6-d1d8-4b12-bf99-135f2aef0568",
-  "meetingId": "2f5dcf63-cf80-4e09-8e3e-13f93da72cf3",
-  "characterId": "marcus",
-  "isUserShare": false,
-  "content": "Now I have learned to sit in a hard minute instead of blowing up my life over it.",
-  "significanceScore": 7,
-  "sequenceOrder": 4,
-  "createdAt": "2026-02-15T04:03:14.000Z"
+	"id": "6eaf7ef6-d1d8-4b12-bf99-135f2aef0568",
+	"meetingId": "2f5dcf63-cf80-4e09-8e3e-13f93da72cf3",
+	"characterId": "marcus",
+	"isUserShare": false,
+	"content": "Now I have learned to sit in a hard minute instead of blowing up my life over it.",
+	"significanceScore": 7,
+	"sequenceOrder": 4,
+	"createdAt": "2026-02-15T04:03:14.000Z"
 }

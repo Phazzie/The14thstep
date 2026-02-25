@@ -115,7 +115,8 @@
 	});
 
 	$effect(() => {
-		const serverPhaseState = (data.phaseState as unknown as RitualPhaseStateSnapshot | undefined) ?? null;
+		const serverPhaseState =
+			(data.phaseState as unknown as RitualPhaseStateSnapshot | undefined) ?? null;
 		if (!ritualPhaseState && serverPhaseState) {
 			ritualPhaseState = serverPhaseState;
 		}
@@ -320,9 +321,7 @@
 				share?: ShareRecord;
 				phaseState?: RitualPhaseStateSnapshot;
 				generation?: { attempts?: number; fallbackUsed?: boolean };
-			}>(
-				JSON.parse((event as MessageEvent<string>).data)
-			);
+			}>(JSON.parse((event as MessageEvent<string>).data));
 			if (parsed?.ok) {
 				if (parsed.value.phaseState) ritualPhaseState = parsed.value.phaseState;
 			}
@@ -457,7 +456,9 @@
 		<header class="space-y-2">
 			<h1 class="text-2xl font-bold text-amber-200">Meeting Room</h1>
 			<p class="text-sm text-gray-300">Meeting ID: <code>{data.meetingId}</code></p>
-			<p class="text-xs text-gray-400">Ritual phase: {ritualPhaseState?.currentPhase ?? 'unknown'}</p>
+			<p class="text-xs text-gray-400">
+				Ritual phase: {ritualPhaseState?.currentPhase ?? 'unknown'}
+			</p>
 			<p class="text-sm text-gray-300">
 				{userName} · {data.initialCleanTime ?? 'clean time not set'}
 			</p>

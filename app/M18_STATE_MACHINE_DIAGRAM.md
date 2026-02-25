@@ -215,6 +215,7 @@ User Input NOT REQUIRED:
 ## State Tracking Per Round
 
 Each round maintains:
+
 - `charactersSpokenThisRound: string[]` (array of character IDs)
 - `userHasSharedInRound: boolean` (true or false)
 

@@ -140,7 +140,11 @@ describe('prompt templates', () => {
 	});
 
 	it('builds ritual closing prompt with confidentiality reminder', () => {
-		const prompt = buildRitualClosingPrompt(marcus, 'trap', 'honesty, accountability, staying present');
+		const prompt = buildRitualClosingPrompt(
+			marcus,
+			'trap',
+			'honesty, accountability, staying present'
+		);
 
 		expect(prompt).toContain('You are Marcus');
 		expect(prompt).toContain('closing this meeting');

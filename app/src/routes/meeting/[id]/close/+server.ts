@@ -43,21 +43,32 @@ function toPostMeetingPhaseState(current: MeetingPhaseState): MeetingPhaseState 
 	};
 }
 
-async function getCurrentPhaseState(meetingId: string, locals: App.Locals): Promise<MeetingPhaseState> {
+async function getCurrentPhaseState(
+	meetingId: string,
+	locals: App.Locals
+): Promise<MeetingPhaseState> {
 	let phaseState = initializeMeetingPhase();
 	const persistedPhaseState = await locals.seams.database.getMeetingPhase(meetingId);
 	if (persistedPhaseState.ok && persistedPhaseState.value) {
 		phaseState = persistedPhaseState.value;
 	} else if (!persistedPhaseState.ok) {
-		console.warn(`[close] getMeetingPhase failed for meeting=${meetingId}: ${persistedPhaseState.error.message}`);
+		console.warn(
+			`[close] getMeetingPhase failed for meeting=${meetingId}: ${persistedPhaseState.error.message}`
+		);
 	}
 	return phaseState;
 }
 
-async function persistPhaseState(meetingId: string, phaseState: MeetingPhaseState, locals: App.Locals) {
+async function persistPhaseState(
+	meetingId: string,
+	phaseState: MeetingPhaseState,
+	locals: App.Locals
+) {
 	const updateResult = await locals.seams.database.updateMeetingPhase(meetingId, phaseState);
 	if (!updateResult.ok) {
-		console.error(`[close] Failed to persist phase state for meeting=${meetingId}: ${updateResult.error.message}`);
+		console.error(
+			`[close] Failed to persist phase state for meeting=${meetingId}: ${updateResult.error.message}`
+		);
 	}
 }
 
@@ -66,7 +77,10 @@ function speakerNameForShare(characterId: string | null): string {
 	return CORE_CHARACTERS.find((character) => character.id === characterId)?.name ?? 'Character';
 }
 
-function renderTranscript(lastShares: Array<{ speakerName: string; content: string }>, limit = 12): string {
+function renderTranscript(
+	lastShares: Array<{ speakerName: string; content: string }>,
+	limit = 12
+): string {
 	return lastShares
 		.slice(-limit)
 		.map((share) => `${share.speakerName}: ${share.content}`)
@@ -76,7 +90,10 @@ function renderTranscript(lastShares: Array<{ speakerName: string; content: stri
 function stripCodeFences(value: string): string {
 	const trimmed = value.trim();
 	if (!trimmed.startsWith('```')) return trimmed;
-	return trimmed.replace(/^```(?:json)?\s*/i, '').replace(/```$/, '').trim();
+	return trimmed
+		.replace(/^```(?:json)?\s*/i, '')
+		.replace(/```$/, '')
+		.trim();
 }
 
 function parseExtractedMeetingMemory(raw: string): ExtractedMeetingMemory | null {
@@ -273,13 +290,16 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 	});
 	const extractionDurationMs = Date.now() - extractionStartedAt;
 	const extractedCharacterCount = Object.keys(extractedMemory?.characterThreads ?? {}).length;
-	const shouldBuildFallbackCharacterSummaries = extractedCharacterCount < CORE_CHARACTERS.slice(0, 6).length;
+	const shouldBuildFallbackCharacterSummaries =
+		extractedCharacterCount < CORE_CHARACTERS.slice(0, 6).length;
 	if (extractedMemory) {
 		console.info(
 			`[close] memory extraction parsed for meeting=${meetingId} in ${extractionDurationMs}ms (characters=${extractedCharacterCount})`
 		);
 	} else {
-		console.warn(`[close] memory extraction failed/invalid for meeting=${meetingId} after ${extractionDurationMs}ms`);
+		console.warn(
+			`[close] memory extraction failed/invalid for meeting=${meetingId} after ${extractionDurationMs}ms`
+		);
 	}
 	const fallbackStartedAt = Date.now();
 	const fallbackCharacterMemorySummaries = shouldBuildFallbackCharacterSummaries
@@ -321,7 +341,8 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 	const postMeetingPhaseState = toPostMeetingPhaseState(closingPhaseState);
 	await persistPhaseState(meetingId, postMeetingPhaseState, locals);
 
-	let callbackScan: { detected: number; saved: number; skipped: number; failed: number } | null = null;
+	let callbackScan: { detected: number; saved: number; skipped: number; failed: number } | null =
+		null;
 	let callbackScanError: string | null = null;
 
 	const scanResult = await scanForCallbacks({

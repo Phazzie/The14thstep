@@ -47,7 +47,9 @@ async function getCurrentPhaseState(
 			phaseState = persistedPhaseState.value;
 		}
 	} else if (!persistedPhaseState.ok) {
-		console.warn(`[user-share] getMeetingPhase failed for meeting=${meetingId}: ${persistedPhaseState.error.message}`);
+		console.warn(
+			`[user-share] getMeetingPhase failed for meeting=${meetingId}: ${persistedPhaseState.error.message}`
+		);
 	}
 
 	if (phaseState.currentPhase === MeetingPhase.SETUP) {
@@ -64,10 +66,16 @@ async function getCurrentPhaseState(
 	return { phaseState, phaseLoaded };
 }
 
-async function persistPhaseState(meetingId: string, phaseState: MeetingPhaseState, locals: App.Locals) {
+async function persistPhaseState(
+	meetingId: string,
+	phaseState: MeetingPhaseState,
+	locals: App.Locals
+) {
 	const updateResult = await locals.seams.database.updateMeetingPhase(meetingId, phaseState);
 	if (!updateResult.ok) {
-		console.error(`[user-share] Failed to persist phase state for meeting=${meetingId}: ${updateResult.error.message}`);
+		console.error(
+			`[user-share] Failed to persist phase state for meeting=${meetingId}: ${updateResult.error.message}`
+		);
 	}
 }
 
@@ -85,13 +93,18 @@ function isNonEmptyString(value: unknown): value is string {
 }
 
 function isShareInteractionType(value: unknown): value is ShareInteractionType {
-	return typeof value === 'string' && SHARE_INTERACTION_TYPES.includes(value as ShareInteractionType);
+	return (
+		typeof value === 'string' && SHARE_INTERACTION_TYPES.includes(value as ShareInteractionType)
+	);
 }
 
 function stripCodeFences(value: string): string {
 	const trimmed = value.trim();
 	if (!trimmed.startsWith('```')) return trimmed;
-	return trimmed.replace(/^```(?:json)?\s*/i, '').replace(/```$/, '').trim();
+	return trimmed
+		.replace(/^```(?:json)?\s*/i, '')
+		.replace(/```$/, '')
+		.trim();
 }
 
 function parseCrisisTriage(raw: string): CrisisTriageParse | null {
@@ -177,7 +190,11 @@ async function parseRequest(request: Request): Promise<SeamResult<UserShareReque
 		return err(SeamErrorCodes.INPUT_INVALID, 'content is required');
 	}
 	const rawSequenceOrder = body.sequenceOrder;
-	if (typeof rawSequenceOrder !== 'number' || !Number.isInteger(rawSequenceOrder) || rawSequenceOrder < 0) {
+	if (
+		typeof rawSequenceOrder !== 'number' ||
+		!Number.isInteger(rawSequenceOrder) ||
+		rawSequenceOrder < 0
+	) {
 		return err(SeamErrorCodes.INPUT_INVALID, 'sequenceOrder must be a non-negative integer');
 	}
 	const sequenceOrder = rawSequenceOrder;
@@ -209,11 +226,17 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 
 	const input = inputResult.value;
 	const interactionType = input.interactionType ?? 'standard';
-	const { phaseState: currentPhaseState, phaseLoaded } = await getCurrentPhaseState(meetingId, locals);
+	const { phaseState: currentPhaseState, phaseLoaded } = await getCurrentPhaseState(
+		meetingId,
+		locals
+	);
 	if (phaseLoaded && currentPhaseState.currentPhase === MeetingPhase.POST_MEETING) {
-		return json(err(SeamErrorCodes.INPUT_INVALID, 'User shares are unavailable after the meeting closes'), {
-			status: 409
-		});
+		return json(
+			err(SeamErrorCodes.INPUT_INVALID, 'User shares are unavailable after the meeting closes'),
+			{
+				status: 409
+			}
+		);
 	}
 
 	const crisis = await detectCrisisWithAi({
@@ -267,7 +290,12 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 	const speakerCount =
 		phaseStateAfterUserShare.charactersSpokenThisRound.length +
 		(phaseStateAfterUserShare.userHasSharedInRound ? 1 : 0);
-	let transitionTrigger: 'share_complete' | 'round_complete' | 'user_input' | 'meeting_start' | null = null;
+	let transitionTrigger:
+		| 'share_complete'
+		| 'round_complete'
+		| 'user_input'
+		| 'meeting_start'
+		| null = null;
 
 	if (currentPhase === MeetingPhase.TOPIC_SELECTION) {
 		transitionTrigger = 'user_input';
@@ -297,7 +325,9 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 	if (phaseLoaded) {
 		await persistPhaseState(meetingId, phaseStateToPersist, locals);
 	} else {
-		console.warn(`[user-share] Skipping phase persistence because phase state could not be loaded for meeting=${meetingId}`);
+		console.warn(
+			`[user-share] Skipping phase persistence because phase state could not be loaded for meeting=${meetingId}`
+		);
 	}
 
 	return json(

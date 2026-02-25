@@ -70,7 +70,9 @@ describe('runCallbackLifecycleWorkflow', () => {
 		});
 
 		expect(result.ok).toBe(true);
-		expect(calls).toEqual([{ characterId: 'marcus', meetingId: 'meeting-99', scopeToMeeting: false }]);
+		expect(calls).toEqual([
+			{ characterId: 'marcus', meetingId: 'meeting-99', scopeToMeeting: false }
+		]);
 	});
 
 	it('deduplicates room callbacks returned from multiple characters', async () => {

@@ -120,6 +120,7 @@ Five ritual-specific prompts implemented:
   - **Location**: Lines 328-337
 
 All prompts follow style constraints:
+
 - [x] Use character's voiceExamples where applicable
 - [x] 2-4 sentences (ritual moments brief)
 - [x] NO therapy-speak
@@ -134,6 +135,7 @@ All prompts follow style constraints:
 **Status**: COMPLETE - 43 Test Cases
 
 #### Initialization Tests (2)
+
 - [x] Initializes to SETUP phase
   - **Test**: "initializes to SETUP phase"
   - **Line**: ~38
@@ -143,6 +145,7 @@ All prompts follow style constraints:
   - **Line**: ~45
 
 #### Phase Transition Tests (8)
+
 - [x] Validates valid transitions
   - SETUP → OPENING
   - SETUP → CRISIS_MODE
@@ -156,6 +159,7 @@ All prompts follow style constraints:
   - **Tests**: Lines ~80-90
 
 #### Full Sequence Tests (5)
+
 - [x] Transitions through entire ritual
   - All 10 phases in order
   - Round resets on new phase
@@ -163,6 +167,7 @@ All prompts follow style constraints:
   - **Tests**: Lines ~110-180
 
 #### Prompt Selection Tests (7)
+
 - [x] Maps all phases to correct prompt type
   - OPENING → 'opening'
   - EMPTY_CHAIR → 'reading'
@@ -174,6 +179,7 @@ All prompts follow style constraints:
   - **Tests**: Lines ~230-280
 
 #### User Input Tests (6)
+
 - [x] Identifies phases requiring user input
   - TOPIC_SELECTION requires input
   - SHARING_ROUNDs require input
@@ -181,17 +187,20 @@ All prompts follow style constraints:
   - **Tests**: Lines ~310-340
 
 #### Speaker Tracking Tests (6)
+
 - [x] Records character speeches
 - [x] Prevents duplicate speakers
 - [x] Allows multiple different speakers
   - **Tests**: Lines ~365-410
 
 #### User Sharing Tests (3)
+
 - [x] Marks user as shared
 - [x] Prevents duplicate user shares
   - **Tests**: Lines ~415-435
 
 #### Round Completion Tests (5)
+
 - [x] Returns false with no speakers
 - [x] Returns false with 1 speaker
 - [x] Returns true with 2 speakers
@@ -199,21 +208,25 @@ All prompts follow style constraints:
   - **Tests**: Lines ~445-480
 
 #### Intro Completion Tests (4)
+
 - [x] Requires 6 core characters
 - [x] Supports custom visitor count
   - **Tests**: Lines ~490-520
 
 #### Constant Tests (2)
+
 - [x] INTRO_ORDER has canonical order
 - [x] INTRO_ORDER has 6 characters
   - **Tests**: Lines ~530-545
 
 #### Crisis Mode Tests (1)
+
 - [x] Can interrupt from any phase
 - [x] Preserves round tracking
   - **Tests**: Lines ~550-565
 
 #### Prompt Template Tests (6 - in prompt-templates.spec.ts)
+
 - [x] buildRitualOpeningPrompt includes empty chair
 - [x] buildRitualIntroPrompt handles first-timer
 - [x] buildRitualReadingPrompt avoids polished language
@@ -272,15 +285,15 @@ All prompts follow style constraints:
 
 ## 5. Code Quality Metrics
 
-| Metric | Value | Status |
-|--------|-------|--------|
-| Test Cases | 43 (core) + 6 (prompt) | ✓ Comprehensive |
-| Coverage | All phases | ✓ 100% |
-| Lines of Code | ~1,025 | ✓ Reasonable |
-| Cyclomatic Complexity | Low | ✓ Pure functions |
-| Type Safety | Full TypeScript | ✓ No any types |
-| Documentation | JSDoc comments | ✓ Complete |
-| Therapy-speak | 0 violations | ✓ Detected & tested |
+| Metric                | Value                  | Status              |
+| --------------------- | ---------------------- | ------------------- |
+| Test Cases            | 43 (core) + 6 (prompt) | ✓ Comprehensive     |
+| Coverage              | All phases             | ✓ 100%              |
+| Lines of Code         | ~1,025                 | ✓ Reasonable        |
+| Cyclomatic Complexity | Low                    | ✓ Pure functions    |
+| Type Safety           | Full TypeScript        | ✓ No any types      |
+| Documentation         | JSDoc comments         | ✓ Complete          |
+| Therapy-speak         | 0 violations           | ✓ Detected & tested |
 
 ---
 
@@ -289,6 +302,7 @@ All prompts follow style constraints:
 These functions are ready for Phase 2c integration into routes:
 
 ### Route Integration Points
+
 - [x] `/meeting/[id]` - Display current phase
 - [x] `/meeting/[id]/share` - Character share generation
 - [x] `/meeting/[id]/user-share` - User input handling
@@ -296,12 +310,14 @@ These functions are ready for Phase 2c integration into routes:
 - [x] `/meeting/[id]/close` - Meeting closing
 
 ### State Persistence
+
 - [x] MeetingPhaseState serializable to/from database
 - [x] All fields are primitive types or Date
 - [x] Phase enum values are strings
 - [x] Ready for storage in meeting records
 
 ### Error Boundaries
+
 - [x] All errors return SeamResult
 - [x] Error codes aligned with SeamErrorCodes
 - [x] Routes can handle errors uniformly
@@ -334,13 +350,13 @@ Created supplementary docs:
 
 ## 8. Files Changed
 
-| File | Type | Changes |
-|------|------|---------|
-| `ritual-orchestration.ts` | NEW | 316 lines |
-| `ritual-orchestration.spec.ts` | NEW | 548 lines |
-| `prompt-templates.ts` | MODIFIED | +92 lines |
-| `prompt-templates.spec.ts` | MODIFIED | +61 lines |
-| `style-constitution.ts` | NEW | 8 lines |
+| File                           | Type     | Changes   |
+| ------------------------------ | -------- | --------- |
+| `ritual-orchestration.ts`      | NEW      | 316 lines |
+| `ritual-orchestration.spec.ts` | NEW      | 548 lines |
+| `prompt-templates.ts`          | MODIFIED | +92 lines |
+| `prompt-templates.spec.ts`     | MODIFIED | +61 lines |
+| `style-constitution.ts`        | NEW      | 8 lines   |
 
 **Total**: ~1,025 lines of code and tests
 

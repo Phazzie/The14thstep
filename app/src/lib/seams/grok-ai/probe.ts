@@ -136,7 +136,10 @@ async function main() {
 		raw: sample.body
 	};
 
-	await writeFile(resolve(FIXTURES_DIR, 'probe.sample.json'), JSON.stringify(sampleFixture, null, 2));
+	await writeFile(
+		resolve(FIXTURES_DIR, 'probe.sample.json'),
+		JSON.stringify(sampleFixture, null, 2)
+	);
 
 	const fault = await callResponsesApi({
 		apiKey,

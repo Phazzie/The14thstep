@@ -45,8 +45,12 @@ interface QueryResponseLike<T = unknown> {
 const NETWORK_STATUSES = new Set([0, 408, 429, 502, 503, 504, 522, 524]);
 const UUID_V4_PATTERN =
 	/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const CORE_CHARACTER_NAME_BY_ID = new Map(CORE_CHARACTERS.map((character) => [character.id, character.name]));
-const CORE_CHARACTER_ID_BY_NAME = new Map(CORE_CHARACTERS.map((character) => [character.name, character.id]));
+const CORE_CHARACTER_NAME_BY_ID = new Map(
+	CORE_CHARACTERS.map((character) => [character.id, character.name])
+);
+const CORE_CHARACTER_ID_BY_NAME = new Map(
+	CORE_CHARACTERS.map((character) => [character.name, character.id])
+);
 
 interface CharacterMaps {
 	dbIdByDomainId: Map<string, string>;
@@ -107,21 +111,26 @@ function isNotFoundResponse(response: { error: QueryErrorLike | null; status?: n
 	const code = asString(response.error?.code);
 	if (code === 'PGRST116') return true;
 
-	const message = `${asString(response.error?.message) ?? ''} ${asString(response.error?.details) ?? ''}`
-		.trim()
-		.toLowerCase();
+	const message =
+		`${asString(response.error?.message) ?? ''} ${asString(response.error?.details) ?? ''}`
+			.trim()
+			.toLowerCase();
 	return message.includes('no rows');
 }
 
-function isNetworkLikeResponse(response: { error: QueryErrorLike | null; status?: number }): boolean {
+function isNetworkLikeResponse(response: {
+	error: QueryErrorLike | null;
+	status?: number;
+}): boolean {
 	const status = asStatus(response.status) ?? asStatus(response.error?.status);
 	if (status !== undefined && NETWORK_STATUSES.has(status)) return true;
 
-	const message = `${asString(response.error?.message) ?? ''} ${asString(response.error?.details) ?? ''} ${
-		asString(response.error?.hint) ?? ''
-	}`
-		.trim()
-		.toLowerCase();
+	const message =
+		`${asString(response.error?.message) ?? ''} ${asString(response.error?.details) ?? ''} ${
+			asString(response.error?.hint) ?? ''
+		}`
+			.trim()
+			.toLowerCase();
 
 	return /(network|timeout|timed out|fetch failed|failed to fetch|econn|enotfound|eai_again|socket|aborted)/.test(
 		message
@@ -133,7 +142,11 @@ function mapUpstreamError<T>(
 	response: { error: QueryErrorLike | null; status?: number }
 ): SeamResult<T> {
 	if (isNotFoundResponse(response)) {
-		return err(SeamErrorCodes.NOT_FOUND, `${method} record not found`, upstreamDetails(method, response));
+		return err(
+			SeamErrorCodes.NOT_FOUND,
+			`${method} record not found`,
+			upstreamDetails(method, response)
+		);
 	}
 	if (isNetworkLikeResponse(response)) {
 		return err(
@@ -197,7 +210,8 @@ function mapMeetingPhaseStateValue(value: unknown): MeetingPhaseState | null {
 	}
 
 	if (!Array.isArray(value.charactersSpokenThisRound)) return null;
-	if (!value.charactersSpokenThisRound.every((characterId) => isNonEmptyString(characterId))) return null;
+	if (!value.charactersSpokenThisRound.every((characterId) => isNonEmptyString(characterId)))
+		return null;
 
 	const userHasSharedInRound = asBoolean(value.userHasSharedInRound);
 	if (userHasSharedInRound === undefined) return null;
@@ -224,9 +238,7 @@ function mapMeetingPhaseStateValue(value: unknown): MeetingPhaseState | null {
 	};
 }
 
-function serializeMeetingPhaseState(
-	phaseState: MeetingPhaseState
-): SeamResult<{
+function serializeMeetingPhaseState(phaseState: MeetingPhaseState): SeamResult<{
 	currentPhase: MeetingPhase;
 	phaseStartedAt: string;
 	roundNumber?: number;
@@ -282,7 +294,10 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 	const supabase = options.supabase ?? createSupabaseServiceRoleClient();
 	let characterMapsPromise: Promise<SeamResult<CharacterMaps>> | null = null;
 
-	function mapCharacterIdToDomainId(maps: CharacterMaps, characterId: string | null): string | null {
+	function mapCharacterIdToDomainId(
+		maps: CharacterMaps,
+		characterId: string | null
+	): string | null {
 		if (characterId === null) return null;
 		return maps.domainIdByDbId.get(characterId) ?? characterId;
 	}
@@ -306,7 +321,9 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 				.map((row) => (isObject(row) ? asString(row.name) : undefined))
 				.filter((name): name is string => isNonEmptyString(name))
 		);
-		const missingProfiles = CORE_CHARACTERS.filter((character) => !existingNames.has(character.name));
+		const missingProfiles = CORE_CHARACTERS.filter(
+			(character) => !existingNames.has(character.name)
+		);
 		if (missingProfiles.length > 0) {
 			const today = new Date().toISOString().slice(0, 10);
 			const insertResponse = (await supabase
@@ -336,10 +353,14 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 			.in('name', coreNames)) as QueryResponseLike<unknown[]>;
 		if (finalResponse.error) return mapUpstreamError(method, finalResponse);
 		if (!Array.isArray(finalResponse.data)) {
-			return err(SeamErrorCodes.CONTRACT_VIOLATION, 'characters final lookup response is not an array', {
-				method,
-				provider: 'supabase'
-			});
+			return err(
+				SeamErrorCodes.CONTRACT_VIOLATION,
+				'characters final lookup response is not an array',
+				{
+					method,
+					provider: 'supabase'
+				}
+			);
 		}
 
 		const dbIdByDomainId = new Map<string, string>();
@@ -446,7 +467,10 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 
 			const meeting = mapMeetingRecordRow(response.data);
 			if (!validateMeetingRecord(meeting)) {
-				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'createMeeting response violates MeetingRecord');
+				return err(
+					SeamErrorCodes.CONTRACT_VIOLATION,
+					'createMeeting response violates MeetingRecord'
+				);
 			}
 
 			return ok(meeting);
@@ -511,7 +535,10 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 
 			if (response.error) return mapUpstreamError('getHeavyMemory', response);
 			if (!Array.isArray(response.data)) {
-				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'getHeavyMemory response is not ShareRecord[]');
+				return err(
+					SeamErrorCodes.CONTRACT_VIOLATION,
+					'getHeavyMemory response is not ShareRecord[]'
+				);
 			}
 
 			const shares = response.data.map((row) => mapShareRecordRow(row));
@@ -521,7 +548,10 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 				share.characterId = mapCharacterIdToDomainId(mapsResult.value, share.characterId);
 			}
 			if (!shares.every((share) => validateShareRecord(share))) {
-				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'getHeavyMemory response violates ShareRecord[]');
+				return err(
+					SeamErrorCodes.CONTRACT_VIOLATION,
+					'getHeavyMemory response violates ShareRecord[]'
+				);
 			}
 
 			return ok(shares);
@@ -577,7 +607,10 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 
 			if (response.error) return mapUpstreamError('getMeetingShares', response);
 			if (!Array.isArray(response.data)) {
-				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'getMeetingShares response is not ShareRecord[]');
+				return err(
+					SeamErrorCodes.CONTRACT_VIOLATION,
+					'getMeetingShares response is not ShareRecord[]'
+				);
 			}
 
 			const shares = response.data.map((row) => mapShareRecordRow(row));
@@ -587,7 +620,10 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 				share.characterId = mapCharacterIdToDomainId(mapsResult.value, share.characterId);
 			}
 			if (!shares.every((share) => validateShareRecord(share))) {
-				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'getMeetingShares response violates ShareRecord[]');
+				return err(
+					SeamErrorCodes.CONTRACT_VIOLATION,
+					'getMeetingShares response violates ShareRecord[]'
+				);
 			}
 
 			return ok(shares);
@@ -647,7 +683,10 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 
 			const phaseStateResult = mapMeetingPhaseStateValue(rawPhaseState);
 			if (!phaseStateResult) {
-				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'getMeetingPhase response violates MeetingPhaseState');
+				return err(
+					SeamErrorCodes.CONTRACT_VIOLATION,
+					'getMeetingPhase response violates MeetingPhaseState'
+				);
 			}
 
 			return ok(phaseStateResult);
@@ -684,7 +723,10 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 			if (!mapsResult.ok) return mapsResult;
 			callback.characterId = mapCharacterIdToDomainId(mapsResult.value, callback.characterId) ?? '';
 			if (!validateCallbackRecord(callback)) {
-				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'createCallback response violates CallbackRecord');
+				return err(
+					SeamErrorCodes.CONTRACT_VIOLATION,
+					'createCallback response violates CallbackRecord'
+				);
 			}
 
 			return ok(callback);
@@ -695,7 +737,10 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid getActiveCallbacks input');
 			}
 
-			const resolvedCharacterId = await resolveDbCharacterId('getActiveCallbacks', input.characterId);
+			const resolvedCharacterId = await resolveDbCharacterId(
+				'getActiveCallbacks',
+				input.characterId
+			);
 			if (!resolvedCharacterId.ok) return resolvedCharacterId;
 
 			const callbacksQuery = supabase
@@ -706,7 +751,9 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 				.in('status', ['active', 'stale', 'retired', 'legend'])
 				.or(`character_id.eq.${resolvedCharacterId.value},scope.eq.room`);
 			const callbacksScopedQuery =
-				input.scopeToMeeting === false ? callbacksQuery : callbacksQuery.eq('shares.meeting_id', input.meetingId);
+				input.scopeToMeeting === false
+					? callbacksQuery
+					: callbacksQuery.eq('shares.meeting_id', input.meetingId);
 			const response = (await callbacksScopedQuery
 				.order('potential_score', { ascending: false })
 				.order('times_referenced', { ascending: false })
@@ -714,17 +761,24 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 
 			if (response.error) return mapUpstreamError('getActiveCallbacks', response);
 			if (!Array.isArray(response.data)) {
-				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'getActiveCallbacks response is not CallbackRecord[]');
+				return err(
+					SeamErrorCodes.CONTRACT_VIOLATION,
+					'getActiveCallbacks response is not CallbackRecord[]'
+				);
 			}
 
 			const callbacks = response.data.map((row) => mapCallbackRecordRow(row));
 			const mapsResult = await getCharacterMaps('getActiveCallbacks');
 			if (!mapsResult.ok) return mapsResult;
 			for (const callback of callbacks) {
-				callback.characterId = mapCharacterIdToDomainId(mapsResult.value, callback.characterId) ?? '';
+				callback.characterId =
+					mapCharacterIdToDomainId(mapsResult.value, callback.characterId) ?? '';
 			}
 			if (!callbacks.every((callback) => validateCallbackRecord(callback))) {
-				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'getActiveCallbacks response violates CallbackRecord[]');
+				return err(
+					SeamErrorCodes.CONTRACT_VIOLATION,
+					'getActiveCallbacks response violates CallbackRecord[]'
+				);
 			}
 
 			return ok(callbacks);
@@ -752,7 +806,10 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 
 			const current = mapCallbackRecordRow(currentResponse.data);
 			if (!validateCallbackRecord(current)) {
-				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'markCallbackReferenced source violates CallbackRecord');
+				return err(
+					SeamErrorCodes.CONTRACT_VIOLATION,
+					'markCallbackReferenced source violates CallbackRecord'
+				);
 			}
 
 			const nextTimesReferenced = current.timesReferenced + 1;
@@ -802,7 +859,10 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 
 			const meeting = mapMeetingRecordRow(response.data);
 			if (!validateMeetingRecord(meeting)) {
-				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'completeMeeting response violates MeetingRecord');
+				return err(
+					SeamErrorCodes.CONTRACT_VIOLATION,
+					'completeMeeting response violates MeetingRecord'
+				);
 			}
 
 			return ok(meeting);
@@ -842,7 +902,10 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 			if (!mapsResult.ok) return mapsResult;
 			callback.characterId = mapCharacterIdToDomainId(mapsResult.value, callback.characterId) ?? '';
 			if (!validateCallbackRecord(callback)) {
-				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'updateCallback response violates CallbackRecord');
+				return err(
+					SeamErrorCodes.CONTRACT_VIOLATION,
+					'updateCallback response violates CallbackRecord'
+				);
 			}
 
 			return ok(callback);
@@ -859,7 +922,11 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 				.eq('user_id', input.userId)
 				.gt('started_at', input.startedAfter)) as QueryResponseLike;
 			if (response.error) return mapUpstreamError('getMeetingCountAfterDate', response);
-			if (typeof response.count !== 'number' || !Number.isInteger(response.count) || response.count < 0) {
+			if (
+				typeof response.count !== 'number' ||
+				!Number.isInteger(response.count) ||
+				response.count < 0
+			) {
 				return err(
 					SeamErrorCodes.CONTRACT_VIOLATION,
 					'getMeetingCountAfterDate response did not include a valid count'

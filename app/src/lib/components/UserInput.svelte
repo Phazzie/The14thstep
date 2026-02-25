@@ -29,10 +29,10 @@
 			id="user-share"
 			rows="4"
 			class="w-full rounded-lg border border-gray-700 bg-gray-900 p-3 text-gray-100"
-			value={value}
+			{value}
 			oninput={(event) => onValueChange((event.currentTarget as HTMLTextAreaElement).value)}
 			placeholder={crisisMode ? "Take your time. We're here." : 'Type your share...'}
-			disabled={disabled}
+			{disabled}
 		></textarea>
 		<div class="flex flex-wrap gap-2">
 			<button
@@ -46,7 +46,7 @@
 			<button
 				type="button"
 				onclick={onPass}
-				disabled={disabled}
+				{disabled}
 				class="min-h-11 rounded-md bg-gray-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
 			>
 				Pass

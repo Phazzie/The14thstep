@@ -9,19 +9,21 @@ describe('POST /meeting/[id]/user-share', () => {
 				shareText: '{"crisis":true,"confidence":"high","reason":"direct self-harm intent"}'
 			}
 		});
-		const appendShare = vi.fn().mockImplementation(async (input: { significanceScore: number }) => ({
-			ok: true,
-			value: {
-				id: 'share-1',
-				meetingId: 'meeting-1',
-				characterId: null,
-				isUserShare: true,
-				content: 'I want to die tonight.',
-				significanceScore: input.significanceScore,
-				sequenceOrder: 0,
-				createdAt: '2026-02-19T00:00:00.000Z'
-			}
-		}));
+		const appendShare = vi
+			.fn()
+			.mockImplementation(async (input: { significanceScore: number }) => ({
+				ok: true,
+				value: {
+					id: 'share-1',
+					meetingId: 'meeting-1',
+					characterId: null,
+					isUserShare: true,
+					content: 'I want to die tonight.',
+					significanceScore: input.significanceScore,
+					sequenceOrder: 0,
+					createdAt: '2026-02-19T00:00:00.000Z'
+				}
+			}));
 		const updateMeetingPhase = vi.fn().mockResolvedValue({ ok: true, value: undefined });
 
 		const request = new Request('http://localhost/meeting/meeting-1/user-share', {
@@ -65,19 +67,21 @@ describe('POST /meeting/[id]/user-share', () => {
 			ok: true,
 			value: { shareText: 'not valid json' }
 		});
-		const appendShare = vi.fn().mockImplementation(async (input: { significanceScore: number }) => ({
-			ok: true,
-			value: {
-				id: 'share-2',
-				meetingId: 'meeting-1',
-				characterId: null,
-				isUserShare: true,
-				content: 'I do not know what to do.',
-				significanceScore: input.significanceScore,
-				sequenceOrder: 1,
-				createdAt: '2026-02-19T00:00:01.000Z'
-			}
-		}));
+		const appendShare = vi
+			.fn()
+			.mockImplementation(async (input: { significanceScore: number }) => ({
+				ok: true,
+				value: {
+					id: 'share-2',
+					meetingId: 'meeting-1',
+					characterId: null,
+					isUserShare: true,
+					content: 'I do not know what to do.',
+					significanceScore: input.significanceScore,
+					sequenceOrder: 1,
+					createdAt: '2026-02-19T00:00:01.000Z'
+				}
+			}));
 		const updateMeetingPhase = vi.fn().mockResolvedValue({ ok: true, value: undefined });
 
 		const request = new Request('http://localhost/meeting/meeting-1/user-share', {

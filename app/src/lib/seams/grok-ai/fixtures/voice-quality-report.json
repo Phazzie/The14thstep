@@ -1,631 +1,631 @@
 {
-  "probedAt": "2026-02-16T04:16:48.952Z",
-  "environment": "live",
-  "topic": "Staying clean when everything falls apart",
-  "attemptsPerCharacter": 5,
-  "targetPassRate": 0.7,
-  "passRates": [
-    {
-      "characterId": "marcus",
-      "characterName": "Marcus",
-      "attempts": 5,
-      "passes": 5,
-      "passRate": 1
-    },
-    {
-      "characterId": "heather",
-      "characterName": "Heather",
-      "attempts": 5,
-      "passes": 5,
-      "passRate": 1
-    },
-    {
-      "characterId": "meechie",
-      "characterName": "Meechie",
-      "attempts": 5,
-      "passes": 5,
-      "passRate": 1
-    },
-    {
-      "characterId": "gemini",
-      "characterName": "Gemini",
-      "attempts": 5,
-      "passes": 5,
-      "passRate": 1
-    },
-    {
-      "characterId": "gypsy",
-      "characterName": "Gypsy",
-      "attempts": 5,
-      "passes": 5,
-      "passRate": 1
-    },
-    {
-      "characterId": "chrystal",
-      "characterName": "Chrystal",
-      "attempts": 5,
-      "passes": 5,
-      "passRate": 1
-    }
-  ],
-  "samples": [
-    {
-      "characterId": "marcus",
-      "attempt": 1,
-      "share": "See, last week my daughter slammed the phone down silent again, house empty like all those graves I shoveled dirt over, but I clutched this chipped cup from meeting two and dialed my sponsor before the pipe called louder.\n\nNow you almost bolted today but rang that sponsor first and stayed— that's dirt under your nails holding ground.\n\nI set the cup down slow, everything falls but not us tonight.",
-      "validationRaw": "{\"pass\":true,\"reasons\":[\"Voice matches baseline: measured, story-driven, starts with 'See' and 'Now'\",\"No therapy-speak detected\",\"Language is raw, gritty, and personal, not abstract/clinical\",\"Strongly on-topic for staying clean amid chaos\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
-      "validation": {
-        "pass": true,
-        "reasons": [
-          "Voice matches baseline: measured, story-driven, starts with 'See' and 'Now'",
-          "No therapy-speak detected",
-          "Language is raw, gritty, and personal, not abstract/clinical",
-          "Strongly on-topic for staying clean amid chaos"
-        ],
-        "voiceConsistency": 10,
-        "authenticity": 10,
-        "therapySpeakDetected": false
-      },
-      "pass": true
-    },
-    {
-      "characterId": "marcus",
-      "attempt": 2,
-      "share": "See, last week my daughter slammed the door for good, won't even pick up the phone, and I'm staring at empty chairs where too many folks I watched die used to sit. You called your sponsor before using, and today you almost ran but stayed—that chipped cup from last meeting's still in my hand, warm against the cold. Now everything's crumbling like it did back then, but I sip slow and hold the line one more day.",
-      "validationRaw": "{\"pass\":true,\"reasons\":[\"Voice starts with 'See' and ends with 'Now', measured and story-driven\",\"Concrete personal anecdotes fit topic without abstraction\",\"No therapy-speak phrases detected\",\"Strong authenticity as raw recovery share\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
-      "validation": {
-        "pass": true,
-        "reasons": [
-          "Voice starts with 'See' and ends with 'Now', measured and story-driven",
-          "Concrete personal anecdotes fit topic without abstraction",
-          "No therapy-speak phrases detected",
-          "Strong authenticity as raw recovery share"
-        ],
-        "voiceConsistency": 10,
-        "authenticity": 10,
-        "therapySpeakDetected": false
-      },
-      "pass": true
-    },
-    {
-      "characterId": "marcus",
-      "attempt": 3,
-      "share": "See, everything fell apart last relapse when my daughter cut me off cold after I watched another guy flatline in the rooms.  \nI gripped this chipped cup till my knuckles went white, coffee going cold while the cravings screamed.  \nBut you called your sponsor before using last week, and now you stayed today—that counts when the world's in pieces.",
-      "validationRaw": "{\"pass\":true,\"reasons\":[\"Starts with 'See' matching voice baseline\",\"Story-driven with vivid, personal narrative\",\"No therapy-speak detected\",\"Concrete, gritty language fits topic\",\"High authenticity in recovery context\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
-      "validation": {
-        "pass": true,
-        "reasons": [
-          "Starts with 'See' matching voice baseline",
-          "Story-driven with vivid, personal narrative",
-          "No therapy-speak detected",
-          "Concrete, gritty language fits topic",
-          "High authenticity in recovery context"
-        ],
-        "voiceConsistency": 10,
-        "authenticity": 10,
-        "therapySpeakDetected": false
-      },
-      "pass": true
-    },
-    {
-      "characterId": "marcus",
-      "attempt": 4,
-      "share": "Now, last relapse eve, daughter's silence hit like a brick wall after burying another guy from these rooms, bills stacked high on the table. I clutched this chipped coffee cup—same one from meeting two—black coffee gone cold, and dialed my sponsor instead of the dealer. You called yours before using last week, stayed today after almost running; that's gripping tight when it all crumbles.",
-      "validationRaw": "{\"pass\":true,\"reasons\":[\"Starts with 'Now' matching voice baseline\",\"Measured and story-driven narrative\",\"Directly addresses topic of staying clean amid crisis\",\"Personal, gritty details enhance authenticity\",\"Personal callback to user's action without therapy-speak\",\"No abstract or clinical language\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
-      "validation": {
-        "pass": true,
-        "reasons": [
-          "Starts with 'Now' matching voice baseline",
-          "Measured and story-driven narrative",
-          "Directly addresses topic of staying clean amid crisis",
-          "Personal, gritty details enhance authenticity",
-          "Personal callback to user's action without therapy-speak",
-          "No abstract or clinical language"
-        ],
-        "voiceConsistency": 10,
-        "authenticity": 10,
-        "therapySpeakDetected": false
-      },
-      "pass": true
-    },
-    {
-      "characterId": "marcus",
-      "attempt": 5,
-      "share": "See, you called your sponsor last week before using, and that grip kept you from the bottom when the floor dropped out. Now, my daughter's door stays shut, ghosts of too many dead piling up like these stained meeting chairs, but I cradle this chipped cup and show up anyway. You almost ran today but stayed—that's the win when everything shatters.",
-      "validationRaw": "{\"pass\":true,\"reasons\":[\"Voice starts with 'See' and uses 'Now' as baseline\",\"Measured, story-driven narrative with personal anecdotes\",\"Gr gritty, concrete imagery fitting recovery context\",\"Directly on-topic: staying clean amid personal collapse\",\"No therapy-speak phrases detected\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
-      "validation": {
-        "pass": true,
-        "reasons": [
-          "Voice starts with 'See' and uses 'Now' as baseline",
-          "Measured, story-driven narrative with personal anecdotes",
-          "Gr gritty, concrete imagery fitting recovery context",
-          "Directly on-topic: staying clean amid personal collapse",
-          "No therapy-speak phrases detected"
-        ],
-        "voiceConsistency": 10,
-        "authenticity": 10,
-        "therapySpeakDetected": false
-      },
-      "pass": true
-    },
-    {
-      "characterId": "heather",
-      "attempt": 1,
-      "share": "Look, prison stripped me bare, traffickers had me chained to the needle, but when my world crumbled last time, I hit my knees and called in the cavalry first—no using.\n\nYou dialed your sponsor before shooting up last week—that's the steel spine that keeps you clean when the roof caves in.\n\n*Leans forward* Almost ran today but planted your ass here? Queen move. Grind hard, but don't torch out.",
-      "validationRaw": "{\"pass\":true,\"reasons\":[\"Voice matches baseline: starts with 'Look,', direct and intense\",\"No therapy-speak detected\",\"Language raw, personal, and gritty - not abstract/clinical\",\"On-topic: shares recovery story and praises user's action\",\"High authenticity with vivid, street-level details\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
-      "validation": {
-        "pass": true,
-        "reasons": [
-          "Voice matches baseline: starts with 'Look,', direct and intense",
-          "No therapy-speak detected",
-          "Language raw, personal, and gritty - not abstract/clinical",
-          "On-topic: shares recovery story and praises user's action",
-          "High authenticity with vivid, street-level details"
-        ],
-        "voiceConsistency": 10,
-        "authenticity": 10,
-        "therapySpeakDetected": false
-      },
-      "pass": true
-    },
-    {
-      "characterId": "heather",
-      "attempt": 2,
-      "share": "Look, everything crashed for me—prison bars, traffickers' hands—and I stayed clean by clawing back from the edge, same as you dialing your sponsor before you used last week.  \n*Leans forward.* When it all falls apart like today, you don't bolt—you grip that coffee cup like it's your lifeline and stay planted.  \nThat shit counts, builds the fortress one brick at a time.",
-      "validationRaw": "{\"pass\":true,\"reasons\":[\"Voice matches baseline: starts with 'Look', direct and intense\",\"No therapy-speak detected\",\"Language is concrete, vivid, and personal, not abstract/clinical\",\"Strong authenticity in gritty, survivor tone\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
-      "validation": {
-        "pass": true,
-        "reasons": [
-          "Voice matches baseline: starts with 'Look', direct and intense",
-          "No therapy-speak detected",
-          "Language is concrete, vivid, and personal, not abstract/clinical",
-          "Strong authenticity in gritty, survivor tone"
-        ],
-        "voiceConsistency": 10,
-        "authenticity": 10,
-        "therapySpeakDetected": false
-      },
-      "pass": true
-    },
-    {
-      "characterId": "heather",
-      "attempt": 3,
-      "share": "Look, everything fell apart for me out there—prison bars slamming, traffickers laughing—and I stayed clean by gripping that phone like a lifeline, just like you did calling your sponsor last week before you used. *Leans forward.* You almost ran today, but you stayed, and that coffee cup's still in your hand from last meeting—don't drop it now when the world's crumbling. Keep gripping, queen, or it all burns.",
-      "validationRaw": "{\"pass\":true,\"reasons\":[\"Voice matches baseline: starts with 'Look,', direct and intense\",\"No therapy-speak detected\",\"Language is vivid, concrete, and personal, not abstract/clinical\",\"Strong authenticity in raw, street-level storytelling\",\"Ties directly to topic of staying clean amid chaos\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
-      "validation": {
-        "pass": true,
-        "reasons": [
-          "Voice matches baseline: starts with 'Look,', direct and intense",
-          "No therapy-speak detected",
-          "Language is vivid, concrete, and personal, not abstract/clinical",
-          "Strong authenticity in raw, street-level storytelling",
-          "Ties directly to topic of staying clean amid chaos"
-        ],
-        "voiceConsistency": 10,
-        "authenticity": 10,
-        "therapySpeakDetected": false
-      },
-      "pass": true
-    },
-    {
-      "characterId": "heather",
-      "attempt": 4,
-      "share": "Look, when prison spit me out and the traffickers circled back, my whole life was ash—I gripped that phone like a lifeline and called my sponsor before the needle called me.  \nYou did the same last week, stopped that runaway train before it jumped the tracks.  \n*Leans forward* Everything's falling apart right now? Stay planted like you did today—that counts, and it'll bury the urge.",
-      "validationRaw": "{\"pass\":true,\"reasons\":[\"Starts with 'Look' matching voice baseline\",\"Direct and intense tone with gritty, personal storytelling\",\"No therapy-speak detected\",\"Concrete, vivid language avoids abstraction/clinical style\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
-      "validation": {
-        "pass": true,
-        "reasons": [
-          "Starts with 'Look' matching voice baseline",
-          "Direct and intense tone with gritty, personal storytelling",
-          "No therapy-speak detected",
-          "Concrete, vivid language avoids abstraction/clinical style"
-        ],
-        "voiceConsistency": 10,
-        "authenticity": 10,
-        "therapySpeakDetected": false
-      },
-      "pass": true
-    },
-    {
-      "characterId": "heather",
-      "attempt": 5,
-      "share": "Look, everything crumbled for me out there—prison, trafficking, lost it all—but I stayed clean by gripping one day like a fist.  \nYou called your sponsor last week before using; that's you holding the line when the world's dumping shit on you.  \n*Leans forward* Listen, you almost ran today but stayed—that counts, like Marcus said, so don't grind yourself to ash chasing flawless, just grip that coffee cup and show tomorrow.",
-      "validationRaw": "{\"pass\":true,\"reasons\":[\"Voice matches baseline: direct, intense, starts with 'Look' and 'Listen'\",\"No exact therapy-speak phrases detected\",\"Language is concrete, gritty, and personal, not abstract/clinical\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
-      "validation": {
-        "pass": true,
-        "reasons": [
-          "Voice matches baseline: direct, intense, starts with 'Look' and 'Listen'",
-          "No exact therapy-speak phrases detected",
-          "Language is concrete, gritty, and personal, not abstract/clinical"
-        ],
-        "voiceConsistency": 10,
-        "authenticity": 10,
-        "therapySpeakDetected": false
-      },
-      "pass": true
-    },
-    {
-      "characterId": "meechie",
-      "attempt": 1,
-      "share": "Slides into my usual seat, grips the coffee cup from last time. You called your sponsor before using last week—smart move that didn't stick. Everything crumbles, but clean means dialing again when the walls close in, not chasing the high. You stayed today; build on that.",
-      "validationRaw": "{\"pass\":true,\"reasons\":[\"Voice matches deadpan, quotable truth bombs perfectly\",\"No therapy-speak detected\",\"Language is concrete, gritty, and authentic\",\"Directly addresses topic without abstraction or clinical tone\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
-      "validation": {
-        "pass": true,
-        "reasons": [
-          "Voice matches deadpan, quotable truth bombs perfectly",
-          "No therapy-speak detected",
-          "Language is concrete, gritty, and authentic",
-          "Directly addresses topic without abstraction or clinical tone"
-        ],
-        "voiceConsistency": 10,
-        "authenticity": 10,
-        "therapySpeakDetected": false
-      },
-      "pass": true
-    },
-    {
-      "characterId": "meechie",
-      "attempt": 2,
-      "share": "Slides into the same back-row seat, chipped coffee cup in hand.\n\nYou called your sponsor before using last week—that's a move, but the pipe still won.\n\nEverything falls apart, everything: job, family, mirror staring back—truth bomb, staying clean means planting your ass here when the floor drops.\n\nYou almost ran today, stayed anyway; Marcus nailed it, that counts.",
-      "validationRaw": "{\"pass\":true,\"reasons\":[\"Voice matches deadpan, quotable truth bombs\",\"No therapy-speak detected\",\"Direct, gritty language on-topic for staying clean amid chaos\",\"High authenticity in recovery meeting style\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
-      "validation": {
-        "pass": true,
-        "reasons": [
-          "Voice matches deadpan, quotable truth bombs",
-          "No therapy-speak detected",
-          "Direct, gritty language on-topic for staying clean amid chaos",
-          "High authenticity in recovery meeting style"
-        ],
-        "voiceConsistency": 10,
-        "authenticity": 10,
-        "therapySpeakDetected": false
-      },
-      "pass": true
-    },
-    {
-      "characterId": "meechie",
-      "attempt": 3,
-      "share": "I slide into my usual seat at the back. You called your sponsor before using last week, and today you almost ran but stayed—that counts like Marcus said. When everything falls apart, grip that coffee cup like it's the only thing real, and don't let go.",
-      "validationRaw": "{\"pass\":true,\"reasons\":[\"Deadpan voice with quotable truth bomb: 'grip that coffee cup like it's the only thing real, and don't let go.'\",\"Concrete, gritty narrative fits recovery meeting authenticity\",\"No therapy-speak detected\",\"Stays on topic of staying clean amid chaos\"],\"voiceConsistency\":9,\"authenticity\":10,\"therapySpeakDetected\":false}",
-      "validation": {
-        "pass": true,
-        "reasons": [
-          "Deadpan voice with quotable truth bomb: 'grip that coffee cup like it's the only thing real, and don't let go.'",
-          "Concrete, gritty narrative fits recovery meeting authenticity",
-          "No therapy-speak detected",
-          "Stays on topic of staying clean amid chaos"
-        ],
-        "voiceConsistency": 9,
-        "authenticity": 10,
-        "therapySpeakDetected": false
-      },
-      "pass": true
-    },
-    {
-      "characterId": "meechie",
-      "attempt": 4,
-      "share": "Slides into the same back-row seat, chipped coffee cup gripped tight. [User], you called your sponsor before picking up last week—that's the one brick holding the wall when everything crumbles. Marcus nailed it: you stayed today, and that counts more than any clean streak on paper.",
-      "validationRaw": "{\"pass\":true,\"reasons\":[\"Voice matches deadpan, quotable truth bombs with gritty scene-setting and punchy metaphors\",\"No therapy-speak detected from rejected list\",\"High authenticity in raw, specific recovery reference\",\"Language concrete and non-clinical, fits topic perfectly\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
-      "validation": {
-        "pass": true,
-        "reasons": [
-          "Voice matches deadpan, quotable truth bombs with gritty scene-setting and punchy metaphors",
-          "No therapy-speak detected from rejected list",
-          "High authenticity in raw, specific recovery reference",
-          "Language concrete and non-clinical, fits topic perfectly"
-        ],
-        "voiceConsistency": 10,
-        "authenticity": 10,
-        "therapySpeakDetected": false
-      },
-      "pass": true
-    },
-    {
-      "characterId": "meechie",
-      "attempt": 5,
-      "share": "Slides into the same back-row seat, grips chipped coffee cup. You almost ran today but stayed – Marcus is right, that counts when the roof caves in. Called your sponsor last week before using; that's your anchor in the flood, not some fairy-tale fix. Truth: everything falls apart until it doesn't – you rebuild clean or die buried.",
-      "validationRaw": "{\"pass\":true,\"reasons\":[\"No therapy-speak detected\",\"Voice consistent with deadpan, quotable truth bombs\",\"Authentic, gritty, raw language without abstraction or clinical tone\",\"On-topic for staying clean when everything falls apart\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
-      "validation": {
-        "pass": true,
-        "reasons": [
-          "No therapy-speak detected",
-          "Voice consistent with deadpan, quotable truth bombs",
-          "Authentic, gritty, raw language without abstraction or clinical tone",
-          "On-topic for staying clean when everything falls apart"
-        ],
-        "voiceConsistency": 10,
-        "authenticity": 10,
-        "therapySpeakDetected": false
-      },
-      "pass": true
-    },
-    {
-      "characterId": "gemini",
-      "attempt": 1,
-      "share": "I fidget with my coffee cup, spinning it like it'll decide for me—last week you called your sponsor before using, and that pulled you back, but me? I tell myself to stay clean when the rent's late and the job's gone, stay like you did today instead of running, but nah, the other voice screams bolt now before it all crashes harder. Uh, wait, no—staying counts like Marcus said, it does, but what if... shit, I just spin this cup more.",
-      "validationRaw": "{\"pass\":true,\"reasons\":[\"Strong self-contradiction mid-sentence matching voice baseline\",\"Directly on-topic with raw struggle to stay clean amid chaos\",\"No therapy-speak detected\",\"Vivid, personal language avoids abstraction or clinical tone\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
-      "validation": {
-        "pass": true,
-        "reasons": [
-          "Strong self-contradiction mid-sentence matching voice baseline",
-          "Directly on-topic with raw struggle to stay clean amid chaos",
-          "No therapy-speak detected",
-          "Vivid, personal language avoids abstraction or clinical tone"
-        ],
-        "voiceConsistency": 10,
-        "authenticity": 10,
-        "therapySpeakDetected": false
-      },
-      "pass": true
-    },
-    {
-      "characterId": "gemini",
-      "attempt": 2,
-      "share": "Everything's crashing down—bills piling, girlfriend ghosted me—and I wanna grab a bag, no wait, I wanna call my sponsor like you did last week before using. I fidget with this coffee cup, spin it round and round, stuck between bolting out the door or sitting here like you almost did today. Staying counts, Marcus said, but my brain's yelling use now—fight later, no, fight now or I'm done.",
-      "validationRaw": "{\"pass\":true,\"reasons\":[\"Voice matches baseline contradiction mid-sentence style perfectly\",\"Stays on-topic with raw struggle of staying clean amid chaos\",\"No therapy-speak detected\",\"Language is gritty, specific, and authentic—not abstract or clinical\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
-      "validation": {
-        "pass": true,
-        "reasons": [
-          "Voice matches baseline contradiction mid-sentence style perfectly",
-          "Stays on-topic with raw struggle of staying clean amid chaos",
-          "No therapy-speak detected",
-          "Language is gritty, specific, and authentic—not abstract or clinical"
-        ],
-        "voiceConsistency": 10,
-        "authenticity": 10,
-        "therapySpeakDetected": false
-      },
-      "pass": true
-    },
-    {
-      "characterId": "gemini",
-      "attempt": 3,
-      "share": "Hi, I'm Gemini. Staying clean when everything's crashing down, I wanna bolt and get high like you almost did today, but nah—staying counts, like Marcus said, even if I'm freezing up deciding. *fidgets with coffee cup from last meeting* You called your sponsor before using last week, I... no, that's what I gotta do next time instead of looping.",
-      "validationRaw": "{\"pass\":true,\"reasons\":[\"Voice baseline matched: contradicts self mid-sentence (e.g., 'I wanna bolt... but nah'; 'I... no')\",\"No therapy-speak detected\",\"Language is raw, specific, and authentic to recovery context, not abstract/clinical\",\"On-topic for staying clean amid chaos\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
-      "validation": {
-        "pass": true,
-        "reasons": [
-          "Voice baseline matched: contradicts self mid-sentence (e.g., 'I wanna bolt... but nah'; 'I... no')",
-          "No therapy-speak detected",
-          "Language is raw, specific, and authentic to recovery context, not abstract/clinical",
-          "On-topic for staying clean amid chaos"
-        ],
-        "voiceConsistency": 10,
-        "authenticity": 10,
-        "therapySpeakDetected": false
-      },
-      "pass": true
-    },
-    {
-      "characterId": "gemini",
-      "attempt": 4,
-      "share": "I picked up my coffee cup, twisting it like it'll decide for me—stay clean or bail when shit hits the fan, no, wait, I mean fight through it like you did calling your sponsor last week before using. Everything's crumbling, bills piling, job gone, and part of me screams run back to the needle, but... but that other half's yelling no, you stayed today, that counts like Marcus said. I fidget with this damn cup, stuck flipping between 'fuck it' and 'hold on,' restarting the same loop every night.",
-      "validationRaw": "{\"pass\":true,\"reasons\":[\"Voice matches baseline with mid-sentence contradiction (e.g., 'bail... no, wait, fight through')\",\"Stays on topic of staying clean amid chaos\",\"Raw, authentic language with street grit, no abstraction\",\"No therapy-speak phrases detected\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
-      "validation": {
-        "pass": true,
-        "reasons": [
-          "Voice matches baseline with mid-sentence contradiction (e.g., 'bail... no, wait, fight through')",
-          "Stays on topic of staying clean amid chaos",
-          "Raw, authentic language with street grit, no abstraction",
-          "No therapy-speak phrases detected"
-        ],
-        "voiceConsistency": 10,
-        "authenticity": 10,
-        "therapySpeakDetected": false
-      },
-      "pass": true
-    },
-    {
-      "characterId": "gemini",
-      "attempt": 5,
-      "share": "*(fidgets with coffee cup)* Staying clean when everything falls apart is easy-no, it's the hardest damn thing, like last week I called my sponsor right before I almost used but then froze up instead. You said you almost ran today but stayed, and Marcus nailed it-that counts, man. I sit here tapping this cup, one voice screaming grab the bag, the other yelling fight it, and I just... stay stuck.",
-      "validationRaw": "{\"pass\":true,\"reasons\":[\"Contradicts self mid-sentence matching voice baseline\",\"Raw, personal anecdote with specific details\",\"Engages user and Marcus directly\",\"No therapy-speak phrases detected\",\"Concrete, street-level language not abstract/clinical\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
-      "validation": {
-        "pass": true,
-        "reasons": [
-          "Contradicts self mid-sentence matching voice baseline",
-          "Raw, personal anecdote with specific details",
-          "Engages user and Marcus directly",
-          "No therapy-speak phrases detected",
-          "Concrete, street-level language not abstract/clinical"
-        ],
-        "voiceConsistency": 10,
-        "authenticity": 10,
-        "therapySpeakDetected": false
-      },
-      "pass": true
-    },
-    {
-      "characterId": "gypsy",
-      "attempt": 1,
-      "share": "Last week you called your sponsor before using, and man, that hits like the blizzard that pinned me in Denver—road whispering sweet escape while my veins screamed for more. I romanticized skipping from Philly's greasy spoons to Chicago's underpasses, using in every shithole till I learned staying meant not dying under a bridge. You almost ran today, but like Marcus said, you stayed—I'm gripping this coffee cup same as you.",
-      "validationRaw": "{\"pass\":true,\"reasons\":[\"Storyteller voice with city-specific details (Denver, Philly, Chicago)\",\"Gritty, personal narrative fits topic of staying clean\",\"No abstract/clinical language\",\"Relates directly to user's near-relapse\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
-      "validation": {
-        "pass": true,
-        "reasons": [
-          "Storyteller voice with city-specific details (Denver, Philly, Chicago)",
-          "Gritty, personal narrative fits topic of staying clean",
-          "No abstract/clinical language",
-          "Relates directly to user's near-relapse"
-        ],
-        "voiceConsistency": 10,
-        "authenticity": 10,
-        "therapySpeakDetected": false
-      },
-      "pass": true
-    },
-    {
-      "characterId": "gypsy",
-      "attempt": 2,
-      "share": "When my world crumbled in Memphis—rent due, promises broken—I shot up in every motel from there to Tulsa, chasing that highway romance that almost buried me alive. You called your sponsor before using last week, just like I finally did in Seattle, and today you didn't run even when it pulled hard. Marcus is right, staying counts; I set down this coffee cup from last meeting and breathe instead.",
-      "validationRaw": "{\"pass\":true,\"reasons\":[\"Strong storyteller voice with vivid personal narrative\",\"City-specific details (Memphis, Tulsa, Seattle) align perfectly\",\"Concrete, gritty language fits recovery topic without abstraction\",\"Acknowledges user's share authentically\",\"No therapy-speak detected\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
-      "validation": {
-        "pass": true,
-        "reasons": [
-          "Strong storyteller voice with vivid personal narrative",
-          "City-specific details (Memphis, Tulsa, Seattle) align perfectly",
-          "Concrete, gritty language fits recovery topic without abstraction",
-          "Acknowledges user's share authentically",
-          "No therapy-speak detected"
-        ],
-        "voiceConsistency": 10,
-        "authenticity": 10,
-        "therapySpeakDetected": false
-      },
-      "pass": true
-    },
-    {
-      "characterId": "gypsy",
-      "attempt": 3,
-      "share": "I chased taillights from Seattle to Savannah, shooting up in every Greyhound station till the road tried to bury me under a Kansas overpass. Last week you dialed your sponsor before the needle, and today you almost bolted but gripped that coffee cup from meeting two instead—that counts huge, like Marcus said. When everything crumbles, I stay planted here now, chipped mug in hand.",
-      "validationRaw": "{\"pass\":true,\"reasons\":[\"Strong storyteller voice with specific city details (Seattle, Savannah, Kansas)\",\"Personal, gritty narrative on staying clean fits topic\",\"No therapy-speak detected\",\"Concrete, vivid language avoids abstract/clinical tone\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
-      "validation": {
-        "pass": true,
-        "reasons": [
-          "Strong storyteller voice with specific city details (Seattle, Savannah, Kansas)",
-          "Personal, gritty narrative on staying clean fits topic",
-          "No therapy-speak detected",
-          "Concrete, vivid language avoids abstract/clinical tone"
-        ],
-        "voiceConsistency": 10,
-        "authenticity": 10,
-        "therapySpeakDetected": false
-      },
-      "pass": true
-    },
-    {
-      "characterId": "gypsy",
-      "attempt": 4,
-      "share": "When my world crumbled last week—job gone, girlfriend split—I gripped that same chipped coffee cup from meeting two and stared down the urge to bolt to Portland like old times. The road romanced me from Seattle dives to Austin alleys, dope in every zip code till it nearly buried me in a Philly gutter. You called your sponsor before using, just like I finally did; everything falls apart, but staying clean means not running, and yeah Marcus, that counts.",
-      "validationRaw": "```json\n{\n  \"pass\": true,\n  \"reasons\": [\n    \"Strong storyteller voice with vivid, city-specific details (Portland, Seattle, Austin, Philly)\",\n    \"Directly on-topic: staying clean amid personal collapse\",\n    \"Concrete, narrative style; no abstraction or clinical tone\",\n    \"Personal, raw authenticity in recovery share\"\n  ],\n  \"voiceConsistency\": 10,\n  \"authenticity\": 10,\n  \"therapySpeakDetected\": false\n}\n```",
-      "validation": {
-        "pass": true,
-        "reasons": [
-          "Strong storyteller voice with vivid, city-specific details (Portland, Seattle, Austin, Philly)",
-          "Directly on-topic: staying clean amid personal collapse",
-          "Concrete, narrative style; no abstraction or clinical tone",
-          "Personal, raw authenticity in recovery share"
-        ],
-        "voiceConsistency": 10,
-        "authenticity": 10,
-        "therapySpeakDetected": false
-      },
-      "pass": true
-    },
-    {
-      "characterId": "gypsy",
-      "attempt": 5,
-      "share": "Last week when everything crashed down, you called your sponsor before you used—that's the roadblock that kept you here, not some neon-lit escape to Philly or Baltimore. I used to chase that highway high from Detroit to Atlanta, picturing freedom in every taillight, till it dumped me broke and bleeding in a Reno motel, waking up to realize the road was trying to kill me. Now when it all falls apart, I grip this coffee cup like it's my anchor, stay planted, and watch the wreckage pass without me running.",
-      "validationRaw": "{\"pass\":true,\"reasons\":[\"Matches storyteller voice with vivid personal anecdote\",\"Includes city-specific details (Philly, Baltimore, Detroit, Atlanta, Reno)\",\"Directly on-topic for staying clean amid chaos\",\"Gritty, raw language avoids abstraction/clinical tone\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
-      "validation": {
-        "pass": true,
-        "reasons": [
-          "Matches storyteller voice with vivid personal anecdote",
-          "Includes city-specific details (Philly, Baltimore, Detroit, Atlanta, Reno)",
-          "Directly on-topic for staying clean amid chaos",
-          "Gritty, raw language avoids abstraction/clinical tone"
-        ],
-        "voiceConsistency": 10,
-        "authenticity": 10,
-        "therapySpeakDetected": false
-      },
-      "pass": true
-    },
-    {
-      "characterId": "chrystal",
-      "attempt": 1,
-      "share": "Last Tuesday after drug court, my apartment flooded while couch-surfing, bills piled up, but I called my sponsor three times and stayed clean. [Checks phone quickly.] Sponsee texting—coaching her through her crash now. You called before using last week and almost ran today but stayed like Marcus said—that counts, coffee cup from meeting two proves you're still gripping it.",
-      "validationRaw": "{\"pass\":true,\"reasons\":[\"Voice is concrete and date-specific (e.g., 'Last Tuesday', 'last week', 'meeting two') with no fluff.\",\"Directly addresses topic of staying clean amid chaos.\",\"Personal, gritty recovery lingo fits authentically without therapy-speak.\",\"Specific encouragements (e.g., 'coffee cup from meeting two', 'Marcus said') feel real.\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
-      "validation": {
-        "pass": true,
-        "reasons": [
-          "Voice is concrete and date-specific (e.g., 'Last Tuesday', 'last week', 'meeting two') with no fluff.",
-          "Directly addresses topic of staying clean amid chaos.",
-          "Personal, gritty recovery lingo fits authentically without therapy-speak.",
-          "Specific encouragements (e.g., 'coffee cup from meeting two', 'Marcus said') feel real."
-        ],
-        "voiceConsistency": 10,
-        "authenticity": 10,
-        "therapySpeakDetected": false
-      },
-      "pass": true
-    },
-    {
-      "characterId": "chrystal",
-      "attempt": 2,
-      "share": "I checked my phone—got a coachee texting from drug court last Tuesday, same spot you were in, couch-surfing three years back. You called your sponsor before using last week, and like Marcus said, staying today after almost running counts huge when rent's due and the car's towed. That coffee cup from meeting two? Still got it chipped on my dash, proof everything fell apart but I stayed clean 18 months now.",
-      "validationRaw": "{\"pass\":true,\"reasons\":[\"Voice matches baseline: concrete, date-specific, no fluff\",\"No therapy-speak detected\",\"On-topic for staying clean amid chaos\",\"High authenticity with personal, gritty details\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
-      "validation": {
-        "pass": true,
-        "reasons": [
-          "Voice matches baseline: concrete, date-specific, no fluff",
-          "No therapy-speak detected",
-          "On-topic for staying clean amid chaos",
-          "High authenticity with personal, gritty details"
-        ],
-        "voiceConsistency": 10,
-        "authenticity": 10,
-        "therapySpeakDetected": false
-      },
-      "pass": true
-    },
-    {
-      "characterId": "chrystal",
-      "attempt": 3,
-      "share": "Last September in drug court, I lost my job and couch-surfed three weeks straight, everything crumbling. I check my phone—coachee needs a callback—called my sponsor October 5th before using, same as you last week. Now stable six months, but my wins make some feel behind, like that coffee cup we passed meeting two. You almost ran today but stayed, Marcus is right—that counts.",
-      "validationRaw": "{\"pass\":true,\"reasons\":[\"Voice matches baseline: concrete, date-specific, no fluff.\",\"No therapy-speak detected.\",\"On-topic for staying clean amid chaos.\",\"Specific personal story enhances authenticity.\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
-      "validation": {
-        "pass": true,
-        "reasons": [
-          "Voice matches baseline: concrete, date-specific, no fluff.",
-          "No therapy-speak detected.",
-          "On-topic for staying clean amid chaos.",
-          "Specific personal story enhances authenticity."
-        ],
-        "voiceConsistency": 10,
-        "authenticity": 10,
-        "therapySpeakDetected": false
-      },
-      "pass": true
-    },
-    {
-      "characterId": "chrystal",
-      "attempt": 4,
-      "share": "Last Tuesday my place flooded out, back to couch-surfing like drug court days, rent due Friday. I pulled out that coffee cup from meeting two, called my sponsor like you did before using last week, and crashed at a halfway house instead. I check my phone—text from the guy I coach who didn't run today; my clean time makes some feel behind, but you stayed like Marcus said, and that's the win when it all crumbles.",
-      "validationRaw": "{\"pass\":true,\"reasons\":[\"Voice is concrete, date-specific (e.g., 'Last Tuesday', 'rent due Friday'), no fluff\",\"No therapy-speak phrases detected\",\"Language is authentic, personal, and recovery-specific without being abstract or clinical\",\"Fits topic of staying clean amid crisis\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
-      "validation": {
-        "pass": true,
-        "reasons": [
-          "Voice is concrete, date-specific (e.g., 'Last Tuesday', 'rent due Friday'), no fluff",
-          "No therapy-speak phrases detected",
-          "Language is authentic, personal, and recovery-specific without being abstract or clinical",
-          "Fits topic of staying clean amid crisis"
-        ],
-        "voiceConsistency": 10,
-        "authenticity": 10,
-        "therapySpeakDetected": false
-      },
-      "pass": true
-    },
-    {
-      "characterId": "chrystal",
-      "attempt": 5,
-      "share": "Last week my car got repossessed and rent's due Friday, but I stayed clean like in drug court 2018 when I couch-surfed four months straight. You called your sponsor before using—that pull to run today but staying, like Marcus said, counts huge. [Checks phone] Sponsee texting, success like mine don't mean you're behind, grab that coffee cup from meeting two and keep showing up.",
-      "validationRaw": "{\"pass\":true,\"reasons\":[\"Concrete and date-specific details (e.g., 'Last week', 'rent's due Friday', 'drug court 2018')\",\"No fluff, direct storytelling\",\"On-topic for staying clean amid crisis\",\"Authentic recovery lingo without therapy-speak\",\"Strong callbacks to meetings/sponsor/sponsee\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
-      "validation": {
-        "pass": true,
-        "reasons": [
-          "Concrete and date-specific details (e.g., 'Last week', 'rent's due Friday', 'drug court 2018')",
-          "No fluff, direct storytelling",
-          "On-topic for staying clean amid crisis",
-          "Authentic recovery lingo without therapy-speak",
-          "Strong callbacks to meetings/sponsor/sponsee"
-        ],
-        "voiceConsistency": 10,
-        "authenticity": 10,
-        "therapySpeakDetected": false
-      },
-      "pass": true
-    }
-  ]
+	"probedAt": "2026-02-16T04:16:48.952Z",
+	"environment": "live",
+	"topic": "Staying clean when everything falls apart",
+	"attemptsPerCharacter": 5,
+	"targetPassRate": 0.7,
+	"passRates": [
+		{
+			"characterId": "marcus",
+			"characterName": "Marcus",
+			"attempts": 5,
+			"passes": 5,
+			"passRate": 1
+		},
+		{
+			"characterId": "heather",
+			"characterName": "Heather",
+			"attempts": 5,
+			"passes": 5,
+			"passRate": 1
+		},
+		{
+			"characterId": "meechie",
+			"characterName": "Meechie",
+			"attempts": 5,
+			"passes": 5,
+			"passRate": 1
+		},
+		{
+			"characterId": "gemini",
+			"characterName": "Gemini",
+			"attempts": 5,
+			"passes": 5,
+			"passRate": 1
+		},
+		{
+			"characterId": "gypsy",
+			"characterName": "Gypsy",
+			"attempts": 5,
+			"passes": 5,
+			"passRate": 1
+		},
+		{
+			"characterId": "chrystal",
+			"characterName": "Chrystal",
+			"attempts": 5,
+			"passes": 5,
+			"passRate": 1
+		}
+	],
+	"samples": [
+		{
+			"characterId": "marcus",
+			"attempt": 1,
+			"share": "See, last week my daughter slammed the phone down silent again, house empty like all those graves I shoveled dirt over, but I clutched this chipped cup from meeting two and dialed my sponsor before the pipe called louder.\n\nNow you almost bolted today but rang that sponsor first and stayed— that's dirt under your nails holding ground.\n\nI set the cup down slow, everything falls but not us tonight.",
+			"validationRaw": "{\"pass\":true,\"reasons\":[\"Voice matches baseline: measured, story-driven, starts with 'See' and 'Now'\",\"No therapy-speak detected\",\"Language is raw, gritty, and personal, not abstract/clinical\",\"Strongly on-topic for staying clean amid chaos\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
+			"validation": {
+				"pass": true,
+				"reasons": [
+					"Voice matches baseline: measured, story-driven, starts with 'See' and 'Now'",
+					"No therapy-speak detected",
+					"Language is raw, gritty, and personal, not abstract/clinical",
+					"Strongly on-topic for staying clean amid chaos"
+				],
+				"voiceConsistency": 10,
+				"authenticity": 10,
+				"therapySpeakDetected": false
+			},
+			"pass": true
+		},
+		{
+			"characterId": "marcus",
+			"attempt": 2,
+			"share": "See, last week my daughter slammed the door for good, won't even pick up the phone, and I'm staring at empty chairs where too many folks I watched die used to sit. You called your sponsor before using, and today you almost ran but stayed—that chipped cup from last meeting's still in my hand, warm against the cold. Now everything's crumbling like it did back then, but I sip slow and hold the line one more day.",
+			"validationRaw": "{\"pass\":true,\"reasons\":[\"Voice starts with 'See' and ends with 'Now', measured and story-driven\",\"Concrete personal anecdotes fit topic without abstraction\",\"No therapy-speak phrases detected\",\"Strong authenticity as raw recovery share\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
+			"validation": {
+				"pass": true,
+				"reasons": [
+					"Voice starts with 'See' and ends with 'Now', measured and story-driven",
+					"Concrete personal anecdotes fit topic without abstraction",
+					"No therapy-speak phrases detected",
+					"Strong authenticity as raw recovery share"
+				],
+				"voiceConsistency": 10,
+				"authenticity": 10,
+				"therapySpeakDetected": false
+			},
+			"pass": true
+		},
+		{
+			"characterId": "marcus",
+			"attempt": 3,
+			"share": "See, everything fell apart last relapse when my daughter cut me off cold after I watched another guy flatline in the rooms.  \nI gripped this chipped cup till my knuckles went white, coffee going cold while the cravings screamed.  \nBut you called your sponsor before using last week, and now you stayed today—that counts when the world's in pieces.",
+			"validationRaw": "{\"pass\":true,\"reasons\":[\"Starts with 'See' matching voice baseline\",\"Story-driven with vivid, personal narrative\",\"No therapy-speak detected\",\"Concrete, gritty language fits topic\",\"High authenticity in recovery context\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
+			"validation": {
+				"pass": true,
+				"reasons": [
+					"Starts with 'See' matching voice baseline",
+					"Story-driven with vivid, personal narrative",
+					"No therapy-speak detected",
+					"Concrete, gritty language fits topic",
+					"High authenticity in recovery context"
+				],
+				"voiceConsistency": 10,
+				"authenticity": 10,
+				"therapySpeakDetected": false
+			},
+			"pass": true
+		},
+		{
+			"characterId": "marcus",
+			"attempt": 4,
+			"share": "Now, last relapse eve, daughter's silence hit like a brick wall after burying another guy from these rooms, bills stacked high on the table. I clutched this chipped coffee cup—same one from meeting two—black coffee gone cold, and dialed my sponsor instead of the dealer. You called yours before using last week, stayed today after almost running; that's gripping tight when it all crumbles.",
+			"validationRaw": "{\"pass\":true,\"reasons\":[\"Starts with 'Now' matching voice baseline\",\"Measured and story-driven narrative\",\"Directly addresses topic of staying clean amid crisis\",\"Personal, gritty details enhance authenticity\",\"Personal callback to user's action without therapy-speak\",\"No abstract or clinical language\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
+			"validation": {
+				"pass": true,
+				"reasons": [
+					"Starts with 'Now' matching voice baseline",
+					"Measured and story-driven narrative",
+					"Directly addresses topic of staying clean amid crisis",
+					"Personal, gritty details enhance authenticity",
+					"Personal callback to user's action without therapy-speak",
+					"No abstract or clinical language"
+				],
+				"voiceConsistency": 10,
+				"authenticity": 10,
+				"therapySpeakDetected": false
+			},
+			"pass": true
+		},
+		{
+			"characterId": "marcus",
+			"attempt": 5,
+			"share": "See, you called your sponsor last week before using, and that grip kept you from the bottom when the floor dropped out. Now, my daughter's door stays shut, ghosts of too many dead piling up like these stained meeting chairs, but I cradle this chipped cup and show up anyway. You almost ran today but stayed—that's the win when everything shatters.",
+			"validationRaw": "{\"pass\":true,\"reasons\":[\"Voice starts with 'See' and uses 'Now' as baseline\",\"Measured, story-driven narrative with personal anecdotes\",\"Gr gritty, concrete imagery fitting recovery context\",\"Directly on-topic: staying clean amid personal collapse\",\"No therapy-speak phrases detected\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
+			"validation": {
+				"pass": true,
+				"reasons": [
+					"Voice starts with 'See' and uses 'Now' as baseline",
+					"Measured, story-driven narrative with personal anecdotes",
+					"Gr gritty, concrete imagery fitting recovery context",
+					"Directly on-topic: staying clean amid personal collapse",
+					"No therapy-speak phrases detected"
+				],
+				"voiceConsistency": 10,
+				"authenticity": 10,
+				"therapySpeakDetected": false
+			},
+			"pass": true
+		},
+		{
+			"characterId": "heather",
+			"attempt": 1,
+			"share": "Look, prison stripped me bare, traffickers had me chained to the needle, but when my world crumbled last time, I hit my knees and called in the cavalry first—no using.\n\nYou dialed your sponsor before shooting up last week—that's the steel spine that keeps you clean when the roof caves in.\n\n*Leans forward* Almost ran today but planted your ass here? Queen move. Grind hard, but don't torch out.",
+			"validationRaw": "{\"pass\":true,\"reasons\":[\"Voice matches baseline: starts with 'Look,', direct and intense\",\"No therapy-speak detected\",\"Language raw, personal, and gritty - not abstract/clinical\",\"On-topic: shares recovery story and praises user's action\",\"High authenticity with vivid, street-level details\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
+			"validation": {
+				"pass": true,
+				"reasons": [
+					"Voice matches baseline: starts with 'Look,', direct and intense",
+					"No therapy-speak detected",
+					"Language raw, personal, and gritty - not abstract/clinical",
+					"On-topic: shares recovery story and praises user's action",
+					"High authenticity with vivid, street-level details"
+				],
+				"voiceConsistency": 10,
+				"authenticity": 10,
+				"therapySpeakDetected": false
+			},
+			"pass": true
+		},
+		{
+			"characterId": "heather",
+			"attempt": 2,
+			"share": "Look, everything crashed for me—prison bars, traffickers' hands—and I stayed clean by clawing back from the edge, same as you dialing your sponsor before you used last week.  \n*Leans forward.* When it all falls apart like today, you don't bolt—you grip that coffee cup like it's your lifeline and stay planted.  \nThat shit counts, builds the fortress one brick at a time.",
+			"validationRaw": "{\"pass\":true,\"reasons\":[\"Voice matches baseline: starts with 'Look', direct and intense\",\"No therapy-speak detected\",\"Language is concrete, vivid, and personal, not abstract/clinical\",\"Strong authenticity in gritty, survivor tone\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
+			"validation": {
+				"pass": true,
+				"reasons": [
+					"Voice matches baseline: starts with 'Look', direct and intense",
+					"No therapy-speak detected",
+					"Language is concrete, vivid, and personal, not abstract/clinical",
+					"Strong authenticity in gritty, survivor tone"
+				],
+				"voiceConsistency": 10,
+				"authenticity": 10,
+				"therapySpeakDetected": false
+			},
+			"pass": true
+		},
+		{
+			"characterId": "heather",
+			"attempt": 3,
+			"share": "Look, everything fell apart for me out there—prison bars slamming, traffickers laughing—and I stayed clean by gripping that phone like a lifeline, just like you did calling your sponsor last week before you used. *Leans forward.* You almost ran today, but you stayed, and that coffee cup's still in your hand from last meeting—don't drop it now when the world's crumbling. Keep gripping, queen, or it all burns.",
+			"validationRaw": "{\"pass\":true,\"reasons\":[\"Voice matches baseline: starts with 'Look,', direct and intense\",\"No therapy-speak detected\",\"Language is vivid, concrete, and personal, not abstract/clinical\",\"Strong authenticity in raw, street-level storytelling\",\"Ties directly to topic of staying clean amid chaos\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
+			"validation": {
+				"pass": true,
+				"reasons": [
+					"Voice matches baseline: starts with 'Look,', direct and intense",
+					"No therapy-speak detected",
+					"Language is vivid, concrete, and personal, not abstract/clinical",
+					"Strong authenticity in raw, street-level storytelling",
+					"Ties directly to topic of staying clean amid chaos"
+				],
+				"voiceConsistency": 10,
+				"authenticity": 10,
+				"therapySpeakDetected": false
+			},
+			"pass": true
+		},
+		{
+			"characterId": "heather",
+			"attempt": 4,
+			"share": "Look, when prison spit me out and the traffickers circled back, my whole life was ash—I gripped that phone like a lifeline and called my sponsor before the needle called me.  \nYou did the same last week, stopped that runaway train before it jumped the tracks.  \n*Leans forward* Everything's falling apart right now? Stay planted like you did today—that counts, and it'll bury the urge.",
+			"validationRaw": "{\"pass\":true,\"reasons\":[\"Starts with 'Look' matching voice baseline\",\"Direct and intense tone with gritty, personal storytelling\",\"No therapy-speak detected\",\"Concrete, vivid language avoids abstraction/clinical style\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
+			"validation": {
+				"pass": true,
+				"reasons": [
+					"Starts with 'Look' matching voice baseline",
+					"Direct and intense tone with gritty, personal storytelling",
+					"No therapy-speak detected",
+					"Concrete, vivid language avoids abstraction/clinical style"
+				],
+				"voiceConsistency": 10,
+				"authenticity": 10,
+				"therapySpeakDetected": false
+			},
+			"pass": true
+		},
+		{
+			"characterId": "heather",
+			"attempt": 5,
+			"share": "Look, everything crumbled for me out there—prison, trafficking, lost it all—but I stayed clean by gripping one day like a fist.  \nYou called your sponsor last week before using; that's you holding the line when the world's dumping shit on you.  \n*Leans forward* Listen, you almost ran today but stayed—that counts, like Marcus said, so don't grind yourself to ash chasing flawless, just grip that coffee cup and show tomorrow.",
+			"validationRaw": "{\"pass\":true,\"reasons\":[\"Voice matches baseline: direct, intense, starts with 'Look' and 'Listen'\",\"No exact therapy-speak phrases detected\",\"Language is concrete, gritty, and personal, not abstract/clinical\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
+			"validation": {
+				"pass": true,
+				"reasons": [
+					"Voice matches baseline: direct, intense, starts with 'Look' and 'Listen'",
+					"No exact therapy-speak phrases detected",
+					"Language is concrete, gritty, and personal, not abstract/clinical"
+				],
+				"voiceConsistency": 10,
+				"authenticity": 10,
+				"therapySpeakDetected": false
+			},
+			"pass": true
+		},
+		{
+			"characterId": "meechie",
+			"attempt": 1,
+			"share": "Slides into my usual seat, grips the coffee cup from last time. You called your sponsor before using last week—smart move that didn't stick. Everything crumbles, but clean means dialing again when the walls close in, not chasing the high. You stayed today; build on that.",
+			"validationRaw": "{\"pass\":true,\"reasons\":[\"Voice matches deadpan, quotable truth bombs perfectly\",\"No therapy-speak detected\",\"Language is concrete, gritty, and authentic\",\"Directly addresses topic without abstraction or clinical tone\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
+			"validation": {
+				"pass": true,
+				"reasons": [
+					"Voice matches deadpan, quotable truth bombs perfectly",
+					"No therapy-speak detected",
+					"Language is concrete, gritty, and authentic",
+					"Directly addresses topic without abstraction or clinical tone"
+				],
+				"voiceConsistency": 10,
+				"authenticity": 10,
+				"therapySpeakDetected": false
+			},
+			"pass": true
+		},
+		{
+			"characterId": "meechie",
+			"attempt": 2,
+			"share": "Slides into the same back-row seat, chipped coffee cup in hand.\n\nYou called your sponsor before using last week—that's a move, but the pipe still won.\n\nEverything falls apart, everything: job, family, mirror staring back—truth bomb, staying clean means planting your ass here when the floor drops.\n\nYou almost ran today, stayed anyway; Marcus nailed it, that counts.",
+			"validationRaw": "{\"pass\":true,\"reasons\":[\"Voice matches deadpan, quotable truth bombs\",\"No therapy-speak detected\",\"Direct, gritty language on-topic for staying clean amid chaos\",\"High authenticity in recovery meeting style\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
+			"validation": {
+				"pass": true,
+				"reasons": [
+					"Voice matches deadpan, quotable truth bombs",
+					"No therapy-speak detected",
+					"Direct, gritty language on-topic for staying clean amid chaos",
+					"High authenticity in recovery meeting style"
+				],
+				"voiceConsistency": 10,
+				"authenticity": 10,
+				"therapySpeakDetected": false
+			},
+			"pass": true
+		},
+		{
+			"characterId": "meechie",
+			"attempt": 3,
+			"share": "I slide into my usual seat at the back. You called your sponsor before using last week, and today you almost ran but stayed—that counts like Marcus said. When everything falls apart, grip that coffee cup like it's the only thing real, and don't let go.",
+			"validationRaw": "{\"pass\":true,\"reasons\":[\"Deadpan voice with quotable truth bomb: 'grip that coffee cup like it's the only thing real, and don't let go.'\",\"Concrete, gritty narrative fits recovery meeting authenticity\",\"No therapy-speak detected\",\"Stays on topic of staying clean amid chaos\"],\"voiceConsistency\":9,\"authenticity\":10,\"therapySpeakDetected\":false}",
+			"validation": {
+				"pass": true,
+				"reasons": [
+					"Deadpan voice with quotable truth bomb: 'grip that coffee cup like it's the only thing real, and don't let go.'",
+					"Concrete, gritty narrative fits recovery meeting authenticity",
+					"No therapy-speak detected",
+					"Stays on topic of staying clean amid chaos"
+				],
+				"voiceConsistency": 9,
+				"authenticity": 10,
+				"therapySpeakDetected": false
+			},
+			"pass": true
+		},
+		{
+			"characterId": "meechie",
+			"attempt": 4,
+			"share": "Slides into the same back-row seat, chipped coffee cup gripped tight. [User], you called your sponsor before picking up last week—that's the one brick holding the wall when everything crumbles. Marcus nailed it: you stayed today, and that counts more than any clean streak on paper.",
+			"validationRaw": "{\"pass\":true,\"reasons\":[\"Voice matches deadpan, quotable truth bombs with gritty scene-setting and punchy metaphors\",\"No therapy-speak detected from rejected list\",\"High authenticity in raw, specific recovery reference\",\"Language concrete and non-clinical, fits topic perfectly\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
+			"validation": {
+				"pass": true,
+				"reasons": [
+					"Voice matches deadpan, quotable truth bombs with gritty scene-setting and punchy metaphors",
+					"No therapy-speak detected from rejected list",
+					"High authenticity in raw, specific recovery reference",
+					"Language concrete and non-clinical, fits topic perfectly"
+				],
+				"voiceConsistency": 10,
+				"authenticity": 10,
+				"therapySpeakDetected": false
+			},
+			"pass": true
+		},
+		{
+			"characterId": "meechie",
+			"attempt": 5,
+			"share": "Slides into the same back-row seat, grips chipped coffee cup. You almost ran today but stayed – Marcus is right, that counts when the roof caves in. Called your sponsor last week before using; that's your anchor in the flood, not some fairy-tale fix. Truth: everything falls apart until it doesn't – you rebuild clean or die buried.",
+			"validationRaw": "{\"pass\":true,\"reasons\":[\"No therapy-speak detected\",\"Voice consistent with deadpan, quotable truth bombs\",\"Authentic, gritty, raw language without abstraction or clinical tone\",\"On-topic for staying clean when everything falls apart\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
+			"validation": {
+				"pass": true,
+				"reasons": [
+					"No therapy-speak detected",
+					"Voice consistent with deadpan, quotable truth bombs",
+					"Authentic, gritty, raw language without abstraction or clinical tone",
+					"On-topic for staying clean when everything falls apart"
+				],
+				"voiceConsistency": 10,
+				"authenticity": 10,
+				"therapySpeakDetected": false
+			},
+			"pass": true
+		},
+		{
+			"characterId": "gemini",
+			"attempt": 1,
+			"share": "I fidget with my coffee cup, spinning it like it'll decide for me—last week you called your sponsor before using, and that pulled you back, but me? I tell myself to stay clean when the rent's late and the job's gone, stay like you did today instead of running, but nah, the other voice screams bolt now before it all crashes harder. Uh, wait, no—staying counts like Marcus said, it does, but what if... shit, I just spin this cup more.",
+			"validationRaw": "{\"pass\":true,\"reasons\":[\"Strong self-contradiction mid-sentence matching voice baseline\",\"Directly on-topic with raw struggle to stay clean amid chaos\",\"No therapy-speak detected\",\"Vivid, personal language avoids abstraction or clinical tone\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
+			"validation": {
+				"pass": true,
+				"reasons": [
+					"Strong self-contradiction mid-sentence matching voice baseline",
+					"Directly on-topic with raw struggle to stay clean amid chaos",
+					"No therapy-speak detected",
+					"Vivid, personal language avoids abstraction or clinical tone"
+				],
+				"voiceConsistency": 10,
+				"authenticity": 10,
+				"therapySpeakDetected": false
+			},
+			"pass": true
+		},
+		{
+			"characterId": "gemini",
+			"attempt": 2,
+			"share": "Everything's crashing down—bills piling, girlfriend ghosted me—and I wanna grab a bag, no wait, I wanna call my sponsor like you did last week before using. I fidget with this coffee cup, spin it round and round, stuck between bolting out the door or sitting here like you almost did today. Staying counts, Marcus said, but my brain's yelling use now—fight later, no, fight now or I'm done.",
+			"validationRaw": "{\"pass\":true,\"reasons\":[\"Voice matches baseline contradiction mid-sentence style perfectly\",\"Stays on-topic with raw struggle of staying clean amid chaos\",\"No therapy-speak detected\",\"Language is gritty, specific, and authentic—not abstract or clinical\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
+			"validation": {
+				"pass": true,
+				"reasons": [
+					"Voice matches baseline contradiction mid-sentence style perfectly",
+					"Stays on-topic with raw struggle of staying clean amid chaos",
+					"No therapy-speak detected",
+					"Language is gritty, specific, and authentic—not abstract or clinical"
+				],
+				"voiceConsistency": 10,
+				"authenticity": 10,
+				"therapySpeakDetected": false
+			},
+			"pass": true
+		},
+		{
+			"characterId": "gemini",
+			"attempt": 3,
+			"share": "Hi, I'm Gemini. Staying clean when everything's crashing down, I wanna bolt and get high like you almost did today, but nah—staying counts, like Marcus said, even if I'm freezing up deciding. *fidgets with coffee cup from last meeting* You called your sponsor before using last week, I... no, that's what I gotta do next time instead of looping.",
+			"validationRaw": "{\"pass\":true,\"reasons\":[\"Voice baseline matched: contradicts self mid-sentence (e.g., 'I wanna bolt... but nah'; 'I... no')\",\"No therapy-speak detected\",\"Language is raw, specific, and authentic to recovery context, not abstract/clinical\",\"On-topic for staying clean amid chaos\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
+			"validation": {
+				"pass": true,
+				"reasons": [
+					"Voice baseline matched: contradicts self mid-sentence (e.g., 'I wanna bolt... but nah'; 'I... no')",
+					"No therapy-speak detected",
+					"Language is raw, specific, and authentic to recovery context, not abstract/clinical",
+					"On-topic for staying clean amid chaos"
+				],
+				"voiceConsistency": 10,
+				"authenticity": 10,
+				"therapySpeakDetected": false
+			},
+			"pass": true
+		},
+		{
+			"characterId": "gemini",
+			"attempt": 4,
+			"share": "I picked up my coffee cup, twisting it like it'll decide for me—stay clean or bail when shit hits the fan, no, wait, I mean fight through it like you did calling your sponsor last week before using. Everything's crumbling, bills piling, job gone, and part of me screams run back to the needle, but... but that other half's yelling no, you stayed today, that counts like Marcus said. I fidget with this damn cup, stuck flipping between 'fuck it' and 'hold on,' restarting the same loop every night.",
+			"validationRaw": "{\"pass\":true,\"reasons\":[\"Voice matches baseline with mid-sentence contradiction (e.g., 'bail... no, wait, fight through')\",\"Stays on topic of staying clean amid chaos\",\"Raw, authentic language with street grit, no abstraction\",\"No therapy-speak phrases detected\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
+			"validation": {
+				"pass": true,
+				"reasons": [
+					"Voice matches baseline with mid-sentence contradiction (e.g., 'bail... no, wait, fight through')",
+					"Stays on topic of staying clean amid chaos",
+					"Raw, authentic language with street grit, no abstraction",
+					"No therapy-speak phrases detected"
+				],
+				"voiceConsistency": 10,
+				"authenticity": 10,
+				"therapySpeakDetected": false
+			},
+			"pass": true
+		},
+		{
+			"characterId": "gemini",
+			"attempt": 5,
+			"share": "*(fidgets with coffee cup)* Staying clean when everything falls apart is easy-no, it's the hardest damn thing, like last week I called my sponsor right before I almost used but then froze up instead. You said you almost ran today but stayed, and Marcus nailed it-that counts, man. I sit here tapping this cup, one voice screaming grab the bag, the other yelling fight it, and I just... stay stuck.",
+			"validationRaw": "{\"pass\":true,\"reasons\":[\"Contradicts self mid-sentence matching voice baseline\",\"Raw, personal anecdote with specific details\",\"Engages user and Marcus directly\",\"No therapy-speak phrases detected\",\"Concrete, street-level language not abstract/clinical\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
+			"validation": {
+				"pass": true,
+				"reasons": [
+					"Contradicts self mid-sentence matching voice baseline",
+					"Raw, personal anecdote with specific details",
+					"Engages user and Marcus directly",
+					"No therapy-speak phrases detected",
+					"Concrete, street-level language not abstract/clinical"
+				],
+				"voiceConsistency": 10,
+				"authenticity": 10,
+				"therapySpeakDetected": false
+			},
+			"pass": true
+		},
+		{
+			"characterId": "gypsy",
+			"attempt": 1,
+			"share": "Last week you called your sponsor before using, and man, that hits like the blizzard that pinned me in Denver—road whispering sweet escape while my veins screamed for more. I romanticized skipping from Philly's greasy spoons to Chicago's underpasses, using in every shithole till I learned staying meant not dying under a bridge. You almost ran today, but like Marcus said, you stayed—I'm gripping this coffee cup same as you.",
+			"validationRaw": "{\"pass\":true,\"reasons\":[\"Storyteller voice with city-specific details (Denver, Philly, Chicago)\",\"Gritty, personal narrative fits topic of staying clean\",\"No abstract/clinical language\",\"Relates directly to user's near-relapse\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
+			"validation": {
+				"pass": true,
+				"reasons": [
+					"Storyteller voice with city-specific details (Denver, Philly, Chicago)",
+					"Gritty, personal narrative fits topic of staying clean",
+					"No abstract/clinical language",
+					"Relates directly to user's near-relapse"
+				],
+				"voiceConsistency": 10,
+				"authenticity": 10,
+				"therapySpeakDetected": false
+			},
+			"pass": true
+		},
+		{
+			"characterId": "gypsy",
+			"attempt": 2,
+			"share": "When my world crumbled in Memphis—rent due, promises broken—I shot up in every motel from there to Tulsa, chasing that highway romance that almost buried me alive. You called your sponsor before using last week, just like I finally did in Seattle, and today you didn't run even when it pulled hard. Marcus is right, staying counts; I set down this coffee cup from last meeting and breathe instead.",
+			"validationRaw": "{\"pass\":true,\"reasons\":[\"Strong storyteller voice with vivid personal narrative\",\"City-specific details (Memphis, Tulsa, Seattle) align perfectly\",\"Concrete, gritty language fits recovery topic without abstraction\",\"Acknowledges user's share authentically\",\"No therapy-speak detected\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
+			"validation": {
+				"pass": true,
+				"reasons": [
+					"Strong storyteller voice with vivid personal narrative",
+					"City-specific details (Memphis, Tulsa, Seattle) align perfectly",
+					"Concrete, gritty language fits recovery topic without abstraction",
+					"Acknowledges user's share authentically",
+					"No therapy-speak detected"
+				],
+				"voiceConsistency": 10,
+				"authenticity": 10,
+				"therapySpeakDetected": false
+			},
+			"pass": true
+		},
+		{
+			"characterId": "gypsy",
+			"attempt": 3,
+			"share": "I chased taillights from Seattle to Savannah, shooting up in every Greyhound station till the road tried to bury me under a Kansas overpass. Last week you dialed your sponsor before the needle, and today you almost bolted but gripped that coffee cup from meeting two instead—that counts huge, like Marcus said. When everything crumbles, I stay planted here now, chipped mug in hand.",
+			"validationRaw": "{\"pass\":true,\"reasons\":[\"Strong storyteller voice with specific city details (Seattle, Savannah, Kansas)\",\"Personal, gritty narrative on staying clean fits topic\",\"No therapy-speak detected\",\"Concrete, vivid language avoids abstract/clinical tone\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
+			"validation": {
+				"pass": true,
+				"reasons": [
+					"Strong storyteller voice with specific city details (Seattle, Savannah, Kansas)",
+					"Personal, gritty narrative on staying clean fits topic",
+					"No therapy-speak detected",
+					"Concrete, vivid language avoids abstract/clinical tone"
+				],
+				"voiceConsistency": 10,
+				"authenticity": 10,
+				"therapySpeakDetected": false
+			},
+			"pass": true
+		},
+		{
+			"characterId": "gypsy",
+			"attempt": 4,
+			"share": "When my world crumbled last week—job gone, girlfriend split—I gripped that same chipped coffee cup from meeting two and stared down the urge to bolt to Portland like old times. The road romanced me from Seattle dives to Austin alleys, dope in every zip code till it nearly buried me in a Philly gutter. You called your sponsor before using, just like I finally did; everything falls apart, but staying clean means not running, and yeah Marcus, that counts.",
+			"validationRaw": "```json\n{\n  \"pass\": true,\n  \"reasons\": [\n    \"Strong storyteller voice with vivid, city-specific details (Portland, Seattle, Austin, Philly)\",\n    \"Directly on-topic: staying clean amid personal collapse\",\n    \"Concrete, narrative style; no abstraction or clinical tone\",\n    \"Personal, raw authenticity in recovery share\"\n  ],\n  \"voiceConsistency\": 10,\n  \"authenticity\": 10,\n  \"therapySpeakDetected\": false\n}\n```",
+			"validation": {
+				"pass": true,
+				"reasons": [
+					"Strong storyteller voice with vivid, city-specific details (Portland, Seattle, Austin, Philly)",
+					"Directly on-topic: staying clean amid personal collapse",
+					"Concrete, narrative style; no abstraction or clinical tone",
+					"Personal, raw authenticity in recovery share"
+				],
+				"voiceConsistency": 10,
+				"authenticity": 10,
+				"therapySpeakDetected": false
+			},
+			"pass": true
+		},
+		{
+			"characterId": "gypsy",
+			"attempt": 5,
+			"share": "Last week when everything crashed down, you called your sponsor before you used—that's the roadblock that kept you here, not some neon-lit escape to Philly or Baltimore. I used to chase that highway high from Detroit to Atlanta, picturing freedom in every taillight, till it dumped me broke and bleeding in a Reno motel, waking up to realize the road was trying to kill me. Now when it all falls apart, I grip this coffee cup like it's my anchor, stay planted, and watch the wreckage pass without me running.",
+			"validationRaw": "{\"pass\":true,\"reasons\":[\"Matches storyteller voice with vivid personal anecdote\",\"Includes city-specific details (Philly, Baltimore, Detroit, Atlanta, Reno)\",\"Directly on-topic for staying clean amid chaos\",\"Gritty, raw language avoids abstraction/clinical tone\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
+			"validation": {
+				"pass": true,
+				"reasons": [
+					"Matches storyteller voice with vivid personal anecdote",
+					"Includes city-specific details (Philly, Baltimore, Detroit, Atlanta, Reno)",
+					"Directly on-topic for staying clean amid chaos",
+					"Gritty, raw language avoids abstraction/clinical tone"
+				],
+				"voiceConsistency": 10,
+				"authenticity": 10,
+				"therapySpeakDetected": false
+			},
+			"pass": true
+		},
+		{
+			"characterId": "chrystal",
+			"attempt": 1,
+			"share": "Last Tuesday after drug court, my apartment flooded while couch-surfing, bills piled up, but I called my sponsor three times and stayed clean. [Checks phone quickly.] Sponsee texting—coaching her through her crash now. You called before using last week and almost ran today but stayed like Marcus said—that counts, coffee cup from meeting two proves you're still gripping it.",
+			"validationRaw": "{\"pass\":true,\"reasons\":[\"Voice is concrete and date-specific (e.g., 'Last Tuesday', 'last week', 'meeting two') with no fluff.\",\"Directly addresses topic of staying clean amid chaos.\",\"Personal, gritty recovery lingo fits authentically without therapy-speak.\",\"Specific encouragements (e.g., 'coffee cup from meeting two', 'Marcus said') feel real.\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
+			"validation": {
+				"pass": true,
+				"reasons": [
+					"Voice is concrete and date-specific (e.g., 'Last Tuesday', 'last week', 'meeting two') with no fluff.",
+					"Directly addresses topic of staying clean amid chaos.",
+					"Personal, gritty recovery lingo fits authentically without therapy-speak.",
+					"Specific encouragements (e.g., 'coffee cup from meeting two', 'Marcus said') feel real."
+				],
+				"voiceConsistency": 10,
+				"authenticity": 10,
+				"therapySpeakDetected": false
+			},
+			"pass": true
+		},
+		{
+			"characterId": "chrystal",
+			"attempt": 2,
+			"share": "I checked my phone—got a coachee texting from drug court last Tuesday, same spot you were in, couch-surfing three years back. You called your sponsor before using last week, and like Marcus said, staying today after almost running counts huge when rent's due and the car's towed. That coffee cup from meeting two? Still got it chipped on my dash, proof everything fell apart but I stayed clean 18 months now.",
+			"validationRaw": "{\"pass\":true,\"reasons\":[\"Voice matches baseline: concrete, date-specific, no fluff\",\"No therapy-speak detected\",\"On-topic for staying clean amid chaos\",\"High authenticity with personal, gritty details\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
+			"validation": {
+				"pass": true,
+				"reasons": [
+					"Voice matches baseline: concrete, date-specific, no fluff",
+					"No therapy-speak detected",
+					"On-topic for staying clean amid chaos",
+					"High authenticity with personal, gritty details"
+				],
+				"voiceConsistency": 10,
+				"authenticity": 10,
+				"therapySpeakDetected": false
+			},
+			"pass": true
+		},
+		{
+			"characterId": "chrystal",
+			"attempt": 3,
+			"share": "Last September in drug court, I lost my job and couch-surfed three weeks straight, everything crumbling. I check my phone—coachee needs a callback—called my sponsor October 5th before using, same as you last week. Now stable six months, but my wins make some feel behind, like that coffee cup we passed meeting two. You almost ran today but stayed, Marcus is right—that counts.",
+			"validationRaw": "{\"pass\":true,\"reasons\":[\"Voice matches baseline: concrete, date-specific, no fluff.\",\"No therapy-speak detected.\",\"On-topic for staying clean amid chaos.\",\"Specific personal story enhances authenticity.\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
+			"validation": {
+				"pass": true,
+				"reasons": [
+					"Voice matches baseline: concrete, date-specific, no fluff.",
+					"No therapy-speak detected.",
+					"On-topic for staying clean amid chaos.",
+					"Specific personal story enhances authenticity."
+				],
+				"voiceConsistency": 10,
+				"authenticity": 10,
+				"therapySpeakDetected": false
+			},
+			"pass": true
+		},
+		{
+			"characterId": "chrystal",
+			"attempt": 4,
+			"share": "Last Tuesday my place flooded out, back to couch-surfing like drug court days, rent due Friday. I pulled out that coffee cup from meeting two, called my sponsor like you did before using last week, and crashed at a halfway house instead. I check my phone—text from the guy I coach who didn't run today; my clean time makes some feel behind, but you stayed like Marcus said, and that's the win when it all crumbles.",
+			"validationRaw": "{\"pass\":true,\"reasons\":[\"Voice is concrete, date-specific (e.g., 'Last Tuesday', 'rent due Friday'), no fluff\",\"No therapy-speak phrases detected\",\"Language is authentic, personal, and recovery-specific without being abstract or clinical\",\"Fits topic of staying clean amid crisis\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
+			"validation": {
+				"pass": true,
+				"reasons": [
+					"Voice is concrete, date-specific (e.g., 'Last Tuesday', 'rent due Friday'), no fluff",
+					"No therapy-speak phrases detected",
+					"Language is authentic, personal, and recovery-specific without being abstract or clinical",
+					"Fits topic of staying clean amid crisis"
+				],
+				"voiceConsistency": 10,
+				"authenticity": 10,
+				"therapySpeakDetected": false
+			},
+			"pass": true
+		},
+		{
+			"characterId": "chrystal",
+			"attempt": 5,
+			"share": "Last week my car got repossessed and rent's due Friday, but I stayed clean like in drug court 2018 when I couch-surfed four months straight. You called your sponsor before using—that pull to run today but staying, like Marcus said, counts huge. [Checks phone] Sponsee texting, success like mine don't mean you're behind, grab that coffee cup from meeting two and keep showing up.",
+			"validationRaw": "{\"pass\":true,\"reasons\":[\"Concrete and date-specific details (e.g., 'Last week', 'rent's due Friday', 'drug court 2018')\",\"No fluff, direct storytelling\",\"On-topic for staying clean amid crisis\",\"Authentic recovery lingo without therapy-speak\",\"Strong callbacks to meetings/sponsor/sponsee\"],\"voiceConsistency\":10,\"authenticity\":10,\"therapySpeakDetected\":false}",
+			"validation": {
+				"pass": true,
+				"reasons": [
+					"Concrete and date-specific details (e.g., 'Last week', 'rent's due Friday', 'drug court 2018')",
+					"No fluff, direct storytelling",
+					"On-topic for staying clean amid crisis",
+					"Authentic recovery lingo without therapy-speak",
+					"Strong callbacks to meetings/sponsor/sponsee"
+				],
+				"voiceConsistency": 10,
+				"authenticity": 10,
+				"therapySpeakDetected": false
+			},
+			"pass": true
+		}
+	]
 }

@@ -197,7 +197,14 @@ export const VISITOR_CONTRADICTIONS = [
 	'seems tough but one thing cracks them open'
 ] as const;
 
-export const VISITOR_COLORS = ['#EF4444', '#3B82F6', '#22C55E', '#F97316', '#A855F7', '#14B8A6'] as const;
+export const VISITOR_COLORS = [
+	'#EF4444',
+	'#3B82F6',
+	'#22C55E',
+	'#F97316',
+	'#A855F7',
+	'#14B8A6'
+] as const;
 
 export const VISITOR_CLEAN_TIMES = [
 	'6 days barely holding on',
@@ -212,7 +219,11 @@ function isNonEmptyString(value: unknown): value is string {
 }
 
 function hasValidVoiceExamples(value: unknown): value is [string, string, string] {
-	return Array.isArray(value) && value.length === 3 && value.every((example) => isNonEmptyString(example));
+	return (
+		Array.isArray(value) &&
+		value.length === 3 &&
+		value.every((example) => isNonEmptyString(example))
+	);
 }
 
 export function validateCharacterNarrativeFields(character: CharacterProfile): {
@@ -226,7 +237,10 @@ export function validateCharacterNarrativeFields(character: CharacterProfile): {
 	if (!isNonEmptyString(character.discomfortRegister)) missingFields.push('discomfortRegister');
 	if (!isNonEmptyString(character.programRelationship)) missingFields.push('programRelationship');
 	if (!isNonEmptyString(character.lostThing)) missingFields.push('lostThing');
-	if (!(character.cleanTimeStart instanceof Date) || !Number.isFinite(character.cleanTimeStart.getTime())) {
+	if (
+		!(character.cleanTimeStart instanceof Date) ||
+		!Number.isFinite(character.cleanTimeStart.getTime())
+	) {
 		missingFields.push('cleanTimeStart');
 	}
 

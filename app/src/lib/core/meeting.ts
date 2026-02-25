@@ -104,7 +104,11 @@ export async function createMeeting(
 	deps: MeetingWorkflowDeps,
 	input: CreateMeetingInput
 ): Promise<SeamResult<MeetingRecord>> {
-	if (!isNonEmptyString(input.userId) || !isNonEmptyString(input.topic) || !isNonEmptyString(input.userMood)) {
+	if (
+		!isNonEmptyString(input.userId) ||
+		!isNonEmptyString(input.topic) ||
+		!isNonEmptyString(input.userMood)
+	) {
 		return err(SeamErrorCodes.INPUT_INVALID, 'Invalid createMeeting input');
 	}
 
@@ -146,7 +150,10 @@ export async function addShare(
 	});
 }
 
-function buildCloseSummaryPrompt(topic: string, lastShares: Array<{ speakerName: string; content: string }>): string {
+function buildCloseSummaryPrompt(
+	topic: string,
+	lastShares: Array<{ speakerName: string; content: string }>
+): string {
 	const transcript = lastShares
 		.slice(-6)
 		.map((share) => `${share.speakerName}: ${share.content}`)

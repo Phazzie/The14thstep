@@ -1,7 +1,7 @@
 {
-  "probedAt": "2026-02-19T13:20:00.000Z",
-  "environment": "local",
-  "probe": "sse",
-  "status": "PASS",
-  "notes": "Captured from local probe run; refreshed by scripts/probe outputs."
+	"probedAt": "2026-02-19T13:20:00.000Z",
+	"environment": "local",
+	"probe": "sse",
+	"status": "PASS",
+	"notes": "Captured from local probe run; refreshed by scripts/probe outputs."
 }

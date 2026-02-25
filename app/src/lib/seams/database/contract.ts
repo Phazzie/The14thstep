@@ -305,6 +305,8 @@ export function validateUpdateCallbackInput(value: unknown): value is UpdateCall
 	return Object.keys(updates).length > 0;
 }
 
-export function validateGetMeetingCountAfterDateInput(value: unknown): value is GetMeetingCountAfterDateInput {
+export function validateGetMeetingCountAfterDateInput(
+	value: unknown
+): value is GetMeetingCountAfterDateInput {
 	return isObject(value) && isNonEmptyString(value.userId) && isNonEmptyString(value.startedAfter);
 }

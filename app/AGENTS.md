@@ -14,32 +14,40 @@ Scope: apply these rules for work under `app/`.
 For each I/O seam, execute these steps in order:
 
 1. Contract
+
 - Define seam input/output schemas, result envelope usage, and allowed error codes in `src/lib/seams/<seam>/contract.ts`.
 
 2. Probe
+
 - Add a real-system probe in `probes/` (or seam-local probe if already standardized).
 - Record deterministic fixture outputs (success and failure shapes) under seam fixtures.
 
 3. Fixtures
+
 - Treat fixture captures as source-of-truth snapshots.
 - Do not hand-edit I/O fixture payloads except redaction of secrets.
 
 4. Mock
+
 - Implement a fixture-backed mock that returns fixture data without business logic transforms.
 
 5. Contract tests
+
 - Add tests that prove fixture schema conformance and mock fidelity.
 - Include negative-path validation for malformed input/output shapes.
 
 6. Adapter
+
 - Implement real adapter in `src/lib/server/seams/<seam>/adapter.ts`.
 - Validate adapter input and output against seam contract and map all failures to seam error taxonomy.
 
 7. Composition wiring
+
 - Wire seam implementation through server composition boundaries (for example `hooks.server.ts` or server loaders/actions).
 - Keep browser code free from server-only imports.
 
 8. Verification gate
+
 - Run seam-relevant tests and probes before moving to the next seam.
 - Update plan and governance artifacts (`plans/the-14th-step-execplan.md`, `decision-log.md`, `CHANGELOG.md`, `LESSONS_LEARNED.md`) with meaningful outcomes.
 

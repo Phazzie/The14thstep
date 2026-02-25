@@ -58,7 +58,10 @@ export async function generateVoiceCandidates(
 	const validCandidates = candidateTexts.filter((text): text is string => text !== null);
 
 	if (validCandidates.length === 0) {
-		return err(SeamErrorCodes.UPSTREAM_ERROR, `Failed to generate any valid candidates for ${character.name}`);
+		return err(
+			SeamErrorCodes.UPSTREAM_ERROR,
+			`Failed to generate any valid candidates for ${character.name}`
+		);
 	}
 
 	// Score each candidate
@@ -76,7 +79,10 @@ export async function generateVoiceCandidates(
 	}
 
 	if (scoredCandidates.length === 0) {
-		return err(SeamErrorCodes.CONTRACT_VIOLATION, `Failed to score any candidates for ${character.name}`);
+		return err(
+			SeamErrorCodes.CONTRACT_VIOLATION,
+			`Failed to score any candidates for ${character.name}`
+		);
 	}
 
 	// Filter by quality thresholds
@@ -162,7 +168,9 @@ export function filterCandidatesByQuality(
 	minAuthenticity: number = 6
 ): VoiceCandidate[] {
 	return candidates.filter((candidate) => {
-		const meetsThresholds = candidate.voiceConsistency >= minVoiceConsistency && candidate.authenticity >= minAuthenticity;
+		const meetsThresholds =
+			candidate.voiceConsistency >= minVoiceConsistency &&
+			candidate.authenticity >= minAuthenticity;
 		const noTherapySpeak = !candidate.therapySpeakDetected;
 
 		return meetsThresholds && noTherapySpeak;

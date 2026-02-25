@@ -37,10 +37,14 @@
 	{/if}
 
 	{#if expandedText}
-		<p class="mt-2 rounded-md border border-indigo-500 bg-indigo-950/40 p-2 text-sm text-indigo-100">
+		<p
+			class="mt-2 rounded-md border border-indigo-500 bg-indigo-950/40 p-2 text-sm text-indigo-100"
+		>
 			{expandedText}
 		</p>
 	{/if}
 
-	<p class="mt-2 text-xs text-gray-400">Significance {entry.significanceScore} · #{entry.sequenceOrder}</p>
+	<p class="mt-2 text-xs text-gray-400">
+		Significance {entry.significanceScore} · #{entry.sequenceOrder}
+	</p>
 </li>

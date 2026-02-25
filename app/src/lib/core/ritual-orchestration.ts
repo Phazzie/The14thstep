@@ -24,10 +24,22 @@ const VALID_TRANSITIONS: Record<MeetingPhase, MeetingPhase[]> = {
 	[MeetingPhaseEnum.SETUP]: [MeetingPhaseEnum.OPENING, MeetingPhaseEnum.CRISIS_MODE],
 	[MeetingPhaseEnum.OPENING]: [MeetingPhaseEnum.EMPTY_CHAIR, MeetingPhaseEnum.CRISIS_MODE],
 	[MeetingPhaseEnum.EMPTY_CHAIR]: [MeetingPhaseEnum.INTRODUCTIONS, MeetingPhaseEnum.CRISIS_MODE],
-	[MeetingPhaseEnum.INTRODUCTIONS]: [MeetingPhaseEnum.TOPIC_SELECTION, MeetingPhaseEnum.CRISIS_MODE],
-	[MeetingPhaseEnum.TOPIC_SELECTION]: [MeetingPhaseEnum.SHARING_ROUND_1, MeetingPhaseEnum.CRISIS_MODE],
-	[MeetingPhaseEnum.SHARING_ROUND_1]: [MeetingPhaseEnum.SHARING_ROUND_2, MeetingPhaseEnum.CRISIS_MODE],
-	[MeetingPhaseEnum.SHARING_ROUND_2]: [MeetingPhaseEnum.SHARING_ROUND_3, MeetingPhaseEnum.CRISIS_MODE],
+	[MeetingPhaseEnum.INTRODUCTIONS]: [
+		MeetingPhaseEnum.TOPIC_SELECTION,
+		MeetingPhaseEnum.CRISIS_MODE
+	],
+	[MeetingPhaseEnum.TOPIC_SELECTION]: [
+		MeetingPhaseEnum.SHARING_ROUND_1,
+		MeetingPhaseEnum.CRISIS_MODE
+	],
+	[MeetingPhaseEnum.SHARING_ROUND_1]: [
+		MeetingPhaseEnum.SHARING_ROUND_2,
+		MeetingPhaseEnum.CRISIS_MODE
+	],
+	[MeetingPhaseEnum.SHARING_ROUND_2]: [
+		MeetingPhaseEnum.SHARING_ROUND_3,
+		MeetingPhaseEnum.CRISIS_MODE
+	],
 	[MeetingPhaseEnum.SHARING_ROUND_3]: [MeetingPhaseEnum.CLOSING, MeetingPhaseEnum.CRISIS_MODE],
 	[MeetingPhaseEnum.CRISIS_MODE]: [
 		MeetingPhaseEnum.SHARING_ROUND_1,
@@ -139,11 +151,9 @@ export function transitionToNextPhase(
 
 		case MeetingPhaseEnum.POST_MEETING:
 			// No further transitions from POST_MEETING
-			return err(
-				SeamErrorCodes.UNEXPECTED,
-				'Cannot transition from POST_MEETING phase',
-				{ currentPhase }
-			);
+			return err(SeamErrorCodes.UNEXPECTED, 'Cannot transition from POST_MEETING phase', {
+				currentPhase
+			});
 
 		case MeetingPhaseEnum.CRISIS_MODE:
 			// Crisis mode can transition to any sharing round or closing
@@ -256,11 +266,10 @@ export function recordCharacterSpoke(
 ): SeamResult<MeetingPhaseState> {
 	// Prevent duplicate speakers in same round
 	if (state.charactersSpokenThisRound.includes(characterId)) {
-		return err(
-			SeamErrorCodes.UNEXPECTED,
-			`${characterId} has already spoken in this round`,
-			{ characterId, charactersSpokenThisRound: state.charactersSpokenThisRound }
-		);
+		return err(SeamErrorCodes.UNEXPECTED, `${characterId} has already spoken in this round`, {
+			characterId,
+			charactersSpokenThisRound: state.charactersSpokenThisRound
+		});
 	}
 
 	const updatedState: MeetingPhaseState = {
@@ -277,11 +286,9 @@ export function recordCharacterSpoke(
  */
 export function recordUserShared(state: MeetingPhaseState): SeamResult<MeetingPhaseState> {
 	if (state.userHasSharedInRound) {
-		return err(
-			SeamErrorCodes.UNEXPECTED,
-			'User has already shared in this round',
-			{ currentPhase: state.currentPhase }
-		);
+		return err(SeamErrorCodes.UNEXPECTED, 'User has already shared in this round', {
+			currentPhase: state.currentPhase
+		});
 	}
 
 	const updatedState: MeetingPhaseState = {
@@ -297,7 +304,8 @@ export function recordUserShared(state: MeetingPhaseState): SeamResult<MeetingPh
  * A round is complete when 2 characters (or character + user) have spoken.
  */
 export function isRoundComplete(state: MeetingPhaseState): boolean {
-	const speakerCount = state.charactersSpokenThisRound.length + (state.userHasSharedInRound ? 1 : 0);
+	const speakerCount =
+		state.charactersSpokenThisRound.length + (state.userHasSharedInRound ? 1 : 0);
 	return speakerCount >= 2;
 }
 

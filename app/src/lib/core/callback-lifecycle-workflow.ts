@@ -17,7 +17,10 @@ interface CallbackLifecycleWorkflowDatabasePort {
 			lastReferencedAt?: string;
 		};
 	}): Promise<SeamResult<CallbackRecord>>;
-	getMeetingCountAfterDate(input: { userId: string; startedAfter: string }): Promise<SeamResult<number>>;
+	getMeetingCountAfterDate(input: {
+		userId: string;
+		startedAfter: string;
+	}): Promise<SeamResult<number>>;
 }
 
 export interface RunCallbackLifecycleWorkflowInput {
@@ -38,7 +41,9 @@ export async function runCallbackLifecycleWorkflow(
 ): Promise<SeamResult<CallbackLifecycleWorkflowSummary>> {
 	const callbacksById = new Map<string, CallbackRecord>();
 
-	const presentCharacterIds = [...new Set(input.presentCharacterIds.filter((id) => id.trim().length > 0))];
+	const presentCharacterIds = [
+		...new Set(input.presentCharacterIds.filter((id) => id.trim().length > 0))
+	];
 	for (const characterId of presentCharacterIds) {
 		const callbacksResult = await input.database.getActiveCallbacks({
 			characterId,
@@ -46,7 +51,11 @@ export async function runCallbackLifecycleWorkflow(
 			scopeToMeeting: false
 		});
 		if (!callbacksResult.ok) {
-			return err(callbacksResult.error.code, callbacksResult.error.message, callbacksResult.error.details);
+			return err(
+				callbacksResult.error.code,
+				callbacksResult.error.message,
+				callbacksResult.error.details
+			);
 		}
 
 		for (const callback of callbacksResult.value) {
@@ -71,7 +80,11 @@ export async function runCallbackLifecycleWorkflow(
 			startedAfter: callback.lastReferencedAt
 		});
 		if (!meetingCountResult.ok) {
-			return err(meetingCountResult.error.code, meetingCountResult.error.message, meetingCountResult.error.details);
+			return err(
+				meetingCountResult.error.code,
+				meetingCountResult.error.message,
+				meetingCountResult.error.details
+			);
 		}
 
 		if (

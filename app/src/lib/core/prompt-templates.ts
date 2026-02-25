@@ -38,7 +38,9 @@ function renderCharacterFoundation(character: CharacterProfile): string {
 		? ['Voice examples:', ...character.voiceExamples.map((example) => `  - ${example}`)]
 		: [];
 
-	return ['CHARACTER FOUNDATION:', ...lines.map((line) => `- ${line}`), ...voiceExampleLines].join('\n');
+	return ['CHARACTER FOUNDATION:', ...lines.map((line) => `- ${line}`), ...voiceExampleLines].join(
+		'\n'
+	);
 }
 
 export function buildCharacterSharePrompt(
@@ -60,7 +62,10 @@ export function buildCharacterSharePrompt(
 		.join('\n\n');
 }
 
-export function buildCharacterIntroductionPrompt(character: CharacterProfile, userName: string): string {
+export function buildCharacterIntroductionPrompt(
+	character: CharacterProfile,
+	userName: string
+): string {
 	return [
 		`Generate a 1-2 sentence introduction for ${character.name}.`,
 		`Voice: ${character.voice}`,
@@ -184,7 +189,11 @@ export function buildPostMeetingMemoryExtractionPrompt(
 
 export function buildExpandSharePrompt(
 	character: CharacterProfile,
-	input: { topic: string; originalShare: string; recentShares: Array<{ speaker: string; content: string }> }
+	input: {
+		topic: string;
+		originalShare: string;
+		recentShares: Array<{ speaker: string; content: string }>;
+	}
 ): string {
 	return [
 		`Expand ${character.name}'s share into 8-10 sentences while preserving voice.`,
@@ -202,7 +211,9 @@ export function buildQualityValidationPrompt(
 	callbacksUsed: CallbackRecord[] = []
 ): string {
 	const callbackText = callbacksUsed.length
-		? callbacksUsed.map((callback) => `- ${callback.originalText} (${callback.callbackType})`).join('\n')
+		? callbacksUsed
+				.map((callback) => `- ${callback.originalText} (${callback.callbackType})`)
+				.join('\n')
 		: '- No callbacks referenced.';
 
 	return [

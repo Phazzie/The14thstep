@@ -4,7 +4,10 @@ import type { CallbackRecord } from './types';
 
 export interface MemoryBuilderDatabasePort {
 	getHeavyMemory(userId: string): Promise<SeamResult<ShareRecord[]>>;
-	getActiveCallbacks?(input: { characterId: string; meetingId: string }): Promise<SeamResult<CallbackRecord[]>>;
+	getActiveCallbacks?(input: {
+		characterId: string;
+		meetingId: string;
+	}): Promise<SeamResult<CallbackRecord[]>>;
 	getUserById?(userId: string): Promise<SeamResult<UserProfile>>;
 }
 
@@ -32,7 +35,7 @@ function toIso(value: string): number {
 }
 
 function formatMemoryLine(share: ShareRecord): string {
-	const speaker = share.isUserShare ? 'User' : share.characterId ?? 'Character';
+	const speaker = share.isUserShare ? 'User' : (share.characterId ?? 'Character');
 	return `${speaker} (score ${share.significanceScore}): ${share.content}`;
 }
 
@@ -63,8 +66,10 @@ function buildContinuityLines(input: {
 	const lines: string[] = [];
 	if (input.profile) {
 		lines.push(`Attendance count: ${input.profile.meetingCount} meetings.`);
-		if (input.profile.firstMeetingAt) lines.push(`First meeting on record: ${input.profile.firstMeetingAt}.`);
-		if (input.profile.lastMeetingAt) lines.push(`Most recent meeting on record: ${input.profile.lastMeetingAt}.`);
+		if (input.profile.firstMeetingAt)
+			lines.push(`First meeting on record: ${input.profile.firstMeetingAt}.`);
+		if (input.profile.lastMeetingAt)
+			lines.push(`Most recent meeting on record: ${input.profile.lastMeetingAt}.`);
 	}
 
 	const latestUserShares = [...input.heavyMemory]
@@ -82,13 +87,21 @@ function buildContinuityLines(input: {
 export async function buildPromptContext(
 	input: BuildPromptContextInput
 ): Promise<SeamResult<PromptMemoryContext>> {
-	if (!isNonEmptyString(input.userId) || !isNonEmptyString(input.characterId) || !isNonEmptyString(input.meetingId)) {
+	if (
+		!isNonEmptyString(input.userId) ||
+		!isNonEmptyString(input.characterId) ||
+		!isNonEmptyString(input.meetingId)
+	) {
 		return err(SeamErrorCodes.INPUT_INVALID, 'Invalid memory builder input');
 	}
 
 	const heavyMemoryResult = await input.database.getHeavyMemory(input.userId);
 	if (!heavyMemoryResult.ok) {
-		return err(heavyMemoryResult.error.code, heavyMemoryResult.error.message, heavyMemoryResult.error.details);
+		return err(
+			heavyMemoryResult.error.code,
+			heavyMemoryResult.error.message,
+			heavyMemoryResult.error.details
+		);
 	}
 
 	const allShares = heavyMemoryResult.value;
@@ -103,14 +116,23 @@ export async function buildPromptContext(
 		.sort((a, b) => toIso(a.createdAt) - toIso(b.createdAt) || a.sequenceOrder - b.sequenceOrder)
 		.slice(-40);
 
-	const profileResult = input.database.getUserById ? await input.database.getUserById(input.userId) : null;
+	const profileResult = input.database.getUserById
+		? await input.database.getUserById(input.userId)
+		: null;
 	const profile = profileResult && profileResult.ok ? profileResult.value : null;
 
 	const callbacksResult = input.database.getActiveCallbacks
-		? await input.database.getActiveCallbacks({ characterId: input.characterId, meetingId: input.meetingId })
+		? await input.database.getActiveCallbacks({
+				characterId: input.characterId,
+				meetingId: input.meetingId
+			})
 		: ok<CallbackRecord[]>([]);
 	if (!callbacksResult.ok) {
-		return err(callbacksResult.error.code, callbacksResult.error.message, callbacksResult.error.details);
+		return err(
+			callbacksResult.error.code,
+			callbacksResult.error.message,
+			callbacksResult.error.details
+		);
 	}
 
 	const callbacks = callbacksResult.value

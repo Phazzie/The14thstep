@@ -57,9 +57,9 @@ describe('database seam contract', () => {
 				startedAfter: '2026-02-01T00:00:00.000Z'
 			})
 		).toBe(true);
-		expect(
-			(getHeavyMemorySample as unknown[]).every((record) => validateShareRecord(record))
-		).toBe(true);
+		expect((getHeavyMemorySample as unknown[]).every((record) => validateShareRecord(record))).toBe(
+			true
+		);
 		expect(
 			(getActiveCallbacksSample as unknown[]).every((record) => validateCallbackRecord(record))
 		).toBe(true);

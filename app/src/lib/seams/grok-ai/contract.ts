@@ -54,7 +54,8 @@ export function validateGenerateShareInput(value: unknown): value is GenerateSha
 	if (!isNonEmptyString(value.meetingId)) return false;
 	if (!isNonEmptyString(value.characterId)) return false;
 	if (!isNonEmptyString(value.prompt)) return false;
-	if (!Array.isArray(value.contextMessages) || !value.contextMessages.every(isGrokMessage)) return false;
+	if (!Array.isArray(value.contextMessages) || !value.contextMessages.every(isGrokMessage))
+		return false;
 	if (value.stream !== undefined && typeof value.stream !== 'boolean') return false;
 	return true;
 }

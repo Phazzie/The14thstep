@@ -1,13 +1,13 @@
 {
-  "id": "17b9f6ab-0f63-4b06-90d8-06bcdb54922d",
-  "originShareId": "6eaf7ef6-d1d8-4b12-bf99-135f2aef0568",
-  "characterId": "marcus",
-  "originalText": "I almost bounced and stayed in my chair.",
-  "callbackType": "self_deprecation",
-  "scope": "character",
-  "potentialScore": 8,
-  "timesReferenced": 0,
-  "lastReferencedAt": null,
-  "status": "active",
-  "parentCallbackId": null
+	"id": "17b9f6ab-0f63-4b06-90d8-06bcdb54922d",
+	"originShareId": "6eaf7ef6-d1d8-4b12-bf99-135f2aef0568",
+	"characterId": "marcus",
+	"originalText": "I almost bounced and stayed in my chair.",
+	"callbackType": "self_deprecation",
+	"scope": "character",
+	"potentialScore": 8,
+	"timesReferenced": 0,
+	"lastReferencedAt": null,
+	"status": "active",
+	"parentCallbackId": null
 }

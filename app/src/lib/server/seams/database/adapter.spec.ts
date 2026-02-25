@@ -90,7 +90,11 @@ function createHarness(responses: MockResponses = {}) {
 		status: 200,
 		count: 0
 	};
-	const meetingPhaseMaybeSingle = responses.meetingPhaseMaybeSingle ?? { data: null, error: null, status: 200 };
+	const meetingPhaseMaybeSingle = responses.meetingPhaseMaybeSingle ?? {
+		data: null,
+		error: null,
+		status: 200
+	};
 	const meetingPhaseUpdateMaybeSingle = responses.meetingPhaseUpdateMaybeSingle ?? {
 		data: { id: 'meeting-1' },
 		error: null,

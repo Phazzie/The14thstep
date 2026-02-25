@@ -30,5 +30,7 @@ export function isMeetingInCrisis(input: {
 		return true;
 	}
 
-	return input.shares.some((share) => share.significanceScore >= 10 || detectCrisisContent(share.content));
+	return input.shares.some(
+		(share) => share.significanceScore >= 10 || detectCrisisContent(share.content)
+	);
 }

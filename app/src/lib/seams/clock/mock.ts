@@ -2,7 +2,9 @@ import type { ClockPort } from './contract';
 import { validateClockInstant, type ClockInstant } from './contract';
 import timestampsFixture from './fixtures/timestamps.json';
 
-export function createClockMock(seedInstants: ClockInstant[] = timestampsFixture as ClockInstant[]): ClockPort {
+export function createClockMock(
+	seedInstants: ClockInstant[] = timestampsFixture as ClockInstant[]
+): ClockPort {
 	const instants = [...seedInstants];
 	if (instants.length === 0) {
 		throw new Error('Clock mock requires at least one fixture instant');

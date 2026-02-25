@@ -8,21 +8,19 @@ describe('POST /meeting/[id]/crisis', () => {
 			ok: true,
 			value: { shareText: 'Marcus support response.' }
 		});
-		const appendShare = vi
-			.fn()
-			.mockResolvedValueOnce({
-				ok: true,
-				value: {
-					id: 'share-1',
-					meetingId: 'meeting-1',
-					characterId: 'marcus',
-					isUserShare: false,
-					content: 'Marcus support response.',
-					significanceScore: 10,
-					sequenceOrder: 1,
-					createdAt: '2026-02-19T00:00:00.000Z'
-				}
-			});
+		const appendShare = vi.fn().mockResolvedValueOnce({
+			ok: true,
+			value: {
+				id: 'share-1',
+				meetingId: 'meeting-1',
+				characterId: 'marcus',
+				isUserShare: false,
+				content: 'Marcus support response.',
+				significanceScore: 10,
+				sequenceOrder: 1,
+				createdAt: '2026-02-19T00:00:00.000Z'
+			}
+		});
 		const updateMeetingPhase = vi.fn().mockResolvedValue({ ok: true, value: undefined });
 
 		const request = new Request('http://localhost/meeting/meeting-1/crisis', {

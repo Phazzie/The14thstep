@@ -47,7 +47,10 @@ function toStatus(code: SeamErrorCode): number {
 function stripCodeFences(value: string): string {
 	const trimmed = value.trim();
 	if (!trimmed.startsWith('```')) return trimmed;
-	return trimmed.replace(/^```(?:json)?\s*/i, '').replace(/```$/, '').trim();
+	return trimmed
+		.replace(/^```(?:json)?\s*/i, '')
+		.replace(/```$/, '')
+		.trim();
 }
 
 function parseQualityValidation(value: string): QualityValidation | null {
@@ -90,7 +93,10 @@ async function parseRequest(request: Request): Promise<SeamResult<ExpandRequest>
 	const recentShares: Array<{ speaker: string; content: string }> = [];
 	for (const entry of (body.recentShares ?? []).slice(-8)) {
 		if (!isObject(entry) || !isNonEmptyString(entry.speaker) || !isNonEmptyString(entry.content)) {
-			return err(SeamErrorCodes.INPUT_INVALID, 'Each recent share must include speaker and content');
+			return err(
+				SeamErrorCodes.INPUT_INVALID,
+				'Each recent share must include speaker and content'
+			);
 		}
 		recentShares.push({
 			speaker: entry.speaker.trim(),
@@ -164,7 +170,10 @@ async function generateValidatedExpansion(input: {
 		}
 	}
 
-	return err(SeamErrorCodes.CONTRACT_VIOLATION, 'Expanded share failed quality validation after retries');
+	return err(
+		SeamErrorCodes.CONTRACT_VIOLATION,
+		'Expanded share failed quality validation after retries'
+	);
 }
 
 export const POST: RequestHandler = async ({ params, locals, request }) => {
@@ -186,15 +195,21 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 
 	const share = shareResult.value;
 	if (share.meetingId !== meetingId) {
-		return json(err(SeamErrorCodes.NOT_FOUND, 'Share does not belong to this meeting'), { status: 404 });
+		return json(err(SeamErrorCodes.NOT_FOUND, 'Share does not belong to this meeting'), {
+			status: 404
+		});
 	}
 	if (!share.characterId) {
-		return json(err(SeamErrorCodes.INPUT_INVALID, 'Only character shares can be expanded'), { status: 400 });
+		return json(err(SeamErrorCodes.INPUT_INVALID, 'Only character shares can be expanded'), {
+			status: 400
+		});
 	}
 
 	const character = CORE_CHARACTERS.find((entry) => entry.id === share.characterId);
 	if (!character) {
-		return json(err(SeamErrorCodes.NOT_FOUND, 'Character profile not found for expanded share'), { status: 404 });
+		return json(err(SeamErrorCodes.NOT_FOUND, 'Character profile not found for expanded share'), {
+			status: 404
+		});
 	}
 
 	const prompt = buildExpandSharePrompt(character, {
