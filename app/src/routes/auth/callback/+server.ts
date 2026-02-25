@@ -41,7 +41,8 @@ export const GET: RequestHandler = async ({ url, cookies, locals }) => {
 	if (providerError) {
 		console.warn('auth callback provider error', {
 			error: providerError,
-			description: url.searchParams.get('error_description') ?? null
+			description: url.searchParams.get('error_description') ?? null,
+			path: url.pathname
 		});
 		return toRedirect('magic-link-cancelled');
 	}
@@ -67,7 +68,8 @@ export const GET: RequestHandler = async ({ url, cookies, locals }) => {
 			} else {
 				console.warn('auth callback code exchange failed', {
 					status: exchange.error.status ?? null,
-					code: exchange.error.code ?? null
+					code: exchange.error.code ?? null,
+					message: exchange.error.message ?? null
 				});
 			}
 		} catch (error) {
@@ -92,7 +94,8 @@ export const GET: RequestHandler = async ({ url, cookies, locals }) => {
 			if (verify.error) {
 				console.warn('auth callback otp verify failed', {
 					status: verify.error.status ?? null,
-					code: verify.error.code ?? null
+					code: verify.error.code ?? null,
+					message: verify.error.message ?? null
 				});
 				return toRedirect('auth-failed');
 			}
@@ -134,7 +137,12 @@ export const GET: RequestHandler = async ({ url, cookies, locals }) => {
 	}
 
 	if (!profileResult.ok) {
-		console.warn('auth callback profile bootstrap failed', { code: profileResult.error.code });
+		console.warn('auth callback profile bootstrap failed', {
+			userId: user.id,
+			code: profileResult.error.code,
+			message: profileResult.error.message,
+			details: profileResult.error.details ?? null
+		});
 		clearAllAuthCookies(cookies);
 		return toRedirect('auth-failed');
 	}

@@ -65,6 +65,9 @@ function buildSeamBundle(): {
 	try {
 		database = createDatabaseAdapter();
 	} catch (error) {
+		console.error('failed to create database adapter', {
+			error: error instanceof Error ? error.message : String(error)
+		});
 		const message =
 			error instanceof Error ? `Database adapter unavailable: ${error.message}` : 'Database adapter unavailable';
 		database = createUnavailableDatabaseAdapter(message);
@@ -82,6 +85,14 @@ export const handle: Handle = async ({ event, resolve }) => {
 	event.locals.seams = seams;
 
 	const sessionResult = await seams.auth.getSession(event.request.headers.get('cookie'));
+	if (!sessionResult.ok) {
+		console.warn('auth session resolution failed', {
+			code: sessionResult.error.code,
+			message: sessionResult.error.message,
+			details: sessionResult.error.details ?? null,
+			path: event.url.pathname
+		});
+	}
 	event.locals.userId = sessionResult.ok ? sessionResult.value.userId : null;
 
 	return resolve(event);

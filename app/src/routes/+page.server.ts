@@ -59,6 +59,14 @@ function friendlyAuthConfigError() {
 	return fail(500, { authMessage: 'Sign-in is not configured on this environment.' });
 }
 
+function logAuthActionWarning(action: string, details: Record<string, unknown>): void {
+	console.warn(`auth action warning: ${action}`, details);
+}
+
+function logAuthActionError(action: string, details: Record<string, unknown>): void {
+	console.error(`auth action error: ${action}`, details);
+}
+
 function isRateLimited(error: unknown): boolean {
 	if (typeof error !== 'object' || error === null) return false;
 	const record = error as Record<string, unknown>;
@@ -111,6 +119,14 @@ async function ensureProfileBootstrap(
 
 	if (result.ok) return { ok: true };
 
+	logAuthActionWarning('ensureProfileBootstrap', {
+		userId: input.id,
+		isAnonymous: input.isAnonymous,
+		errorCode: result.error.code,
+		errorMessage: result.error.message,
+		errorDetails: result.error.details ?? null
+	});
+
 	const status = statusFromSeamCode(result.error.code);
 	const authMessage =
 		status >= 500 ? "Couldn't finish account setup right now. Try again." : 'Unable to sign in right now.';
@@ -132,10 +148,25 @@ export const actions: Actions = {
 		const authClient = createPublicSupabaseAuthClient();
 		if (!authClient) return friendlyAuthConfigError();
 
-		const signInResult = await authClient.auth.signInAnonymously();
+		let signInResult;
+		try {
+			signInResult = await authClient.auth.signInAnonymously();
+		} catch (error) {
+			logAuthActionError('continueGuest.signInAnonymously', {
+				error: error instanceof Error ? error.message : String(error)
+			});
+			return fail(503, { authMessage: "Couldn't start a guest session right now. Try again." });
+		}
 		const session = signInResult.data.session;
 		const user = signInResult.data.user ?? session?.user ?? null;
 		if (signInResult.error || !session || !user?.id) {
+			logAuthActionWarning('continueGuest.failed', {
+				hasSession: Boolean(session),
+				hasUserId: Boolean(user?.id),
+				supabaseStatus: signInResult.error?.status ?? null,
+				supabaseCode: signInResult.error?.code ?? null,
+				supabaseMessage: signInResult.error?.message ?? null
+			});
 			return fail(503, { authMessage: "Couldn't start a guest session right now. Try again." });
 		}
 
@@ -174,20 +205,44 @@ export const actions: Actions = {
 
 		const redirectOrigin = resolveCanonicalOrigin(url);
 		if (!redirectOrigin) {
+			logAuthActionWarning('sendMagicLink.missingCanonicalOrigin', {
+				requestOrigin: url.origin,
+				host: url.host
+			});
 			return fail(500, {
 				authMessage: "Couldn't send a sign-in link right now. Try again.",
 				authEmail: email
 			});
 		}
 
-		const sendResult = await authClient.auth.signInWithOtp({
-			email,
-			options: {
-				emailRedirectTo: `${redirectOrigin}/auth/callback`
-			}
-		});
+		let sendResult;
+		try {
+			sendResult = await authClient.auth.signInWithOtp({
+				email,
+				options: {
+					emailRedirectTo: `${redirectOrigin}/auth/callback`
+				}
+			});
+		} catch (error) {
+			logAuthActionError('sendMagicLink.signInWithOtp', {
+				emailDomain: email.split('@')[1] ?? null,
+				redirectOrigin,
+				error: error instanceof Error ? error.message : String(error)
+			});
+			return fail(503, {
+				authMessage: "Couldn't send a sign-in link right now. Try again.",
+				authEmail: email
+			});
+		}
 
 		if (sendResult.error) {
+			logAuthActionWarning('sendMagicLink.failed', {
+				emailDomain: email.split('@')[1] ?? null,
+				redirectOrigin,
+				supabaseStatus: sendResult.error.status ?? null,
+				supabaseCode: sendResult.error.code ?? null,
+				supabaseMessage: sendResult.error.message ?? null
+			});
 			if (isRateLimited(sendResult.error)) {
 				return fail(429, {
 					authMessage: 'Please wait a minute before requesting another sign-in link.',
@@ -220,13 +275,30 @@ export const actions: Actions = {
 			return friendlyAuthConfigError();
 		}
 
-		const signInResult = await authClient.auth.signInWithPassword({
-			email,
-			password
-		});
+		let signInResult;
+		try {
+			signInResult = await authClient.auth.signInWithPassword({
+				email,
+				password
+			});
+		} catch (error) {
+			logAuthActionError('signIn.signInWithPassword', {
+				emailDomain: email.split('@')[1] ?? null,
+				error: error instanceof Error ? error.message : String(error)
+			});
+			return fail(503, { authMessage: 'Sign in failed. Try again in a moment.' });
+		}
 		const session = signInResult.data.session;
 		const user = signInResult.data.user ?? session?.user ?? null;
 		if (signInResult.error || !session || !user?.id) {
+			logAuthActionWarning('signIn.failed', {
+				emailDomain: email.split('@')[1] ?? null,
+				hasSession: Boolean(session),
+				hasUserId: Boolean(user?.id),
+				supabaseStatus: signInResult.error?.status ?? null,
+				supabaseCode: signInResult.error?.code ?? null,
+				supabaseMessage: signInResult.error?.message ?? null
+			});
 			return fail(401, { authMessage: 'Sign in failed. Check your email and password.' });
 		}
 
@@ -287,6 +359,12 @@ export const actions: Actions = {
 
 		const profileLookup = await locals.seams.database.getUserById(userId);
 		if (!profileLookup.ok) {
+			logAuthActionWarning('join.getUserById', {
+				userId,
+				errorCode: profileLookup.error.code,
+				errorMessage: profileLookup.error.message,
+				errorDetails: profileLookup.error.details ?? null
+			});
 			if (profileLookup.error.code === SeamErrorCodes.NOT_FOUND) {
 				const sessionKind = readSessionKindCookie(cookies);
 				const bootstrap = await locals.seams.database.ensureUserProfile({
@@ -296,6 +374,13 @@ export const actions: Actions = {
 					isAnonymous: sessionKind === 'guest'
 				});
 				if (!bootstrap.ok) {
+					logAuthActionWarning('join.ensureUserProfile', {
+						userId,
+						sessionKind,
+						errorCode: bootstrap.error.code,
+						errorMessage: bootstrap.error.message,
+						errorDetails: bootstrap.error.details ?? null
+					});
 					return fail(statusFromSeamCode(bootstrap.error.code), {
 						message: 'Unable to start the meeting right now.',
 						values
@@ -323,6 +408,14 @@ export const actions: Actions = {
 		);
 
 		if (!result.ok) {
+			logAuthActionWarning('join.createMeeting', {
+				userId,
+				mood,
+				listeningOnly,
+				errorCode: result.error.code,
+				errorMessage: result.error.message,
+				errorDetails: result.error.details ?? null
+			});
 			const status = statusFromSeamCode(result.error.code);
 			const message =
 				status === 400
