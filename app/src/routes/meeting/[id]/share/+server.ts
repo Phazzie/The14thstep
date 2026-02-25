@@ -927,7 +927,7 @@ async function handleShareRequest(
 		const currentPhase =
 			persistedPhaseStateResult.ok && persistedPhaseStateResult.value
 				? persistedPhaseStateResult.value.currentPhase
-				: undefined;
+				: input.phaseState?.currentPhase;
 
 		if (currentPhase !== MeetingPhase.CLOSING) {
 			return json(err(SeamErrorCodes.INPUT_INVALID, 'Character shares are paused during crisis mode'), {
