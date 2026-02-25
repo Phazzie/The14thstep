@@ -165,6 +165,27 @@ describe('landing auth route actions', () => {
 		);
 	});
 
+	it('sendMagicLink allows preview origin fallback when VERCEL_ENV=preview', async () => {
+		process.env.NODE_ENV = 'production';
+		process.env.VERCEL_ENV = 'preview';
+		const authClient = createAuthClientStub();
+		authClient.auth.signInWithOtp.mockResolvedValue({ data: {}, error: null });
+		createClientMock.mockReturnValue(authClient as never);
+
+		await actions.sendMagicLink?.({
+			request: makeRequest({ magicEmail: 'person@example.com' }),
+			url: new URL('https://preview-branch.vercel.app/')
+		} as never);
+
+		expect(authClient.auth.signInWithOtp).toHaveBeenCalledWith(
+			expect.objectContaining({
+				options: expect.objectContaining({
+					emailRedirectTo: 'https://preview-branch.vercel.app/auth/callback'
+				})
+			})
+		);
+	});
+
 	it('signIn clears cookies and fails when profile bootstrap fails', async () => {
 		const { cookies, calls } = createCookieJar();
 		const authClient = createAuthClientStub();

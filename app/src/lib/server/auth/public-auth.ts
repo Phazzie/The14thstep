@@ -82,7 +82,13 @@ export function createPublicSupabaseAuthClient(
 ): SupabaseClient | null {
 	const supabaseUrl = env.SUPABASE_URL?.trim() ?? '';
 	const anonKey = resolveAnonKey(env);
-	if (!supabaseUrl || !anonKey) return null;
+	if (!supabaseUrl || !anonKey) {
+		console.warn('public supabase auth client unavailable', {
+			missingSupabaseUrl: !supabaseUrl,
+			missingAnonKey: !anonKey
+		});
+		return null;
+	}
 
 	return createClient(supabaseUrl, anonKey, {
 		auth: {
@@ -99,4 +105,3 @@ export function normalizeEmailToDisplayName(email: string | null | undefined): s
 	const localPart = normalized.split('@')[0]?.trim();
 	return localPart && localPart.length > 0 ? localPart : 'Member';
 }
-
