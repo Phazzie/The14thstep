@@ -634,7 +634,10 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 
 			if (response.error) return mapUpstreamError('getMeetingPhase', response);
 			if (response.data === null) {
-				return ok(null);
+				return err(SeamErrorCodes.NOT_FOUND, 'getMeetingPhase record not found', {
+					method: 'getMeetingPhase',
+					provider: 'supabase'
+				});
 			}
 			if (!isObject(response.data)) {
 				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'getMeetingPhase response is not an object');
