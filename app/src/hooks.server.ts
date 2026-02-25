@@ -90,7 +90,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 			code: sessionResult.error.code,
 			message: sessionResult.error.message,
 			details: sessionResult.error.details ?? null,
-			path: event.url.pathname
+			path: event.url?.pathname ?? null
 		});
 	}
 	event.locals.userId = sessionResult.ok ? sessionResult.value.userId : null;
