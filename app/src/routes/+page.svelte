@@ -4,6 +4,12 @@
 
 	let { data, form } = $props<{ data?: PageData; form?: ActionData }>();
 	const userId = $derived(data?.userId ?? null);
+	const sessionKind = $derived(data?.sessionKind ?? null);
+	const authNotice = $derived(data?.authNotice ?? null);
+	const authNoticeKind = $derived(data?.authNoticeKind ?? null);
+	const authError = $derived(form && 'authMessage' in form ? form.authMessage : null);
+	const authSuccess = $derived(form && 'authSuccess' in form ? form.authSuccess : null);
+	const authEmail = $derived(form && 'authEmail' in form ? form.authEmail : '');
 </script>
 
 <main class="landing-shell">
@@ -27,40 +33,62 @@
 
 	<section class="main-pane">
 	<section class="account-card">
-		<h2>Account</h2>
+		<h2>Start a Meeting</h2>
 		{#if userId}
-			<p class="meta-line">Signed in as <code>{userId}</code></p>
+			<p class="meta-line">{sessionKind === 'guest' ? 'Guest session active' : 'Signed in'}</p>
 			<form method="POST" action="?/signOut" class="auth-form">
 				<button type="submit" class="ghost-btn">
 					Sign Out
 				</button>
 			</form>
 		{:else}
-			<p class="meta-line">Sign in with your Supabase account.</p>
-			{#if form && 'authMessage' in form && form.authMessage}
-				<p class="auth-alert" role="alert">{form.authMessage}</p>
+			<p class="meta-line">Jump in as a guest or sign in to save your continuity.</p>
+			<p class="helper-line">Guest sessions stay on this browser.</p>
+			{#if authNotice}
+				<p class:auth-alert={authNoticeKind === 'error'} class:auth-success={authNoticeKind === 'success'} role="status">
+					{authNotice}
+				</p>
 			{/if}
-			<form method="POST" action="?/signIn" class="auth-form auth-grid">
-				<label for="email">Email</label>
+			{#if authError}
+				<p class="auth-alert" role="alert">{authError}</p>
+			{/if}
+			{#if authSuccess}
+				<p class="auth-success" role="status">{authSuccess}</p>
+			{/if}
+			<form method="POST" action="?/continueGuest" class="auth-form">
+				<button type="submit" class="auth-btn full-width">
+					Continue as Guest
+				</button>
+			</form>
+			<form method="POST" action="?/sendMagicLink" class="auth-form auth-grid">
+				<label for="magicEmail">Email me a sign-in link</label>
 				<input
-					id="email"
-					name="email"
+					id="magicEmail"
+					name="magicEmail"
 					type="email"
 					required
 					autocomplete="email"
+					value={authEmail}
+					placeholder="you@example.com"
 				/>
-				<label for="password">Password</label>
-				<input
-					id="password"
-					name="password"
-					type="password"
-					required
-					autocomplete="current-password"
-				/>
-				<button type="submit" class="auth-btn">
-					Sign In
-				</button>
+				<button type="submit" class="ghost-btn full-width">Send Sign-In Link</button>
 			</form>
+			<details class="more-auth">
+				<summary>More sign-in options</summary>
+				<form method="POST" action="?/signIn" class="auth-form auth-grid">
+					<label for="email">Email</label>
+					<input id="email" name="email" type="email" required autocomplete="email" />
+					<label for="password">Password</label>
+					<input
+						id="password"
+						name="password"
+						type="password"
+						required
+						autocomplete="current-password"
+					/>
+					<button type="submit" class="ghost-btn full-width">Sign In with Password</button>
+				</form>
+			</details>
 		{/if}
 	</section>
 		<SetupFlow {form} />
@@ -162,6 +190,12 @@
 		font-size: 0.9rem;
 	}
 
+	.helper-line {
+		margin: 0.2rem 0 0;
+		color: #94a3b8;
+		font-size: 0.8rem;
+	}
+
 	.auth-alert {
 		margin: 0.65rem 0 0;
 		padding: 0.68rem;
@@ -169,6 +203,16 @@
 		border: 1px solid rgba(244, 63, 94, 0.45);
 		background: rgba(127, 29, 29, 0.2);
 		color: #fecdd3;
+		font-size: 0.86rem;
+	}
+
+	.auth-success {
+		margin: 0.65rem 0 0;
+		padding: 0.68rem;
+		border-radius: 0.65rem;
+		border: 1px solid rgba(34, 197, 94, 0.35);
+		background: rgba(21, 128, 61, 0.12);
+		color: #dcfce7;
 		font-size: 0.86rem;
 	}
 
@@ -222,6 +266,23 @@
 	.ghost-btn {
 		background: rgba(51, 65, 85, 0.95);
 		color: #f8fafc;
+	}
+
+	.full-width {
+		width: 100%;
+	}
+
+	.more-auth {
+		margin-top: 0.75rem;
+		border-top: 1px solid rgba(148, 163, 184, 0.16);
+		padding-top: 0.65rem;
+	}
+
+	.more-auth summary {
+		cursor: pointer;
+		color: #cbd5e1;
+		font-size: 0.84rem;
+		font-weight: 600;
 	}
 
 	@media (max-width: 900px) {

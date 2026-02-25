@@ -72,6 +72,13 @@ export interface CompleteMeetingInput {
 	notableMoments?: Record<string, unknown>;
 }
 
+export interface EnsureUserProfileInput {
+	id: string;
+	displayName: string;
+	cleanTime?: string | null;
+	isAnonymous: boolean;
+}
+
 export interface UpdateCallbackInput {
 	id: string;
 	updates: {
@@ -89,6 +96,7 @@ export interface GetMeetingCountAfterDateInput {
 
 export interface DatabasePort {
 	getUserById(userId: string): Promise<SeamResult<UserProfile>>;
+	ensureUserProfile(input: EnsureUserProfileInput): Promise<SeamResult<UserProfile>>;
 	createMeeting(
 		input: Omit<MeetingRecord, 'id' | 'startedAt' | 'endedAt'>
 	): Promise<SeamResult<MeetingRecord>>;
@@ -162,6 +170,16 @@ export function validateUserProfile(value: unknown): value is UserProfile {
 		meetingCount >= 0 &&
 		isNullableString(value.firstMeetingAt) &&
 		isNullableString(value.lastMeetingAt)
+	);
+}
+
+export function validateEnsureUserProfileInput(value: unknown): value is EnsureUserProfileInput {
+	if (!isObject(value)) return false;
+	return (
+		isNonEmptyString(value.id) &&
+		isNonEmptyString(value.displayName) &&
+		(value.cleanTime === undefined || isNullableString(value.cleanTime)) &&
+		typeof value.isAnonymous === 'boolean'
 	);
 }
 

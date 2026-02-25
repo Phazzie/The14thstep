@@ -4,6 +4,7 @@ import type {
 	CompleteMeetingInput,
 	CreateCallbackInput,
 	DatabasePort,
+	EnsureUserProfileInput,
 	GetMeetingCountAfterDateInput,
 	MeetingRecord,
 	ShareRecord,
@@ -14,6 +15,7 @@ import {
 	validateCallbackRecord,
 	validateCompleteMeetingInput,
 	validateCreateCallbackInput,
+	validateEnsureUserProfileInput,
 	validateGetMeetingCountAfterDateInput,
 	validateAppendShareInput,
 	validateCreateMeetingInput,
@@ -110,6 +112,19 @@ export function createDatabaseMock(options: DatabaseMockOptions = {}): DatabaseP
 		async getUserById(userId) {
 			if (typeof userId !== 'string' || userId.trim().length === 0) {
 				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid userId');
+			}
+			if (scenarios.getUserById === 'fault') {
+				return err(fault.code, fault.message, fault.details);
+			}
+			if (!validateUserProfile(fixtures.getUserById)) {
+				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'Fixture violates UserProfile');
+			}
+			return ok(fixtures.getUserById);
+		},
+
+		async ensureUserProfile(input: EnsureUserProfileInput) {
+			if (!validateEnsureUserProfileInput(input)) {
+				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid ensureUserProfile input');
 			}
 			if (scenarios.getUserById === 'fault') {
 				return err(fault.code, fault.message, fault.details);

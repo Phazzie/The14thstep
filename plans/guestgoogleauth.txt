@@ -1,0 +1,750 @@
+# Guest-First Auth + Email Magic Link Plan (Decision-Complete, AI-Implementer Ready)
+## Supabase Auth, Guest + Magic Link First (Phone/Google Later)
+## Future-Compatible with Quick Guest Mode and Ongoing Room Ideas
+
+## Summary
+
+This plan replaces the previous Guest + Google-first auth plan with a faster, lower-friction path: **Guest + Email Magic Link** using Supabase Auth. It removes backend/provider jargon from the UI (no “Supabase login” language), adds a primary **Continue as Guest** path, adds **Email me a sign-in link** as the main non-guest option, preserves the existing meeting engine and ritual flow, and keeps the architecture compatible with future **Phone OTP**, **Google OAuth**, **Quick Guest Meeting**, and **ongoing/perpetual room** work. Under the hood, guest mode uses **Supabase anonymous auth** so the current database constraints and continuity model stay intact without fake IDs or a parallel guest identity hack.
+
+## Revision Notes (Post-Review Tightening)
+
+### Revision Pass A (Protocol + Semantics)
+1. Tighten callback-route requirements to support the actual Supabase email-link callback variants (PKCE code exchange preferred, OTP token-hash fallback supported if needed).
+2. Tighten `join` bootstrap semantics so it checks `getUserById(...)` first and only bootstraps on `NOT_FOUND`.
+3. Clarify anti-enumeration behavior so UI success/error states do not leak account existence but still surface true environment/config breakage.
+4. Require sanitized server-side logging for callback/bootstrap failures.
+
+### Revision Pass B (Execution + Rollout Discipline)
+1. Add explicit verification evidence expectations (commands + outcomes), not just a test list.
+2. Add magic-link cooldown/rate-limit handling expectations for UX and error messaging.
+3. Add rollback guidance (disable/hide magic-link CTA while keeping guest/password fallback if rollout is unstable).
+4. Tighten acceptance criteria to require one real callback-path success in a configured environment.
+
+## Why This Exists (Product Problem in Plain English)
+
+The current landing/auth experience leaks infrastructure language (“Supabase account”) into a user-facing moment that should feel like entering a room, not logging into tooling. At the same time, the app’s continuity features (meeting history, callbacks, memory) rely on user identity. We need a lower-friction, more human sign-in path that still honors the current data model. Email magic links are simpler to ship than Google OAuth and avoid the Google Console / consent-screen setup overhead while still giving users a real account path beyond guest mode.
+
+---
+
+## Goals (What We ARE Building)
+
+1. Remove all user-facing “Supabase” auth/login wording.
+2. Add a visible, primary **Continue as Guest** flow.
+3. Add a visible **Email me a sign-in link** flow (magic link / email OTP via Supabase Auth).
+4. Keep existing email/password sign-in working as a fallback (hidden/secondary) unless we explicitly remove it later.
+5. Ensure any authenticated user (guest, magic-link, or email/password) has a valid `public.users` row before meeting creation.
+6. Reuse the existing normal meeting flow and ritual phase progression for guests and signed-in users.
+7. Preserve compatibility with future phone auth, Google OAuth, quick guest mode, and ongoing-room continuity ideas.
+
+## Out of Scope (What We Are NOT Building in This Pass)
+
+1. Google OAuth implementation (deferred).
+2. Apple auth implementation (deferred).
+3. Phone auth / SMS OTP implementation (deferred, but planned).
+4. Quick Guest Meeting mode behavior changes (different ritual/UX flow).
+5. Anonymous guest -> permanent account linking/upgrade flow.
+6. Shared guest continuity bucket (explicitly rejected).
+7. Replacing Supabase Auth with another auth backend.
+8. Rewriting the meeting engine for an ongoing/perpetual room.
+
+---
+
+## Locked Decisions (No Further Debate During Implementation)
+
+1. **Auth scope now:** Guest + Email Magic Link.
+2. **Guest implementation now:** Supabase anonymous auth (hidden from the user).
+3. **Guest continuity now:** Per-browser/per-session identity, not shared across strangers.
+4. **Non-guest implementation now:** Supabase email magic link / OTP (`signInWithOtp`) with redirect back to the app.
+5. **Guest experience now:** Reuse the existing normal meeting flow.
+6. **Email/password remains available** as a hidden fallback (secondary UI) in this pass.
+7. **No provider/internal wording** appears in user-facing UI or error messages.
+8. **`ensureUserProfile` is bootstrap-only** (create-if-missing, non-destructive for existing user-editable fields).
+9. **SetupFlow `userName` remains meeting-local alias** in this pass (not account profile sync).
+10. **No shared guest account / guest memory bucket** is allowed.
+11. **Guest account bloat is accepted technical debt for now** (tracked follow-up cleanup later).
+12. **Phone auth is deferred**, but the UI/route structure should make it easy to add a later “Use phone number” option.
+13. **Google OAuth is deferred**, but the callback route should be generic enough to support it later.
+
+---
+
+## Current State (Repo Truth)
+
+## Relevant code locations (Windows paths)
+
+### Landing/Auth UI and actions
+- `C:\Users\latro\Downloads\t\recoverymeeting-codex\app\src\routes\+page.svelte`
+- `C:\Users\latro\Downloads\t\recoverymeeting-codex\app\src\routes\+page.server.ts`
+
+### Session/auth infrastructure
+- `C:\Users\latro\Downloads\t\recoverymeeting-codex\app\src\hooks.server.ts`
+- `C:\Users\latro\Downloads\t\recoverymeeting-codex\app\src\lib\seams\auth\contract.ts`
+- `C:\Users\latro\Downloads\t\recoverymeeting-codex\app\src\lib\server\seams\auth\adapter.ts`
+
+### Meeting setup UI
+- `C:\Users\latro\Downloads\t\recoverymeeting-codex\app\src\lib\components\SetupFlow.svelte`
+
+### Meeting runtime / continuity systems (already implemented)
+- `C:\Users\latro\Downloads\t\recoverymeeting-codex\app\src\routes\meeting\[id]\share\+server.ts`
+- `C:\Users\latro\Downloads\t\recoverymeeting-codex\app\src\routes\meeting\[id]\user-share\+server.ts`
+- `C:\Users\latro\Downloads\t\recoverymeeting-codex\app\src\routes\meeting\[id]\close\+server.ts`
+- `C:\Users\latro\Downloads\t\recoverymeeting-codex\app\src\lib\core\memory-builder.ts`
+- `C:\Users\latro\Downloads\t\recoverymeeting-codex\app\src\lib\core\callback-*.ts`
+
+### DB seam / schema
+- `C:\Users\latro\Downloads\t\recoverymeeting-codex\app\src\lib\seams\database\contract.ts`
+- `C:\Users\latro\Downloads\t\recoverymeeting-codex\app\src\lib\server\seams\database\adapter.ts`
+- `C:\Users\latro\Downloads\t\recoverymeeting-codex\app\supabase\migrations\20260215_000001_init_schema.sql`
+- `C:\Users\latro\Downloads\t\recoverymeeting-codex\app\supabase\migrations\20260221_000002_add_meeting_phase_state.sql`
+
+## Observed UX problems (current)
+1. Landing page says “Sign in with your Supabase account.”
+2. Setup flow exposes “User ID (optional)” / “Supabase auth user id.”
+3. Auth UI is implementation-first, not user-first.
+4. Current sign-in path is email/password only.
+
+## Observed DB constraints (important)
+1. `public.users.id` references `auth.users.id`
+2. `public.meetings.user_id` references `public.users.id`
+3. `public.users.is_anonymous` column already exists
+4. No repo-visible trigger currently auto-creates `public.users` rows from new auth users
+
+## Supabase project this local workspace points to (non-secret metadata)
+- Project ref: `tmcpfhftdrexsjrcrxbo`
+- Host: `tmcpfhftdrexsjrcrxbo.supabase.co`
+
+---
+
+## Product Spec (User Experience, Final)
+
+## Landing Page (`/`) — Signed Out
+
+### CTA order (final)
+1. **Primary:** `Continue as Guest`
+2. **Secondary:** `Email me a sign-in link`
+3. **Tertiary disclosure:** `More sign-in options`
+4. Email/password fallback form inside disclosure
+5. (Optional copy-only placeholder for future phone auth): `Phone sign-in coming soon` (no button yet)
+
+### Copy (final)
+- Heading: `Start a Meeting`
+- Supporting copy: `Jump in as a guest or sign in to save your continuity.`
+- Guest helper copy (small): `Guest sessions stay on this browser.`
+- Magic link helper copy (small): `We’ll email you a sign-in link.`
+- Fallback label: `More sign-in options`
+- Email/password fallback label: `Email + password`
+
+### Error copy (examples)
+- Guest: `Couldn't start a guest session right now. Try again.`
+- Magic link request failure: `Couldn't send a sign-in link right now. Try again.`
+- Callback/auth completion failure: `We couldn't complete sign-in. Try the link again.`
+- Generic config issue: `Sign-in is not configured on this environment.`
+
+No provider jargon and no raw upstream error text.
+
+## Landing Page (`/`) — Signed In
+
+### Signed-in state text rules
+- Anonymous session: `Guest session active`
+- Regular account: `Signed in`
+- Optional subtext: display name or email if available
+- Do not default to raw UUID
+- Keep `Sign Out` button
+
+## Setup Flow (`SetupFlow.svelte`)
+
+### Changes (final)
+1. Remove visible `User ID (optional)` field from normal UX.
+2. Identity is derived from `locals.userId` on the server.
+3. `userName` remains the **meeting-local name/alias** (not profile sync).
+4. Keep the rest of the setup flow intact in this pass.
+
+---
+
+## Under-the-Hood Auth Architecture (Final)
+
+## Overview
+All auth entry paths must converge on the same outcome:
+1. Valid Supabase auth session cookies
+2. `locals.userId` resolvable via current hook/auth adapter
+3. `public.users` row exists for that auth user id
+4. Existing meeting creation and continuity systems proceed unchanged
+
+## Auth Entry Paths
+
+### A. Guest flow (new)
+- UI button posts to `?/continueGuest`
+- Server action uses Supabase anonymous auth
+- Server sets cookies
+- Server ensures `public.users` row with `is_anonymous = true`
+- Redirect to `/`
+
+### B. Email magic-link flow (new primary non-guest path)
+- UI form submits email to `?/sendMagicLink`
+- Server action calls Supabase `signInWithOtp` for email
+- Sends magic link to user email with redirect back to app callback route
+- Server returns success UI message (`Check your email for a sign-in link`)
+- User clicks email link
+- Supabase redirects back to app (`/auth/callback`)
+- Callback finalizes sign-in using the configured Supabase callback shape (PKCE `code` exchange preferred; token-hash verification fallback supported if needed) and sets cookies
+- Callback ensures `public.users` row with `is_anonymous = false`
+- Redirect `/`
+
+### C. Email/password (existing, fallback)
+- Existing `signIn` action remains hidden/secondary
+- After successful sign-in and cookie set, call same `ensureUserProfile(...)`
+- Redirect `/`
+
+### D. Join meeting (existing, hardened)
+- `join` action defensively checks `getUserById(...)` first and only calls `ensureUserProfile(...)` when the profile row is missing
+- This protects against first-login/profile-race failures
+- Then calls `createMeeting(...)`
+
+---
+
+## Required Interface / Contract Changes (Decision Complete)
+
+## 1. Database seam contract addition
+
+### File
+- `app/src/lib/seams/database/contract.ts`
+
+### Add type: `EnsureUserProfileInput`
+Fields:
+- `id: string`
+- `displayName: string`
+- `cleanTime?: string | null`
+- `isAnonymous: boolean`
+
+Decision:
+- Do not add `email` unless the DB schema actually stores it in `public.users` and the app needs it there.
+- Keep the seam contract aligned to current table semantics.
+
+### Add method to `DatabasePort`
+- `ensureUserProfile(input: EnsureUserProfileInput): Promise<SeamResult<UserProfile>>`
+
+### Semantics (strict, non-negotiable)
+- Idempotent
+- Bootstrap-only, non-destructive behavior
+- If row exists:
+  - do **not** overwrite `display_name`
+  - do **not** overwrite `clean_time`
+  - may upgrade `is_anonymous` from `true -> false`
+  - must **not** downgrade `is_anonymous` from `false -> true` during auth bootstrap
+- If row missing:
+  - insert row
+- Return normalized `UserProfile`
+- Map seam errors consistently
+
+## 2. Auth callback route (new)
+
+### File
+- `app/src/routes/auth/callback/+server.ts`
+
+Purpose:
+- Handle email magic-link auth completion now
+- Remain generic enough to support future Google OAuth later
+- Set session cookies and ensure profile bootstrap
+
+## 3. Optional future-proof type scaffold (no behavior change)
+Add shared type:
+- `type ExperienceMode = 'standard' | 'quick_guest'`
+
+Do not branch logic on this yet; add only if it can be done cleanly.
+
+---
+
+## Auth Flow Details (Decision Complete)
+
+## A. Continue as Guest (anonymous auth)
+
+### User flow
+1. User clicks `Continue as Guest`
+2. Server action `continueGuest` creates anonymous Supabase auth session
+3. Server sets auth cookies
+4. Server ensures `public.users` row (`display_name = 'Guest'`, `is_anonymous = true`)
+5. User returns to `/` in signed-in guest state
+6. User can start meeting normally
+
+### Failure behavior
+- If anonymous sign-in fails: return friendly error message on landing page
+- If cookie set succeeds but profile ensure fails: clear cookies and return blocking error
+
+## B. Email Magic Link (email OTP / link)
+
+### User flow
+1. User enters email and submits `Email me a sign-in link`
+2. Server action `sendMagicLink` validates email format
+3. Action calls Supabase `signInWithOtp({ email, options: { emailRedirectTo: <origin>/auth/callback } })`
+4. UI shows success state (no user enumeration details)
+5. User clicks email link
+6. App callback route finalizes session (`exchangeCodeForSession` or equivalent Supabase callback completion flow)
+7. Callback sets auth cookies
+8. Callback ensures `public.users` row (`is_anonymous = false`, displayName derived safely)
+9. Redirect `/`
+
+### Security/UX rules
+- Do not leak whether email is already registered
+- Use the same success copy for normal request outcomes whenever practical (anti-enumeration posture)
+- Only show a distinct error when the request is invalid (e.g. malformed email) or the environment/config is actually broken
+- No raw Supabase error text in UI
+
+### Callback route behavior (exact)
+Callback route must:
+1. Parse query params (`code`, `error`, optional `error_description`)
+2. If `error` present -> redirect `/` with friendly message
+3. If `code` present -> call Supabase PKCE session exchange/completion
+4. Else if token-hash style params are present (`token_hash` + `type`) -> verify OTP with Supabase and complete session
+5. Else -> treat as invalid callback and redirect with friendly message
+6. Validate session/user exists
+7. Set auth cookies
+8. Ensure `public.users` row
+9. Redirect `/`
+10. On failure after partial session setup -> clear cookies and redirect with friendly message
+11. Log a sanitized callback failure reason server-side for debugging (no raw provider text in user UI)
+
+## C. Email/password fallback (existing)
+
+### Behavior in this pass
+- Keep the action working
+- Hide it behind `More sign-in options`
+- After successful sign-in, call `ensureUserProfile(...)`
+- Redirect `/`
+
+Rationale:
+- Avoid regressions while the new primary flow settles
+
+---
+
+## Identity/Profile Bootstrap Design (Important)
+
+## Why no shared guest bucket
+Rejected explicitly:
+- A shared guest account would mix strangers’ continuity/memory/callbacks
+- That is unsafe/confusing for this product
+- It also makes future cleanup/migration worse
+
+## Approved continuity model
+Per-browser/per-session guest continuity using anonymous auth:
+- Each guest gets a unique auth user + `public.users` row
+- Continuity persists only as long as that auth session/cookies survive
+- If cookies are cleared or guest signs out, continuity is lost (acceptable for guest mode)
+
+## `ensureUserProfile(...)` is NOT profile sync
+This is the key anti-bug rule:
+- It exists to ensure a required row exists for DB integrity
+- It is **not** the place to sync provider metadata or overwrite user-customized profile values
+
+## SetupFlow `userName` is meeting-local alias
+- The name entered in setup is used for the meeting experience/transcript context
+- It does not mutate `public.users.display_name` in this pass
+- If we later want “remember this name,” that becomes a separate explicit feature
+
+---
+
+## Database Bloat / Guest Cleanup (Accepted Debt + Future Work)
+
+## Known tradeoff (accepted for now)
+Every guest session can create:
+- `auth.users` anonymous user
+- `public.users` row
+- meetings/shares/etc.
+
+If guests try once and disappear, this creates “dead” guest rows over time.
+
+## Decision for this pass
+Accept this debt for now because:
+- current user count is effectively zero
+- product velocity matters more than preemptive cleanup systems
+- `public.users.is_anonymous` makes cleanup straightforward later
+
+## Required follow-up issue (must be tracked)
+Create a post-ship issue for guest cleanup:
+- purge inactive anonymous users after a retention window (30/60/90 days)
+- handle cascades/related records safely
+- define whether analytics retention is needed before deletion
+
+---
+
+## Phone Auth (Deferred) — Design Notes So We Don’t Paint Ourselves Into a Corner
+
+## Why deferred now
+Phone auth is viable but brings extra work:
+- SMS provider setup / configuration
+- delivery failures and retries
+- cost/rate-limit/abuse handling
+- country formatting edge cases
+
+## What we do now to keep it easy later
+1. Structure landing auth UI as multiple entry methods (guest, email link, more options)
+2. Keep callback/session/profile bootstrap shared and provider-agnostic at the route layer
+3. Do not hardcode Google-specific naming in callback route or helper functions
+
+## Future phone path (not implemented in this pass)
+- Add `?/sendPhoneCode`
+- Add `?/verifyPhoneCode` (or callback completion flow if provider supports redirect)
+- Reuse `ensureUserProfile(...)`
+- Same `public.users` bootstrap semantics (`is_anonymous = false`)
+
+---
+
+## Future Compatibility: Quick Guest Mode + Ongoing/Perpetual Room
+
+## Rules to preserve now
+1. Do not encode guest identity as a fake/manual ID.
+2. Keep auth identity separate from future meeting style selection.
+3. Keep room-level continuity concerns out of auth callback logic.
+4. Optionally introduce `ExperienceMode` now, but do not branch behavior yet.
+
+## Why this matters
+Later you may want:
+- a “Quick Guest Meeting” with a lighter ritual flow
+- an ongoing room with room-level continuity
+
+Today’s auth implementation should not make those harder.
+
+---
+
+## Implementation Plan (File-by-File, Decision Complete)
+
+## Phase 1 — Landing UI rewrite (copy + CTA structure)
+
+### Files
+- `app/src/routes/+page.svelte`
+- `app/src/lib/components/SetupFlow.svelte`
+
+### `app/src/routes/+page.svelte` exact changes
+1. Remove all visible “Supabase” auth wording.
+2. Add guest CTA form:
+   - `method="POST" action="?/continueGuest"`
+3. Add magic-link form:
+   - email input + submit button `method="POST" action="?/sendMagicLink"`
+4. Move email/password form into `More sign-in options` disclosure.
+5. Signed-in state hides UUID by default and shows user-friendly text.
+6. Surface auth success/error messages in a user-friendly way.
+7. Keep keyboard/focus access intact.
+
+### `app/src/lib/components/SetupFlow.svelte` exact changes
+1. Remove visible `User ID (optional)` field and Supabase wording.
+2. Keep hidden compatibility field only if absolutely required by current form shape (prefer removing reliance entirely).
+3. No ritual/setup logic changes in this pass.
+
+## Phase 2 — Add server actions for guest and magic-link request
+
+### File
+- `app/src/routes/+page.server.ts`
+
+### Add helpers (recommended)
+- `createPublicAuthClient(...)` (Supabase public auth client)
+- `setAuthCookies(cookies, session)`
+- `clearAuthCookies(cookies)`
+- `ensureCurrentUserProfile(locals, input)` wrapper for DB seam
+- `resolveDisplayNameFromAuthUser(user)` helper (safe fallback chain)
+
+### New action: `continueGuest`
+Behavior:
+1. Create Supabase auth client
+2. Call anonymous sign-in
+3. Validate session/user
+4. Set auth cookies
+5. `ensureUserProfile({ id, displayName: 'Guest', cleanTime: null, isAnonymous: true })`
+6. On success -> redirect `/`
+7. On failure -> clear cookies + return friendly error
+
+### New action: `sendMagicLink`
+Behavior:
+1. Validate email input
+2. Create Supabase auth client
+3. Call `signInWithOtp` for email with `emailRedirectTo = ${origin}/auth/callback`
+4. Return success state (`Check your email`) even when possible (anti-enumeration-friendly)
+5. If configuration is broken or call fails, return friendly error
+
+### Update existing action: `signIn` (email/password fallback)
+Behavior:
+1. Keep current sign-in behavior
+2. After session success and cookie set, call `ensureUserProfile(...)`
+3. If profile ensure fails, clear cookies and return friendly error
+4. Redirect `/`
+
+### Update existing action: `join`
+Behavior:
+1. Use `locals.userId` as primary identity source
+2. If `locals.userId` exists, call `getUserById(locals.userId)` first
+3. If `getUserById(...)` returns `NOT_FOUND`, call `ensureUserProfile(...)` with bootstrap-safe defaults
+4. If `getUserById(...)` or `ensureUserProfile(...)` returns a non-`ok` error, fail gracefully and do not continue to `createMeeting(...)`
+5. Preserve probe/dev fallback behavior only where intentionally needed
+6. Do not derive identity from user-provided form IDs in normal flow
+
+## Phase 3 — Auth callback route (email magic-link completion now, Google-ready later)
+
+### New file
+- `app/src/routes/auth/callback/+server.ts`
+
+### Exact responsibilities
+1. Parse callback params (`code`, `error`, `error_description`)
+2. Handle provider/auth errors with friendly redirect messages
+3. Complete session exchange/finalization with Supabase
+4. Validate session/user
+5. Set auth cookies
+6. `ensureUserProfile(...)` with `isAnonymous = false`
+7. Redirect `/`
+8. If profile ensure fails after session completion:
+   - clear cookies
+   - redirect `/` with blocking friendly error
+
+### Display name resolution precedence (for non-guest)
+1. `user.user_metadata.full_name`
+2. `user.user_metadata.name`
+3. email local part (before `@`)
+4. `Member`
+
+## Phase 4 — DB seam support for user profile bootstrap
+
+### Files
+- `app/src/lib/seams/database/contract.ts`
+- `app/src/lib/server/seams/database/adapter.ts`
+- `app/src/lib/seams/database/mock.ts`
+- any hand-written `DatabasePort` stubs/tests
+
+### Adapter implementation details (strict)
+1. Validate input (`id`, `displayName`)
+2. Upsert by `id` into `public.users`
+3. Preserve non-destructive semantics for existing rows
+4. Normalize and return `UserProfile`
+5. Map seam errors per current adapter patterns
+
+### Important rule (again)
+Do not accidentally convert a known non-anonymous account into anonymous during bootstrap.
+
+## Phase 5 — Optional future-proof scaffold (no behavior change)
+
+### Shared type module
+Add (optional):
+- `type ExperienceMode = 'standard' | 'quick_guest'`
+
+No runtime branching in this pass.
+
+---
+
+## Supabase Configuration (Required, Non-code)
+
+## Guest (Anonymous Auth)
+1. Enable anonymous sign-ins in Supabase Auth settings (if not already enabled).
+2. Verify anonymous sessions issue the cookies your current hooks/auth adapter expects.
+
+## Email Magic Link
+1. Enable Email provider in Supabase Auth.
+2. Ensure email OTP/magic link is configured for the project.
+3. Configure allowed redirect URLs to include:
+   - local callback URL (for local testing)
+   - production callback URL (for deployed app)
+4. Confirm email templates/settings are sane enough for testing (does not need full polish in first pass).
+5. Confirm the email template/callback flow matches what the app callback route supports (prefer PKCE `code` exchange; if using token-hash style, ensure callback route verifies OTP).
+
+## (Deferred later) Phone
+No phone setup in this pass.
+
+---
+
+## Error Handling / Edge Cases (Explicit Behavior)
+
+## Auth config missing
+- Show: `Sign-in is not configured on this environment.`
+- Do not leak provider names or raw stack traces to users
+
+## Guest sign-in failure
+- Show: `Couldn't start a guest session right now. Try again.`
+
+## Magic-link send failure
+- Show: `Couldn't send a sign-in link right now. Try again.`
+- Keep email input populated if possible
+- If provider rate-limits requests, show a friendly cooldown/retry message (no raw provider codes)
+
+## Callback failures
+- Missing/invalid code -> friendly redirect to `/`
+- Provider returns error params -> friendly redirect to `/`
+- Session exchange failure -> friendly redirect to `/`
+- Profile bootstrap failure after auth -> clear cookies + block user with friendly message
+
+## Existing user with missing `public.users` row
+- `join` defensive `ensureUserProfile(...)` handles this without forcing re-auth
+
+## Guest continuity expectations (must be honest)
+- If cookies are cleared or guest signs out, continuity may be lost
+- This is acceptable in this pass
+
+---
+
+## Testing Plan (Required)
+
+## Unit / seam tests
+
+### DB adapter / contract tests for `ensureUserProfile`
+1. Inserts missing guest user (`is_anonymous = true`)
+2. Inserts missing non-guest user (`is_anonymous = false`)
+3. Existing row is preserved (non-destructive `display_name`, `clean_time`)
+4. `is_anonymous` upgrades `true -> false`
+5. `is_anonymous` does not downgrade `false -> true`
+6. Invalid input -> `INPUT_INVALID`
+7. Malformed upstream payload -> `CONTRACT_VIOLATION`
+8. Upstream/network failures mapped correctly
+
+## Route/action tests
+
+### `app/src/routes/+page.server.ts`
+1. `continueGuest` success sets cookies + ensures profile + redirects
+2. `continueGuest` failure returns friendly error and does not leave broken auth state
+3. `sendMagicLink` valid email triggers Supabase call and returns success UI state
+4. `sendMagicLink` invalid email returns validation error
+5. `sendMagicLink` upstream/config failure returns friendly error
+6. `signIn` (email/password fallback) still works and ensures profile
+7. `join` defensively ensures profile before `createMeeting`
+8. `join` handles ensure-profile failure cleanly (no silent FK crash path)
+9. `join` checks `getUserById(...)` first and only bootstraps on `NOT_FOUND`
+
+### `app/src/routes/auth/callback/+server.ts`
+1. `error` query redirects with friendly message
+2. missing code redirects with friendly message
+3. successful code exchange sets cookies + ensures profile + redirects
+4. profile ensure failure clears cookies and redirects with error
+5. token-hash callback path completes auth (if implemented/supported in this pass)
+
+## UI/component tests
+
+### `app/src/routes/+page.svelte`
+1. No visible “Supabase” auth wording remains
+2. `Continue as Guest` is visible when signed out
+3. `Email me a sign-in link` is visible when signed out
+4. Email/password fallback is hidden under `More sign-in options`
+5. Signed-in state does not display raw UUID by default
+
+### `app/src/lib/components/SetupFlow.svelte`
+1. No visible `User ID (optional)` field in normal UI
+2. Existing setup steps still render/submit correctly
+
+## Integration / e2e (high value)
+1. Guest path:
+   - Continue as Guest
+   - start meeting
+   - reload
+   - session still valid
+2. Magic-link path:
+   - submit email form (mocked provider call OK in CI if needed)
+   - callback route completion path sets session + reaches signed-in state
+3. Meeting regression:
+   - guest + signed-in users can still start meeting and use normal ritual flow
+
+## Verification Evidence Requirements (Do Not Skip)
+1. Report exact commands run (copy/pasteable), not just “tests passed.”
+2. Report pass/fail per command and note any blocked checks explicitly.
+3. Include at least one manual or real-environment callback proof note (local or deployed) once Supabase email settings are configured.
+4. If local environment/tooling blocks a check, state the blocker and fallback evidence used.
+
+---
+
+## Acceptance Criteria (Feature Is Done When…)
+
+1. No user-facing auth copy mentions “Supabase”.
+2. Signed-out landing page shows:
+   - `Continue as Guest`
+   - `Email me a sign-in link`
+   - `More sign-in options` (email/password fallback)
+3. Guest sign-in works without manual user-id entry.
+4. Magic-link request and callback completion work end-to-end in configured environments.
+5. `public.users` row is created/ensured for guest, magic-link, and email/password users.
+6. Meeting creation works for guest and signed-in users without profile/FK bootstrap failures.
+7. Setup flow no longer exposes backend-specific user ID text in normal UX.
+8. Tests cover guest action, magic-link action, callback route, and profile bootstrap seam.
+9. Existing ritual/meeting flow behavior remains intact.
+10. No shared guest continuity bucket is introduced.
+11. At least one real configured environment (local or deployed) successfully completes the magic-link callback path end-to-end (not just mocks).
+
+---
+
+## Rollout / Deployment Plan
+
+1. Merge code changes behind normal PR/CI process.
+2. Confirm Supabase project settings for:
+   - anonymous auth enabled
+   - email auth / magic link enabled
+   - redirect URL allowlist includes `/auth/callback`
+3. Deploy app.
+4. Smoke test (in order):
+   - Guest sign-in
+   - Email magic-link request
+   - Magic-link callback sign-in completion
+   - Email/password fallback (still works)
+   - Join meeting
+   - Share / close / reload
+5. Monitor logs for:
+   - callback failures
+   - profile bootstrap failures
+   - auth cookie/session parsing regressions
+   - meeting create FK failures
+6. If magic-link rollout is unstable, keep guest + password fallback active and temporarily hide/disable the magic-link CTA until callback/config issues are fixed.
+
+No new DB migration is required specifically for this auth UX change because `public.users.is_anonymous` already exists.
+
+---
+
+## Risks and Mitigations
+
+## Risk 1: Missing `public.users` row causes meeting creation failure
+**Mitigation:** Add `ensureUserProfile(...)`; call it in all auth success paths and defensively in `join`.
+
+## Risk 2: Magic-link callback flow differs in environment/config and fails silently
+**Mitigation:** Add explicit callback route tests, friendly error handling, and deployment smoke test for real callback path.
+
+## Risk 3: Anonymous auth enabled locally but not in production
+**Mitigation:** Pre-deploy checklist requires Supabase auth provider settings verification.
+
+## Risk 4: Guest account bloat accumulates over time
+**Mitigation:** Accept now; track and implement anonymous-user cleanup job later.
+
+## Risk 5: AI implementer “fixes copy only” and claims feature done
+**Mitigation:** Acceptance criteria require working guest + magic-link flows, callback route, profile bootstrap, and tests.
+
+---
+
+## “Don’t Be Bullshittin” Reminder for the AI Implementer
+
+## Do NOT take these shortcuts
+1. Do not stop at copy changes; this feature is not “done” until guest + magic-link + callback + profile bootstrap work.
+2. Do not invent fake guest IDs in forms/cookies to bypass auth; use real anonymous auth sessions.
+3. Do not create a shared guest account/bucket for all guests.
+4. Do not assume `public.users` rows auto-appear from Supabase auth; the repo does not show a trigger for this.
+5. Do not bypass the DB seam by sprinkling direct profile writes across route handlers.
+6. Do not overwrite user-editable profile fields inside `ensureUserProfile(...)` (bootstrap-only means bootstrap-only).
+7. Do not treat SetupFlow `userName` as account profile sync in this pass.
+8. Do not expose raw Supabase/auth errors to users.
+9. Do not break the hidden email/password fallback while adding guest + magic link.
+10. Do not claim magic-link sign-in works without implementing and testing the callback route.
+11. Do not claim guest continuity works unless you verify session persistence across reload in the same browser.
+12. Do not add phone auth opportunistically in this PR “while you’re in there”; phone is deferred on purpose.
+13. Do not call `ensureUserProfile(...)` and ignore the `SeamResult`; every bootstrap path must check `.ok`.
+14. Do not blindly call `ensureUserProfile(...)` in `join`; check `getUserById(...)` first and only bootstrap on `NOT_FOUND`.
+
+## What “done” actually means here
+- Users can enter as guest or request an email sign-in link without seeing backend jargon.
+- Auth completion leads to a valid session and a bootstrapped `public.users` row.
+- Meetings start normally for guest and signed-in users.
+- Tests prove the new auth/bootstrap paths.
+- Future phone/Google/quick-guest work is not made harder by today’s implementation.
+
+---
+
+## Post-Ship Follow-ups (Track as Issues, Do Not Sneak Into This PR)
+
+1. Anonymous guest cleanup / retention policy job
+2. Phone auth (SMS OTP) implementation and abuse/rate-limit design
+3. Google OAuth implementation (if still desired)
+4. Guest -> permanent account upgrade/linking flow
+5. Quick Guest Meeting mode (different UX/ritual flow)
+6. Ongoing/perpetual room continuity design
+7. Anonymous-user cleanup/retention job implementation (if not already tracked elsewhere)
+
+---
+
+## Suggested file name (kept as requested)
+- `plans/guestgoogleauth.txt`
+
+(Yes, the filename still mentions Google; rename later if you want, but not required to execute this plan.)
