@@ -1,0 +1,52 @@
+name: CI Triage Review Comments (Starter)
+
+on:
+  pull_request_review:
+    types:
+      - submitted
+      - edited
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to triage
+        required: true
+        type: number
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  triage-review-feedback:
+    name: Triage Bot Review Feedback (Informational)
+    runs-on: ubuntu-latest
+    # Starter triage pipeline only: informational summary + artifact.
+    # This is not the final Codex-decider system and should not block PRs.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Run starter triage script (non-blocking)
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ inputs.pr_number || github.event.pull_request.number }}
+          GITHUB_API_URL: ${{ github.api_url }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          TRIAGE_OUTPUT_PATH: artifacts/ci-triage-summary.json
+        run: node scripts/triage-pr-comments.mjs
+
+      - name: Upload triage summary artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-triage-summary-pr-${{ inputs.pr_number || github.event.pull_request.number || 'unknown' }}
+          path: artifacts/ci-triage-summary.json
+          if-no-files-found: warn
+
