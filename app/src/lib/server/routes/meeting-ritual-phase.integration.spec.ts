@@ -399,7 +399,7 @@ describe('meeting ritual phase route integration (server routes + in-memory seam
 			database,
 			grokAi,
 			sequenceOrder: 3,
-			characterId: 'meechie'
+			characterId: 'marcus'
 		});
 			expect(readPersistedPhase(events)).toBe('topic_selection');
 

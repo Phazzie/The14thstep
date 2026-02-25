@@ -174,6 +174,17 @@ describe('ritual-orchestration', () => {
 			}
 		});
 
+		it('transitions from CLOSING to CRISIS_MODE on user_input', () => {
+			const state = initializeMeetingPhase();
+			state.currentPhase = MeetingPhase.CLOSING;
+
+			const result = transitionToNextPhase(state, 'user_input');
+			expect(result.ok).toBe(true);
+			if (result.ok) {
+				expect(result.value.currentPhase).toBe(MeetingPhase.CRISIS_MODE);
+			}
+		});
+
 		it('resets spoken characters when transitioning to new round', () => {
 			let state = initializeMeetingPhase();
 			state = unwrap(transitionToNextPhase(state, 'meeting_start'));
