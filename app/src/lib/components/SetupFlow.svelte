@@ -103,9 +103,6 @@
 			<label for="mind">What's on your mind?</label>
 			<textarea id="mind" rows="4" bind:value={mind} placeholder="What are you bringing into the room?"></textarea>
 
-			<label for="userId">User ID (optional)</label>
-			<input id="userId" type="text" bind:value={userId} placeholder="Supabase auth user id" />
-
 			<label class="toggle" for="listeningOnly">
 				<input id="listeningOnly" type="checkbox" bind:checked={listeningOnly} />
 				Listening only

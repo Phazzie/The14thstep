@@ -1,0 +1,228 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { SeamErrorCodes, err, ok } from '$lib/core/seam';
+
+const { createClientMock, createMeetingMock } = vi.hoisted(() => ({
+	createClientMock: vi.fn(),
+	createMeetingMock: vi.fn()
+}));
+
+vi.mock('@supabase/supabase-js', () => ({
+	createClient: createClientMock
+}));
+
+vi.mock('$lib/core/meeting', () => ({
+	createMeeting: createMeetingMock
+}));
+
+import { actions, load } from '../../../routes/+page.server';
+
+type CookieCall = { name: string; value?: string; options?: Record<string, unknown> };
+
+function createCookieJar() {
+	const store = new Map<string, string>();
+	const calls = { set: [] as CookieCall[], delete: [] as CookieCall[] };
+	return {
+		cookies: {
+			get(name: string) {
+				return store.get(name);
+			},
+			set(name: string, value: string, options?: Record<string, unknown>) {
+				store.set(name, value);
+				calls.set.push({ name, value, options });
+			},
+			delete(name: string, options?: Record<string, unknown>) {
+				store.delete(name);
+				calls.delete.push({ name, options });
+			}
+		},
+		calls,
+		store
+	};
+}
+
+function expectRedirectLike(error: unknown, status: number, location: string) {
+	expect(error).toMatchObject({ status, location });
+}
+
+function makeRequest(form: Record<string, string>) {
+	const formData = new FormData();
+	for (const [key, value] of Object.entries(form)) {
+		formData.set(key, value);
+	}
+	return { formData: async () => formData } as Request;
+}
+
+function createAuthClientStub() {
+	return {
+		auth: {
+			signInAnonymously: vi.fn(),
+			signInWithOtp: vi.fn(),
+			signInWithPassword: vi.fn()
+		}
+	};
+}
+
+beforeEach(() => {
+	vi.clearAllMocks();
+	process.env.SUPABASE_URL = 'https://example.supabase.co';
+	process.env.SUPABASE_ANON_KEY = 'anon-key';
+	delete process.env.PROBE_USER_ID;
+});
+
+describe('landing auth route actions', () => {
+	it('load returns session kind and auth notice from query string', async () => {
+		const { cookies } = createCookieJar();
+		cookies.set('app-session-kind', 'guest');
+
+		const result = await load({
+			locals: { userId: 'user-1' },
+			cookies,
+			url: new URL('http://localhost/?auth=signed-in')
+		} as never);
+
+		expect((result as { sessionKind: string | null }).sessionKind).toBe('guest');
+		expect((result as { authNotice: string | null }).authNotice).toBe('You are signed in.');
+	});
+
+	it('continueGuest creates anonymous session, bootstraps profile, and redirects', async () => {
+		const { cookies, calls } = createCookieJar();
+		const authClient = createAuthClientStub();
+		authClient.auth.signInAnonymously.mockResolvedValue({
+			data: {
+				session: { access_token: 'access', refresh_token: 'refresh', user: { id: 'guest-1' } },
+				user: { id: 'guest-1' }
+			},
+			error: null
+		});
+		createClientMock.mockReturnValue(authClient as never);
+
+		const ensureUserProfile = vi.fn(async () => ok({
+			id: 'guest-1',
+			displayName: 'Guest',
+			cleanTime: null,
+			meetingCount: 0,
+			firstMeetingAt: null,
+			lastMeetingAt: null
+		}));
+
+		await expect(
+			actions.continueGuest?.({
+				cookies,
+				locals: { seams: { database: { ensureUserProfile } } }
+			} as never)
+		).rejects.toSatisfy((error: unknown) => {
+			expectRedirectLike(error, 303, '/');
+			return true;
+		});
+
+		expect(ensureUserProfile).toHaveBeenCalledWith(
+			expect.objectContaining({ id: 'guest-1', displayName: 'Guest', isAnonymous: true })
+		);
+		expect(calls.set.map((call) => call.name)).toEqual(
+			expect.arrayContaining(['sb-access-token', 'sb-refresh-token', 'app-session-kind'])
+		);
+	});
+
+	it('sendMagicLink returns success state and preserves email', async () => {
+		const authClient = createAuthClientStub();
+		authClient.auth.signInWithOtp.mockResolvedValue({ data: {}, error: null });
+		createClientMock.mockReturnValue(authClient as never);
+
+		const result = await actions.sendMagicLink?.({
+			request: makeRequest({ magicEmail: 'person@example.com' }),
+			url: new URL('http://localhost/')
+		} as never);
+
+		expect(result).toMatchObject({
+			authSuccess: 'Check your email for a sign-in link.',
+			authEmail: 'person@example.com'
+		});
+		expect(authClient.auth.signInWithOtp).toHaveBeenCalled();
+	});
+
+	it('signIn clears cookies and fails when profile bootstrap fails', async () => {
+		const { cookies, calls } = createCookieJar();
+		const authClient = createAuthClientStub();
+		authClient.auth.signInWithPassword.mockResolvedValue({
+			data: {
+				session: {
+					access_token: 'access',
+					refresh_token: 'refresh',
+					user: { id: 'user-1', email: 'john@example.com', user_metadata: {} }
+				},
+				user: { id: 'user-1', email: 'john@example.com', user_metadata: {} }
+			},
+			error: null
+		});
+		createClientMock.mockReturnValue(authClient as never);
+
+		const result = await actions.signIn?.({
+			request: makeRequest({ email: 'john@example.com', password: 'secret' }),
+			cookies,
+			locals: {
+				seams: {
+					database: {
+						ensureUserProfile: vi.fn(async () =>
+							err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, 'down')
+						)
+					}
+				}
+			}
+		} as never);
+
+		expect(result).toMatchObject({
+			status: 503,
+			data: { authMessage: "Couldn't finish account setup right now. Try again." }
+		});
+		expect(calls.delete.map((call) => call.name)).toEqual(
+			expect.arrayContaining(['sb-access-token', 'sb-refresh-token', 'app-session-kind'])
+		);
+	});
+
+	it('join bootstraps profile only when getUserById returns NOT_FOUND', async () => {
+		const { cookies } = createCookieJar();
+		cookies.set('app-session-kind', 'guest');
+
+		const getUserById = vi.fn(async () => err(SeamErrorCodes.NOT_FOUND, 'missing'));
+		const ensureUserProfile = vi.fn(async () =>
+			ok({
+				id: 'user-1',
+				displayName: 'Guest',
+				cleanTime: null,
+				meetingCount: 0,
+				firstMeetingAt: null,
+				lastMeetingAt: null
+			})
+		);
+		createMeetingMock.mockResolvedValue({ ok: true, value: { id: 'meeting-1' } });
+
+		await expect(
+			actions.join?.({
+				request: makeRequest({
+					userName: 'Sarah',
+					cleanTime: '19 days',
+					mood: 'anxious',
+					mind: 'Trying not to run',
+					listeningOnly: ''
+				}),
+				cookies,
+				locals: {
+					userId: 'user-1',
+					seams: {
+						database: { getUserById, ensureUserProfile },
+						grokAi: {}
+					}
+				}
+			} as never)
+		).rejects.toSatisfy((error: unknown) => {
+			expectRedirectLike(error, 303, expect.stringContaining('/meeting/meeting-1?'));
+			return true;
+		});
+
+		expect(getUserById).toHaveBeenCalledWith('user-1');
+		expect(ensureUserProfile).toHaveBeenCalledWith(
+			expect.objectContaining({ id: 'user-1', isAnonymous: true, displayName: 'Guest' })
+		);
+	});
+});
+

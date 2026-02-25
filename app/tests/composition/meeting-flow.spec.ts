@@ -62,6 +62,27 @@ function createInMemoryDatabase(userId: string): { state: InMemoryState; databas
 			return ok(user);
 		},
 
+		async ensureUserProfile(input) {
+			const existing = state.users.find((entry) => entry.id === input.id);
+			if (existing) {
+				if (existing.displayName.trim().length === 0) existing.displayName = input.displayName;
+				if (existing.cleanTime === null && input.cleanTime !== undefined) {
+					existing.cleanTime = input.cleanTime;
+				}
+				return ok(existing);
+			}
+			const created = {
+				id: input.id,
+				displayName: input.displayName,
+				cleanTime: input.cleanTime ?? null,
+				meetingCount: 0,
+				firstMeetingAt: null,
+				lastMeetingAt: null
+			};
+			state.users.push(created);
+			return ok(created);
+		},
+
 		async createMeeting(input) {
 			state.ids.meeting += 1;
 			const meeting: MeetingRecord = {

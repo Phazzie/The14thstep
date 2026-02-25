@@ -51,6 +51,16 @@ function createInMemoryDatabase(
 				lastMeetingAt: new Date().toISOString()
 			});
 		},
+		async ensureUserProfile(): Promise<SeamResult<UserProfile>> {
+			return ok({
+				id: 'user-1',
+				displayName: 'Tester',
+				cleanTime: '10 days',
+				meetingCount: 3,
+				firstMeetingAt: '2026-02-01T00:00:00.000Z',
+				lastMeetingAt: new Date().toISOString()
+			});
+		},
 		async createMeeting(input) {
 			state.meeting = {
 				...state.meeting,

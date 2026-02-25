@@ -22,6 +22,8 @@ interface QueryResponse {
 
 interface MockResponses {
 	userMaybeSingle?: QueryResponse;
+	userInsertSingle?: QueryResponse;
+	userUpdateSingle?: QueryResponse;
 	meetingSingle?: QueryResponse;
 	meetingUpdateSingle?: QueryResponse;
 	meetingPhaseMaybeSingle?: QueryResponse;
@@ -76,8 +78,12 @@ function createHarness(responses: MockResponses = {}) {
 	const meetingInsertSpy = vi.fn();
 	const meetingUpdateSpy = vi.fn();
 	const shareInsertSpy = vi.fn();
+	const userInsertSpy = vi.fn();
+	const userUpdateSpy = vi.fn();
 
 	const userMaybeSingle = responses.userMaybeSingle ?? { data: null, error: null, status: 200 };
+	const userInsertSingle = responses.userInsertSingle ?? { data: null, error: null, status: 201 };
+	const userUpdateSingle = responses.userUpdateSingle ?? { data: null, error: null, status: 200 };
 	const meetingSingle = responses.meetingSingle ?? { data: null, error: null, status: 200 };
 	const meetingUpdateSingle = responses.meetingUpdateSingle ?? {
 		data: null,
@@ -110,7 +116,25 @@ function createHarness(responses: MockResponses = {}) {
 						eq: () => ({
 							maybeSingle: async () => userMaybeSingle
 						})
-					})
+					}),
+					insert: (payload: unknown) => {
+						userInsertSpy(payload);
+						return {
+							select: () => ({
+								single: async () => userInsertSingle
+							})
+						};
+					},
+					update: (payload: unknown) => {
+						userUpdateSpy(payload);
+						return {
+							eq: () => ({
+								select: () => ({
+									single: async () => userUpdateSingle
+								})
+							})
+						};
+					}
 				};
 			}
 
@@ -236,6 +260,8 @@ function createHarness(responses: MockResponses = {}) {
 
 	return {
 		adapter: createDatabaseAdapter({ supabase }),
+		userInsertSpy,
+		userUpdateSpy,
 		meetingInsertSpy,
 		meetingUpdateSpy,
 		shareInsertSpy
@@ -581,6 +607,117 @@ describe('database supabase adapter', () => {
 		if (result.ok) {
 			expect(result.value).toBeNull();
 		}
+	});
+
+	it('ensureUserProfile inserts missing profile row', async () => {
+		const { adapter, userInsertSpy } = createHarness({
+			userMaybeSingle: { data: null, error: null, status: 200 },
+			userInsertSingle: {
+				data: {
+					id: 'user-1',
+					display_name: 'Guest',
+					clean_time: null,
+					meeting_count: 0,
+					first_meeting_at: null,
+					last_meeting_at: null
+				},
+				error: null,
+				status: 201
+			}
+		});
+
+		const result = await adapter.ensureUserProfile({
+			id: 'user-1',
+			displayName: 'Guest',
+			cleanTime: null,
+			isAnonymous: true
+		});
+
+		expect(userInsertSpy).toHaveBeenCalledWith(
+			expect.objectContaining({
+				id: 'user-1',
+				display_name: 'Guest',
+				clean_time: null,
+				is_anonymous: true
+			})
+		);
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value.displayName).toBe('Guest');
+		}
+	});
+
+	it('ensureUserProfile preserves existing profile fields when row already exists', async () => {
+		const { adapter, userInsertSpy, userUpdateSpy } = createHarness({
+			userMaybeSingle: {
+				data: {
+					id: 'user-1',
+					display_name: 'Johnny',
+					clean_time: '2 years',
+					meeting_count: 5,
+					first_meeting_at: '2026-01-01T00:00:00.000Z',
+					last_meeting_at: '2026-02-01T00:00:00.000Z',
+					is_anonymous: false
+				},
+				error: null,
+				status: 200
+			}
+		});
+
+		const result = await adapter.ensureUserProfile({
+			id: 'user-1',
+			displayName: 'John',
+			cleanTime: null,
+			isAnonymous: false
+		});
+
+		expect(userInsertSpy).not.toHaveBeenCalled();
+		expect(userUpdateSpy).not.toHaveBeenCalled();
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value.displayName).toBe('Johnny');
+			expect(result.value.cleanTime).toBe('2 years');
+		}
+	});
+
+	it('ensureUserProfile upgrades anonymous flag true -> false without overwriting profile fields', async () => {
+		const { adapter, userUpdateSpy } = createHarness({
+			userMaybeSingle: {
+				data: {
+					id: 'user-1',
+					display_name: 'Guest',
+					clean_time: null,
+					meeting_count: 0,
+					first_meeting_at: null,
+					last_meeting_at: null,
+					is_anonymous: true
+				},
+				error: null,
+				status: 200
+			},
+			userUpdateSingle: {
+				data: {
+					id: 'user-1',
+					display_name: 'Guest',
+					clean_time: null,
+					meeting_count: 0,
+					first_meeting_at: null,
+					last_meeting_at: null
+				},
+				error: null,
+				status: 200
+			}
+		});
+
+		const result = await adapter.ensureUserProfile({
+			id: 'user-1',
+			displayName: 'Some Name',
+			cleanTime: '99 days',
+			isAnonymous: false
+		});
+
+		expect(userUpdateSpy).toHaveBeenCalledWith({ is_anonymous: false });
+		expect(result.ok).toBe(true);
 	});
 
 	it('loads active callbacks scoped to the meeting and maps character ids', async () => {

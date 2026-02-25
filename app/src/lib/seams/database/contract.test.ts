@@ -7,6 +7,7 @@ import {
 	validateCreateCallbackInput,
 	validateGetMeetingCountAfterDateInput,
 	validateAppendShareInput,
+	validateEnsureUserProfileInput,
 	validateMeetingRecord,
 	validateShareRecord,
 	validateUpdateCallbackInput,
@@ -58,6 +59,14 @@ describe('database seam contract', () => {
 			})
 		).toBe(true);
 		expect(
+			validateEnsureUserProfileInput({
+				id: 'fab8bc65-1f5e-4ef1-8606-ab51921f9a07',
+				displayName: 'Guest',
+				cleanTime: null,
+				isAnonymous: true
+			})
+		).toBe(true);
+		expect(
 			(getHeavyMemorySample as unknown[]).every((record) => validateShareRecord(record))
 		).toBe(true);
 		expect(
@@ -83,6 +92,17 @@ describe('database seam contract', () => {
 		expect(createdMeeting.ok).toBe(true);
 		if (createdMeeting.ok) {
 			expect(createdMeeting.value).toEqual(createMeetingSample);
+		}
+
+		const ensuredProfile = await mock.ensureUserProfile({
+			id: 'fab8bc65-1f5e-4ef1-8606-ab51921f9a07',
+			displayName: 'Guest',
+			cleanTime: null,
+			isAnonymous: true
+		});
+		expect(ensuredProfile.ok).toBe(true);
+		if (ensuredProfile.ok) {
+			expect(ensuredProfile.value).toEqual(getUserByIdSample);
 		}
 
 		const appendedShare = await mock.appendShare({

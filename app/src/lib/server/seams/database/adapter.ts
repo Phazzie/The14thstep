@@ -4,12 +4,14 @@ import { MeetingPhase, type MeetingPhaseState } from '$lib/core/types';
 import {
 	type CallbackRecord,
 	type DatabasePort,
+	type EnsureUserProfileInput,
 	type MeetingRecord,
 	type ShareRecord,
 	type UserProfile,
 	validateCallbackRecord,
 	validateCompleteMeetingInput,
 	validateCreateCallbackInput,
+	validateEnsureUserProfileInput,
 	validateGetMeetingCountAfterDateInput,
 	validateAppendShareInput,
 	validateCreateMeetingInput,
@@ -159,6 +161,12 @@ function mapUserProfileRow(row: unknown): UserProfile {
 		firstMeetingAt: asNullableString(record.first_meeting_at) ?? null,
 		lastMeetingAt: asNullableString(record.last_meeting_at) ?? null
 	};
+}
+
+function mapIsAnonymousRowValue(row: unknown): boolean | null {
+	if (!isObject(row)) return null;
+	const value = row.is_anonymous;
+	return typeof value === 'boolean' ? value : null;
 }
 
 function mapMeetingRecordRow(row: unknown): MeetingRecord {
@@ -424,6 +432,102 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 			}
 
 			return ok(profile);
+		},
+
+		async ensureUserProfile(input: EnsureUserProfileInput) {
+			if (!validateEnsureUserProfileInput(input)) {
+				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid ensureUserProfile input');
+			}
+
+			const existingResponse = (await supabase
+				.from('users')
+				.select('id, display_name, clean_time, meeting_count, first_meeting_at, last_meeting_at, is_anonymous')
+				.eq('id', input.id)
+				.maybeSingle()) as QueryResponseLike;
+
+			if (existingResponse.error) return mapUpstreamError('ensureUserProfile', existingResponse);
+
+			if (existingResponse.data !== null) {
+				const existingProfile = mapUserProfileRow(existingResponse.data);
+				if (!validateUserProfile(existingProfile)) {
+					return err(
+						SeamErrorCodes.CONTRACT_VIOLATION,
+						'ensureUserProfile existing row violates UserProfile'
+					);
+				}
+
+				const existingIsAnonymous = mapIsAnonymousRowValue(existingResponse.data);
+				if (existingIsAnonymous === null) {
+					return err(
+						SeamErrorCodes.CONTRACT_VIOLATION,
+						'ensureUserProfile existing row missing is_anonymous flag'
+					);
+				}
+
+				if (existingIsAnonymous && !input.isAnonymous) {
+					const updateResponse = (await supabase
+						.from('users')
+						.update({ is_anonymous: false })
+						.eq('id', input.id)
+						.select('id, display_name, clean_time, meeting_count, first_meeting_at, last_meeting_at')
+						.single()) as QueryResponseLike;
+
+					if (updateResponse.error) return mapUpstreamError('ensureUserProfile', updateResponse);
+
+					const updatedProfile = mapUserProfileRow(updateResponse.data);
+					if (!validateUserProfile(updatedProfile)) {
+						return err(
+							SeamErrorCodes.CONTRACT_VIOLATION,
+							'ensureUserProfile updated row violates UserProfile'
+						);
+					}
+
+					return ok(updatedProfile);
+				}
+
+				return ok(existingProfile);
+			}
+
+			const insertResponse = (await supabase
+				.from('users')
+				.insert({
+					id: input.id,
+					display_name: input.displayName,
+					clean_time: input.cleanTime ?? null,
+					is_anonymous: input.isAnonymous
+				})
+				.select('id, display_name, clean_time, meeting_count, first_meeting_at, last_meeting_at')
+				.single()) as QueryResponseLike;
+
+			if (insertResponse.error) {
+				if (asString(insertResponse.error.code) === '23505') {
+					const retryReadResponse = (await supabase
+						.from('users')
+						.select('id, display_name, clean_time, meeting_count, first_meeting_at, last_meeting_at')
+						.eq('id', input.id)
+						.maybeSingle()) as QueryResponseLike;
+					if (retryReadResponse.error) return mapUpstreamError('ensureUserProfile', retryReadResponse);
+					if (retryReadResponse.data === null) {
+						return err(SeamErrorCodes.CONTRACT_VIOLATION, 'ensureUserProfile race retry missing row');
+					}
+					const retriedProfile = mapUserProfileRow(retryReadResponse.data);
+					if (!validateUserProfile(retriedProfile)) {
+						return err(
+							SeamErrorCodes.CONTRACT_VIOLATION,
+							'ensureUserProfile race retry violates UserProfile'
+						);
+					}
+					return ok(retriedProfile);
+				}
+				return mapUpstreamError('ensureUserProfile', insertResponse);
+			}
+
+			const insertedProfile = mapUserProfileRow(insertResponse.data);
+			if (!validateUserProfile(insertedProfile)) {
+				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'ensureUserProfile insert violates UserProfile');
+			}
+
+			return ok(insertedProfile);
 		},
 
 		async createMeeting(input) {

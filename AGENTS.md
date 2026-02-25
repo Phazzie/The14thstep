@@ -9,6 +9,7 @@ This root file defines global rules. For detailed instructions, also read the ne
   - `decision-log.md`
   - `CHANGELOG.md`
   - `LESSONS_LEARNED.md`
+- If work is intentionally deferred, incomplete, or left as a known follow-up, create a GitHub issue before finishing the task/PR and link it in your summary.
 - Follow Seam-Driven Development for app implementation. Summary order: contract, probe, fixtures, mock, contract test, adapter, composition wiring. See `app/AGENTS.md` for the full workflow and gate checks.
 - Proceed milestone by milestone unless blocked by missing credentials, missing infrastructure access, or conflicting product direction.
 - Do not commit secrets. Keep credentials in local env files only.
