@@ -29,6 +29,7 @@ import type { MeetingPhaseState } from '$lib/core/types';
 import { MeetingPhase } from '$lib/core/types';
 import { SeamErrorCodes, err, ok, type SeamErrorCode, type SeamResult } from '$lib/core/seam';
 import type { CallbackScope, CallbackStatus, CallbackType } from '$lib/seams/database/contract';
+import { trackCallbackTransition, trackCrisisMode } from '$lib/observability';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
@@ -796,6 +797,8 @@ function createShareStream(
 						significanceScore
 					});
 
+					trackCallbackTransition(callback.id, callback.status, lifecycle.status);
+
 					const updateResult = await locals.seams.database.updateCallback({
 						id: callback.id,
 						updates: {
@@ -923,6 +926,13 @@ async function handleShareRequest(
 			significanceScore: share.significanceScore
 		}))
 	});
+
+	if (persistedCrisisMode) {
+		trackCrisisMode(meetingId, 'persistence');
+	} else if (input.crisisMode) {
+		trackCrisisMode(meetingId, 'input');
+	}
+
 	if (persistedCrisisMode || input.crisisMode) {
 		const currentPhase =
 			persistedPhaseStateResult.ok && persistedPhaseStateResult.value
