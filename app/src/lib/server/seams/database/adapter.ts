@@ -396,7 +396,16 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 			if (!refreshedMapsResult.ok) return refreshedMapsResult;
 			mapped = refreshedMapsResult.value.dbIdByDomainId.get(characterId);
 		}
-		if (mapped) return ok(mapped);
+		if (mapped) {
+			if (!isUuidLike(mapped)) {
+				return err(
+					SeamErrorCodes.CONTRACT_VIOLATION,
+					`Resolved character ID is not a UUID: ${mapped}`,
+					{ method, provider: 'supabase' }
+				);
+			}
+			return ok(mapped);
+		}
 
 		const coreName = CORE_CHARACTER_NAME_BY_ID.get(characterId);
 		return err(SeamErrorCodes.INPUT_INVALID, `Unknown characterId: ${characterId}`, {

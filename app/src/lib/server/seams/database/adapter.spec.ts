@@ -809,4 +809,34 @@ describe('database supabase adapter', () => {
 			expect(result.value.characterId).toBe('marcus');
 		}
 	});
+
+	it('rejects slug with CONTRACT_VIOLATION if map returns non-UUID (fix verification)', async () => {
+		const { adapter, shareInsertSpy } = createHarness({
+			charactersSelect: {
+				data: [{ id: 'marcus', name: 'Marcus' }],
+				error: null,
+				status: 200
+			},
+			shareSingle: {
+				data: null,
+				error: null,
+				status: 200
+			}
+		});
+
+		const result = await adapter.appendShare({
+			meetingId: 'meeting-1',
+			characterId: 'marcus',
+			isUserShare: false,
+			content: 'test',
+			significanceScore: 5,
+			sequenceOrder: 1
+		});
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe(SeamErrorCodes.CONTRACT_VIOLATION);
+		}
+		expect(shareInsertSpy).not.toHaveBeenCalled();
+	});
 });

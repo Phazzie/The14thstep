@@ -144,4 +144,77 @@ describe('composition: seam failure injection', () => {
 		expect(resolve).toHaveBeenCalledTimes(1);
 		expect((event.locals as { userId?: string | null }).userId).toBeNull();
 	});
+
+	it('emits SSE error when appendShare fails', async () => {
+		const response = await shareRouteGet({
+			params: { id: 'meeting-3' },
+			url: new URL(
+				'http://localhost/meeting/meeting-3/share?topic=test&sequenceOrder=0'
+			),
+			locals: {
+				userId: 'user-3',
+				seams: {
+					database: {
+						getMeetingShares: async () => ok([]),
+						getMeetingPhase: async () => ok(null),
+						updateMeetingPhase: async () => ok(undefined),
+						getHeavyMemory: async () => ok([]),
+						getActiveCallbacks: async () => ok([]),
+						appendShare: async () => err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, 'db unavailable')
+					} as never,
+					grokAi: {
+						generateShare: async () =>
+							ok({ shareText: 'generated content', attempts: 1, fallbackUsed: false })
+					} as never,
+					auth: {} as never
+				}
+			}
+		} as never);
+
+		expect(response.status).toBe(200);
+		const events = parseSseEvents(await response.text());
+		const errorEvent = events.find((event) => event.event === 'error');
+		expect(errorEvent).toBeTruthy();
+		expect((errorEvent?.data as { error?: { code?: string } })?.error?.code).toBe(
+			SeamErrorCodes.UPSTREAM_UNAVAILABLE
+		);
+	});
+
+	it('retries updateMeetingPhase on failure', async () => {
+		const updateSpy = vi
+			.fn()
+			.mockResolvedValueOnce(err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, 'fail 1'))
+			.mockResolvedValueOnce(ok(undefined));
+
+		const response = await shareRouteGet({
+			params: { id: 'meeting-4' },
+			url: new URL(
+				'http://localhost/meeting/meeting-4/share?topic=test&sequenceOrder=0'
+			),
+			locals: {
+				userId: 'user-4',
+				seams: {
+					database: {
+						getMeetingShares: async () => ok([]),
+						getMeetingPhase: async () => ok(null),
+						updateMeetingPhase: updateSpy,
+						getHeavyMemory: async () => ok([]),
+						getActiveCallbacks: async () => ok([]),
+						appendShare: async () =>
+							ok({ id: 'share-1', createdAt: new Date().toISOString() })
+					} as never,
+					grokAi: {
+						generateShare: async () =>
+							ok({ shareText: 'generated content', attempts: 1, fallbackUsed: false })
+					} as never,
+					auth: {} as never
+				}
+			}
+		} as never);
+
+		// Consume stream
+		await response.text();
+
+		expect(updateSpy).toHaveBeenCalledTimes(2);
+	});
 });
