@@ -7,7 +7,7 @@ import {
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { execSync } from "child_process";
+import { execSync, execFileSync } from "child_process";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -97,7 +97,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   if (request.params.name === "record_seam_probe") {
     const { seamId } = request.params.arguments;
     try {
-      const output = execSync(`node ${CLI_PATH} record ${seamId}`, { encoding: "utf8" });
+      const output = execFileSync(process.execPath, [CLI_PATH, "record", seamId], { encoding: "utf8" });
       return { content: [{ type: "text", text: output }] };
     } catch (e) {
       return { content: [{ type: "text", text: e.stdout + "\n" + e.stderr }], isError: true };
@@ -107,7 +107,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   if (request.params.name === "automock_seam") {
     const { seamId } = request.params.arguments;
     try {
-      const output = execSync(`node ${CLI_PATH} automock ${seamId}`, { encoding: "utf8" });
+      const output = execFileSync(process.execPath, [CLI_PATH, "automock", seamId], { encoding: "utf8" });
       return { content: [{ type: "text", text: output }] };
     } catch (e) {
       return { content: [{ type: "text", text: e.stdout + "\n" + e.stderr }], isError: true };
