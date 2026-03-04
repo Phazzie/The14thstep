@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import SetupFlow from '$lib/components/SetupFlow.svelte';
 	import type { ActionData, PageData } from './$types';
 
@@ -103,6 +104,11 @@
 					</form>
 				</details>
 			{/if}
+			<p class="legal-links">
+				<a href={resolve('/privacy')}>Privacy</a>
+				<span aria-hidden="true">&bull;</span>
+				<a href={resolve('/terms')}>Terms</a>
+			</p>
 		</section>
 		<SetupFlow {form} />
 	</section>
@@ -377,6 +383,27 @@
 		font-size: 0.8rem;
 		font-weight: 600;
 		letter-spacing: 0.03em;
+	}
+
+	.legal-links {
+		margin: 0.9rem 0 0;
+		padding-top: 0.62rem;
+		border-top: 1px solid rgba(148, 163, 184, 0.18);
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		font-size: 0.78rem;
+		letter-spacing: 0.03em;
+		color: var(--muted);
+	}
+
+	.legal-links a {
+		color: #d7e5ff;
+		text-decoration: none;
+	}
+
+	.legal-links a:hover {
+		text-decoration: underline;
 	}
 
 	@keyframes cardRise {
