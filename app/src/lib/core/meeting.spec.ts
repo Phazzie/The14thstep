@@ -285,6 +285,31 @@ describe('meeting workflow', () => {
 		}
 	});
 
+	it('uses close summary prompt constraints that reject generic lesson language', async () => {
+		let capturedPrompt = '';
+		const generateShare = vi.fn(async (input: { prompt: string }) => {
+			capturedPrompt = input.prompt;
+			return ok({ shareText: 'Room stayed concrete and unfinished in the right way.' });
+		});
+		const deps = createDeps({
+			grokAi: { generateShare }
+		});
+
+		const result = await closeMeeting(deps, {
+			meetingId: 'meeting-1',
+			topic: 'staying in the room',
+			lastShares: [
+				{ speakerName: 'Marcus', content: 'Now we stay even when it hurts.' },
+				{ speakerName: 'User', content: 'I am trying not to run tonight.' }
+			]
+		});
+
+		expect(result.ok).toBe(true);
+		expect(capturedPrompt).toContain('4-6 spoken-style sentences');
+		expect(capturedPrompt).toContain('No therapy-speak');
+		expect(capturedPrompt).toContain('no moralized lesson ending');
+	});
+
 	it('propagates seam errors from summary generation', async () => {
 		const deps = createDeps({
 			grokAi: {

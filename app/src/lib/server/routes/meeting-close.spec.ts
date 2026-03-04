@@ -16,7 +16,7 @@ describe('POST /meeting/[id]/close', () => {
 				endedAt: '2026-02-22T00:10:00.000Z'
 			}
 		});
-		const generateShare = vi.fn(async (input: { characterId: string }) => {
+		const generateShare = vi.fn(async (input: { characterId: string; prompt: string }) => {
 			if (input.characterId === 'summary-narrator') {
 				return { ok: true, value: { shareText: 'Closing summary.' } };
 			}
@@ -89,6 +89,11 @@ describe('POST /meeting/[id]/close', () => {
 		expect(updateMeetingPhase.mock.calls[0][1].currentPhase).toBe('closing');
 		expect(updateMeetingPhase.mock.calls[1][1].currentPhase).toBe('post_meeting');
 		expect(completeMeeting).toHaveBeenCalledTimes(1);
+		const summaryPrompt = generateShare.mock.calls.find(
+			(call) => call[0]?.characterId === 'summary-narrator'
+		)?.[0]?.prompt;
+		expect(summaryPrompt).toContain('No therapy-speak');
+		expect(summaryPrompt).toContain('no moralized lesson ending');
 		expect(completeMeeting.mock.calls[0][0].notableMoments.characterThreads).toEqual(
 			expect.objectContaining({
 				marcus: expect.any(String)

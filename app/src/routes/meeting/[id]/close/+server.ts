@@ -133,7 +133,9 @@ async function buildCharacterMemorySummaries(input: {
 		const prompt = [
 			`Write a one-paragraph memory note for ${character.name} after this meeting.`,
 			`Topic: ${input.topic}`,
-			'Keep it concrete and human. No therapy-speak.',
+			'Keep it concrete and character-specific.',
+			'Anchor on one durable detail, one unresolved pressure point, and one likely next-step tension.',
+			'No therapy-speak, no inspirational summary language, and no moralized closing sentence.',
 			`Transcript excerpt:\n${transcript}`
 		].join('\n\n');
 

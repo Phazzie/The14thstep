@@ -78,6 +78,7 @@ async function persistPhaseState(meetingId: string, phaseState: MeetingPhaseStat
 interface CrisisTriageParse {
 	crisis: boolean;
 	confidence: 'high' | 'medium' | 'low';
+	reason?: string;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -98,6 +99,28 @@ function stripCodeFences(value: string): string {
 	return trimmed.replace(/^```(?:json)?\s*/i, '').replace(/```$/, '').trim();
 }
 
+function normalizeCrisisBoolean(value: unknown): boolean | undefined {
+	if (typeof value === 'boolean') return value;
+	if (typeof value === 'string') {
+		const normalized = value.trim().toLowerCase();
+		if (normalized === 'true') return true;
+		if (normalized === 'false') return false;
+	}
+	if (typeof value === 'number') {
+		if (value === 1) return true;
+		if (value === 0) return false;
+	}
+	return undefined;
+}
+
+function normalizeCrisisConfidence(value: unknown): 'high' | 'medium' | 'low' | undefined {
+	if (typeof value !== 'string') return undefined;
+	const normalized = value.trim().toLowerCase();
+	if (normalized === 'high' || normalized === 'medium' || normalized === 'low') return normalized;
+	if (normalized === 'uncertain' || normalized === 'unclear' || normalized === 'ambiguous') return 'low';
+	return undefined;
+}
+
 function parseCrisisTriage(raw: string): CrisisTriageParse | null {
 	let parsed: unknown;
 	try {
@@ -108,14 +131,15 @@ function parseCrisisTriage(raw: string): CrisisTriageParse | null {
 
 	if (typeof parsed !== 'object' || parsed === null) return null;
 	const value = parsed as Record<string, unknown>;
-	if (typeof value.crisis !== 'boolean') return null;
-	if (value.confidence !== 'high' && value.confidence !== 'medium' && value.confidence !== 'low') {
-		return null;
-	}
+	const crisis = normalizeCrisisBoolean(value.crisis);
+	const confidence = normalizeCrisisConfidence(value.confidence);
+	if (crisis === undefined || confidence === undefined) return null;
+	const reason = typeof value.reason === 'string' && value.reason.trim().length > 0 ? value.reason.trim() : undefined;
 
 	return {
-		crisis: value.crisis,
-		confidence: value.confidence
+		crisis,
+		confidence,
+		reason
 	};
 }
 
@@ -134,6 +158,7 @@ async function detectCrisisWithAi(input: {
 		return detectCrisisContent(input.content);
 	}
 
+	// Policy: parse uncertainty fails conservative (crisis=true) rather than trusting loose model output.
 	const parsed = parseCrisisTriage(result.value.shareText);
 	if (!parsed) {
 		return true;

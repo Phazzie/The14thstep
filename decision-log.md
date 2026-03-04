@@ -66,3 +66,11 @@
 - Renamed route-test helper export in `app/src/routes/meeting/[id]/share/+server.ts` to `_generateValidatedShare` to comply with SvelteKit endpoint export validation rules while preserving direct route-module test coverage.
 - Increased Playwright `webServer.timeout` from `180000` to `300000` after measuring local `npm run build` wall time (~2m12s) and confirming the previous timeout created false e2e startup failures in this workspace.
 - Accepted a local closeout exception for `npm run check` root-cause diagnosis (silent `svelte-check` stall) while still requiring fallback verification lanes (`tsc`, contracts/core/composition tests, build, and Playwright e2e) to pass and be documented.
+
+## 2026-03-04
+
+- Completed immediate post-ship hardening for seam-driven auth and phase semantics (guest/magic-link auth through `AuthPort`, explicit meeting-not-found handling, crisis transition recovery state, and explicit Marcus responder lookup) and merged through PR #51.
+- Reworked prompt style system into layered guidance (`BASE_STYLE_GUARDRAILS` + `EDITORIAL_REALITY_CHECKS`) and wired those checks explicitly into share and validator prompts; merged through PR #52.
+- Hardened quality-gate editorial enforcement by adding explicit anti-pattern flags (`moralizingEnding`, `overexplainsImage`, `genericAcrossCharacters`, `emotionLabelingWithoutScene`) and using shared threshold logic for expansion flow parity; merged through PR #53.
+- Updated narrative-context generation and fallback wording to use the same room-specific style/taste constraints as runtime share prompts; merged through PR #54.
+- Adopted an explicit crisis-triage parse policy: normalize common boolean/confidence token drift, but treat malformed/ambiguous parse results as fail-conservative (`crisis=true`) and cover confidence-token edge cases with tests.

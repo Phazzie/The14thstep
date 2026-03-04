@@ -97,8 +97,11 @@ export function buildMarcusCrisisPrompt(userName: string, userText: string): str
 	return [
 		`Marcus gives a direct crisis response to ${userName}.`,
 		`User text: ${userText}`,
-		'Speak directly to safety right now. No storytelling, no metaphors, no clinical jargon.',
-		'Keep tone steady, grounded, and human. Encourage immediate support contact and staying present.'
+		'Prioritize immediate safety in plain language.',
+		'Marcus voice: steady, practical, compassionate without speeches.',
+		'Use short spoken sentences. No storytelling detours, no metaphors, no clinical jargon.',
+		'No slogans or inspirational boilerplate. No moralizing close.',
+		'Include immediate support direction: call/text 988, and call 911 if in immediate danger.'
 	].join('\n\n');
 }
 
@@ -106,7 +109,11 @@ export function buildHeatherCrisisPrompt(userName: string, userText: string): st
 	return [
 		`Heather responds to ${userName} in crisis mode.`,
 		`User text: ${userText}`,
-		'Heather should be direct, fierce, and deeply human. No slogans.'
+		'Prioritize immediate safety in plain language.',
+		'Heather voice: direct, fierce, deeply human, never performative.',
+		'Use short spoken sentences. No metaphors, no clinical labels, no motivational quote language.',
+		'No slogans or moralized ending.',
+		'Include immediate support direction: call/text 988, and call 911 if in immediate danger.'
 	].join('\n\n');
 }
 
@@ -114,9 +121,14 @@ export function buildCrisisTriagePrompt(userText: string): string {
 	return [
 		'Classify whether this user text indicates potential self-harm or suicide risk.',
 		`User text: ${userText}`,
-		'Return JSON only with keys: crisis (boolean), confidence ("high" | "medium" | "low"), reason (string).',
-		'Mark crisis true if there is direct risk, implied intent, hopelessness with self-harm language, or uncertainty.',
-		'Be conservative: if unsure, set crisis to true and confidence to low.'
+		'Return one JSON object only (no markdown, no code fences, no prose).',
+		'JSON keys required: crisis (boolean), confidence ("high" | "medium" | "low"), reason (string).',
+		'Confidence semantics:',
+		'- high: explicit self-harm intent/plan/imminent danger language',
+		'- medium: concerning self-harm language but not explicit plan',
+		'- low: ambiguous language or limited evidence',
+		'Conservative policy: if uncertain, set crisis=true and confidence=low.',
+		'reason must be a brief evidence statement (8-20 words), quoting or paraphrasing text cues without diagnosis.'
 	].join('\n\n');
 }
 
@@ -179,7 +191,9 @@ export function buildPostMeetingMemoryExtractionPrompt(
 		`Character IDs: ${characterIds.join(', ')}`,
 		`Transcript:\n${transcript}`,
 		'Return JSON only with keys: userMemory (string), highMoment (string), characterThreads (object).',
-		'characterThreads must be an object keyed by character ID with one concrete sentence per character.',
+		'userMemory and highMoment must be concrete, specific, and room-grounded. No generic recovery wisdom.',
+		'characterThreads must be an object keyed by character ID with one concrete sentence per listed character ID.',
+		'Each sentence should capture a durable detail or unresolved thread, not a polished lesson.',
 		'No markdown, no code fences, no extra keys.'
 	].join('\n\n');
 }

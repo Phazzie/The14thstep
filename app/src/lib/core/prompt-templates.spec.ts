@@ -67,7 +67,11 @@ describe('prompt templates', () => {
 		const heatherPrompt = buildHeatherCrisisPrompt('trap', 'I do not know if I can keep going.');
 
 		expect(marcusPrompt).toContain('Marcus');
+		expect(marcusPrompt).toContain('call/text 988');
+		expect(marcusPrompt).toContain('No slogans');
 		expect(heatherPrompt).toContain('Heather');
+		expect(heatherPrompt).toContain('call/text 988');
+		expect(heatherPrompt).toContain('No slogans');
 	});
 
 	it('builds crisis triage and post-meeting memory extraction prompts', () => {
@@ -78,10 +82,12 @@ describe('prompt templates', () => {
 			['marcus', 'heather']
 		);
 
-		expect(triagePrompt).toContain('JSON only');
+		expect(triagePrompt).toContain('one JSON object only');
 		expect(triagePrompt).toContain('crisis');
+		expect(triagePrompt).toContain('Conservative policy');
 		expect(memoryPrompt).toContain('userMemory');
 		expect(memoryPrompt).toContain('characterThreads');
+		expect(memoryPrompt).toContain('unresolved thread');
 	});
 
 	it('builds quality validation prompt with required JSON contract and blocklist', () => {
