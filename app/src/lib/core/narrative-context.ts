@@ -1,4 +1,5 @@
 import type { GrokAiPort } from '$lib/seams/grok-ai/contract';
+import { EDITORIAL_REALITY_CHECKS, STYLE_CONSTITUTION } from './style-constitution';
 
 const MAX_LINE_LENGTH = 220;
 const QUALITY_MIN_SCORE = 6;
@@ -63,8 +64,11 @@ function buildNarrativeContextPrompt(input: MeetingNarrativeContextInput): strin
 		`User: ${input.userName}`,
 		`User mood: ${input.userMood}`,
 		`Recent shares:\n${renderRecentShares(input.recentShares)}`,
+		`STYLE CONSTITUTION:\n${STYLE_CONSTITUTION}`,
+		`EDITORIAL REALITY CHECKS:\n${EDITORIAL_REALITY_CHECKS}`,
 		'Return JSON with keys: roomFrame, emotionalUndercurrent.',
-		'Each value must be one concrete sentence with no therapy-speak or clinical language.'
+		'Each value must be exactly one concrete sentence rooted in room details and social pressure.',
+		'No therapy-speak, no clinical phrasing, no inspirational slogan language, and no explanatory moral.'
 	].join('\n\n');
 }
 
@@ -104,8 +108,8 @@ function fallbackNarrativeContext(input: MeetingNarrativeContextInput): MeetingN
 	const userMood = normalizeLine(input.userMood) || 'steady';
 
 	return toContext(
-		`${userName} brings ${topic} into the room, and the chairs settle into a listening silence.`,
-		`The room feels ${userMood}, with people trying to stay concrete and honest tonight.`,
+		`${userName} brings ${topic} into a room of folding chairs, paper cups, and people deciding whether to stay.`,
+		`The undercurrent is ${userMood}; people are listening hard without pretending to have easy answers.`,
 		'fallback'
 	);
 }
