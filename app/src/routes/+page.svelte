@@ -88,7 +88,7 @@
 					<button type="submit" class="ghost-btn full-width">Send Sign-In Link</button>
 				</form>
 				<details class="more-auth">
-					<summary>Use password instead</summary>
+					<summary>Use password instead (existing account)</summary>
 					<form method="POST" action="?/signIn" class="auth-form auth-grid">
 						<label for="email">Email</label>
 						<input id="email" name="email" type="email" required autocomplete="email" />
@@ -102,6 +102,9 @@
 						/>
 						<button type="submit" class="ghost-btn full-width">Sign In with Password</button>
 					</form>
+					<p class="helper-line">
+						New here? Use the magic link above first, then set a password later from your account flow.
+					</p>
 				</details>
 			{/if}
 			<p class="legal-links">

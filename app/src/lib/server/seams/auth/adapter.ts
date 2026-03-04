@@ -288,7 +288,11 @@ function classifyUpstreamError(error: SupabaseAuthErrorLike) {
 		return SeamErrorCodes.INPUT_INVALID;
 	}
 
-	if (code && RATE_LIMITED_UPSTREAM_CODES.has(code)) {
+	if (
+		(code && RATE_LIMITED_UPSTREAM_CODES.has(code)) ||
+		code === 'over_email_send_rate_limit' ||
+		code === 'over_sms_send_rate_limit'
+	) {
 		return SeamErrorCodes.RATE_LIMITED;
 	}
 

@@ -205,6 +205,36 @@ describe('auth server adapter', () => {
 		}
 	});
 
+	it('maps email send rate-limit code to RATE_LIMITED even without numeric status', async () => {
+		const adapter = createAuthAdapter({
+			publicClient: {
+				auth: {
+					signInAnonymously: vi.fn(),
+					signInWithOtp: vi.fn().mockResolvedValue({
+						data: {},
+						error: { code: 'over_email_send_rate_limit', message: 'email rate limit exceeded' }
+					}),
+					signInWithPassword: vi.fn(),
+					exchangeCodeForSession: vi.fn(),
+					verifyOtp: vi.fn()
+				}
+			}
+		});
+
+		const result = await adapter.sendMagicLink({
+			email: 'person@example.com',
+			emailRedirectTo: 'https://example.com/auth/callback'
+		});
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe(SeamErrorCodes.RATE_LIMITED);
+			expect(result.error.details).toMatchObject({
+				upstreamCode: 'over_email_send_rate_limit',
+				upstreamMessage: 'email rate limit exceeded'
+			});
+		}
+	});
+
 	it('maps password sign-in failures to unauthorized with upstream details', async () => {
 		const adapter = createAuthAdapter({
 			publicClient: {

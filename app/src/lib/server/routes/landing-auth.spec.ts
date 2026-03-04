@@ -160,6 +160,25 @@ describe('landing auth route actions', () => {
 		});
 	});
 
+	it('sendMagicLink returns retry guidance when provider rate limits requests', async () => {
+		const auth = createAuthSeamStub();
+		auth.sendMagicLink.mockResolvedValue(err(SeamErrorCodes.RATE_LIMITED, 'rate limited'));
+
+		const result = await actions.sendMagicLink?.({
+			request: makeRequest({ magicEmail: 'person@example.com' }),
+			url: new URL('http://localhost/'),
+			locals: { seams: { auth } }
+		} as never);
+
+		expect(result).toMatchObject({
+			status: 429,
+			data: {
+				authMessage: 'Please wait a minute before requesting another sign-in link.',
+				authEmail: 'person@example.com'
+			}
+		});
+	});
+
 	it('sendMagicLink prefers canonical origin for callback redirect when configured', async () => {
 		process.env.CANONICAL_ORIGIN = 'https://14thstep.com';
 		const auth = createAuthSeamStub();
