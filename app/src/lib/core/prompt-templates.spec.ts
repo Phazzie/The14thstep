@@ -99,10 +99,12 @@ describe('prompt templates', () => {
 
 		expect(prompt).toContain('return JSON only');
 		expect(prompt).toContain('therapySpeakDetected');
+		expect(prompt).toContain('moralizingEnding');
+		expect(prompt).toContain('overexplainsImage');
 		expect(prompt).toContain('I hear you.');
 		expect(prompt).toContain(STYLE_CONSTITUTION);
 		expect(prompt).toContain(EDITORIAL_REALITY_CHECKS);
-		expect(prompt).toContain('lesson ending');
+		expect(prompt).toContain('wraps the moment in a lesson');
 	});
 
 	it('builds ritual opening prompt with character voice and meeting context', () => {
@@ -158,7 +160,8 @@ describe('prompt templates', () => {
 
 		expect(prompt).toContain('empty chair');
 		expect(prompt).toContain('recovery');
-		expect(prompt).toContain('2-3 sentences');
+		expect(prompt).toContain('2-4 spoken sentences');
+		expect(prompt).toContain(STYLE_CONSTITUTION);
 		// Constraint: no character names in the actual prompt content
 		expect(prompt).not.toContain('Marcus');
 		expect(prompt).not.toContain('Heather');

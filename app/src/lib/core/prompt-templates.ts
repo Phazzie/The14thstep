@@ -55,7 +55,8 @@ export function buildCharacterSharePrompt(
 		renderOptionalSection('CONTINUITY NOTES', context.continuityLines),
 		renderOptionalSection('CALLBACK OPPORTUNITIES THIS MEETING', context.callbackLines),
 		`MEETING CONTEXT:\nCurrent topic: ${context.topic}\nRecent shares:\n${renderShares(context.recentShares)}`,
-		'Write a short, spoken share that is concrete, emotionally honest, and room-authentic. No therapy-speak.'
+		'Write a short, spoken share that is concrete, emotionally honest, and room-authentic.',
+		'No therapy-speak. No lesson-ending. Do not explain the metaphor after it lands.'
 	]
 		.filter((section): section is string => Boolean(section))
 		.join('\n\n');
@@ -192,7 +193,10 @@ export function buildExpandSharePrompt(
 		`Topic: ${input.topic}`,
 		`Original share:\n${input.originalShare}`,
 		`Recent room context:\n${renderShares(input.recentShares)}`,
-		'Stay grounded and specific. No therapy-speak. Keep it spoken, not essay-like.'
+		`STYLE CONSTITUTION:\n${STYLE_CONSTITUTION}`,
+		`EDITORIAL REALITY CHECKS:\n${EDITORIAL_REALITY_CHECKS}`,
+		'Stay grounded and specific. Keep it spoken, not essay-like.',
+		'No therapy-speak, no moralized takeaway, and no sentence that explains an image that already works.'
 	].join('\n\n');
 }
 
@@ -220,8 +224,9 @@ export function buildQualityValidationPrompt(
 		`Candidate share:\n${candidateShare}`,
 		`Callbacks referenced:\n${callbackText}`,
 		`Therapy-speak phrases to reject:\n${THERAPY_SPEAK_EXACT_PHRASES.join(' | ')}`,
-		'Return JSON with keys: pass (boolean), reasons (string[]), voiceConsistency (0-10), authenticity (0-10), therapySpeakDetected (boolean).',
-		'Fail if therapy-speak appears, if voice drifts, if language is abstract/clinical, or if editorial reality checks are violated (lesson ending, metaphor explanation, generic voice).'
+		'Return JSON with keys: pass (boolean), reasons (string[]), voiceConsistency (0-10), authenticity (0-10), therapySpeakDetected (boolean), moralizingEnding (boolean), overexplainsImage (boolean), genericAcrossCharacters (boolean), emotionLabelingWithoutScene (boolean).',
+		'Set pass=false if any editorial flag is true or if therapy-speak appears.',
+		'Fail if voice drifts, language is abstract/clinical, endings moralize, or images get explained after they land.'
 	].join('\n\n');
 }
 
@@ -255,7 +260,8 @@ export function buildRitualOpeningPrompt(userName: string, character: CharacterP
 	return [
 		`You are ${character.name}. You are opening this meeting for ${userName}.`,
 		`Your voice: ${character.voice}`,
-		'Acknowledge the empty chair with respect. Welcome everyone present. 2-3 sentences max.',
+		'Acknowledge the empty chair with respect. Welcome everyone present.',
+		'Target 2-4 spoken sentences. If a shorter landing is stronger, keep it shorter.',
 		`STYLE CONSTITUTION:\n${STYLE_CONSTITUTION}`,
 		'Grounded, direct, no clichés or slogans.'
 	]
@@ -277,7 +283,8 @@ export function buildRitualIntroPrompt(character: CharacterProfile, isFirstTimer
 		`Your voice: ${character.voice}`,
 		`Clean time: ${character.cleanTime}`,
 		firstTimerNote,
-		'1-2 sentences. Authentic and brief. No therapy-speak.',
+		'Target 1-3 spoken sentences. Keep it brief, but not robotic.',
+		'No therapy-speak. Avoid tidy mini-lessons.',
 		`STYLE CONSTITUTION:\n${STYLE_CONSTITUTION}`
 	]
 		.filter((section): section is string => Boolean(section))
@@ -293,9 +300,9 @@ export function buildRitualReadingPrompt(character: CharacterProfile): string {
 		`You are ${character.name}. You are reading this evening.`,
 		`Your voice: ${character.voice}`,
 		'Generate one short original reading about showing up, staying present, or holding space.',
-		'2-3 sentences. Street-level wisdom. No polished inspiration language.',
+		'Target 2-4 spoken sentences. Street-level wisdom, not polished inspiration copy.',
 		`STYLE CONSTITUTION:\n${STYLE_CONSTITUTION}`,
-		'No names, no therapy-speak, no clichés.'
+		'No names, no therapy-speak, no clichés, and no explained metaphor ending.'
 	]
 		.filter((section): section is string => Boolean(section))
 		.join('\n\n');
@@ -316,9 +323,9 @@ export function buildRitualClosingPrompt(
 		`Thank ${userName} for being present and honest tonight.`,
 		`Meeting summary themes: ${meetingSummary}`,
 		'Include a plain-language reminder about confidentiality: what is said here stays here.',
-		'2-3 sentences. Direct and grounded.',
+		'Target 2-4 spoken sentences. Direct and grounded.',
 		`STYLE CONSTITUTION:\n${STYLE_CONSTITUTION}`,
-		'No therapy-speak, no slogans.'
+		'No therapy-speak, no slogans, and no tidy moralizing wrap-up.'
 	]
 		.filter((section): section is string => Boolean(section))
 		.join('\n\n');
@@ -332,8 +339,9 @@ export function buildEmptyChairPrompt(): string {
 	return [
 		'Create a brief narrative moment about the empty chair.',
 		'The empty chair represents those in recovery not physically present.',
-		'2-3 sentences. Grounded and human.',
-		'No names, no therapy-speak, no slogans.'
+		'Target 2-4 spoken sentences. Grounded and human.',
+		`STYLE CONSTITUTION:\n${STYLE_CONSTITUTION}`,
+		'No names, no therapy-speak, no slogans, and no explained moral.'
 	]
 		.filter((section): section is string => Boolean(section))
 		.join('\n\n');

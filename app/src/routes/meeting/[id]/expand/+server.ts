@@ -1,4 +1,5 @@
 import { CORE_CHARACTERS } from '$lib/core/characters';
+import { parseQualityValidation, passesQualityValidationThresholds } from '$lib/core/narrative-context';
 import { buildExpandSharePrompt, buildQualityValidationPrompt } from '$lib/core/prompt-templates';
 import { SeamErrorCodes, err, ok, type SeamErrorCode, type SeamResult } from '$lib/core/seam';
 import { json } from '@sveltejs/kit';
@@ -8,11 +9,6 @@ interface ExpandRequest {
 	shareId: string;
 	topic: string;
 	recentShares: Array<{ speaker: string; content: string }>;
-}
-
-interface QualityValidation {
-	pass: boolean;
-	reasons?: string[];
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -42,28 +38,6 @@ function toStatus(code: SeamErrorCode): number {
 		default:
 			return 500;
 	}
-}
-
-function stripCodeFences(value: string): string {
-	const trimmed = value.trim();
-	if (!trimmed.startsWith('```')) return trimmed;
-	return trimmed.replace(/^```(?:json)?\s*/i, '').replace(/```$/, '').trim();
-}
-
-function parseQualityValidation(value: string): QualityValidation | null {
-	let parsed: unknown;
-	try {
-		parsed = JSON.parse(stripCodeFences(value));
-	} catch {
-		return null;
-	}
-	if (!isObject(parsed) || typeof parsed.pass !== 'boolean') return null;
-	return {
-		pass: parsed.pass,
-		reasons: Array.isArray(parsed.reasons)
-			? parsed.reasons.filter((item): item is string => typeof item === 'string')
-			: undefined
-	};
 }
 
 async function parseRequest(request: Request): Promise<SeamResult<ExpandRequest>> {
@@ -159,7 +133,7 @@ async function generateValidatedExpansion(input: {
 		}
 
 		const parsed = parseQualityValidation(qualityCheck.value.shareText);
-		if (parsed?.pass) {
+		if (parsed && passesQualityValidationThresholds(parsed)) {
 			return ok({ expandedText, attempts: attempt });
 		}
 	}
