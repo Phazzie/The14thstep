@@ -15,4 +15,16 @@ describe('/+page.svelte', () => {
 		await expect.element(name).toBeInTheDocument();
 		await expect.element(next).toBeInTheDocument();
 	});
+
+	it('shows guest and magic-link auth options without supabase wording', async () => {
+		render(Page);
+
+		const main = page.getByRole('main');
+		const guest = page.getByRole('button', { name: 'Continue as Guest' });
+		const magic = page.getByRole('button', { name: 'Send Sign-In Link' });
+
+		await expect.element(main).not.toHaveTextContent(/supabase/i);
+		await expect.element(guest).toBeInTheDocument();
+		await expect.element(magic).toBeInTheDocument();
+	});
 });

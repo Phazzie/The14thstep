@@ -11,6 +11,9 @@ function createUnavailableDatabaseAdapter(message: string): DatabasePort {
 		async getUserById() {
 			return err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, message);
 		},
+		async ensureUserProfile() {
+			return err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, message);
+		},
 		async createMeeting() {
 			return err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, message);
 		},

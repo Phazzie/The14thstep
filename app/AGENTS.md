@@ -47,6 +47,7 @@ For each I/O seam, execute these steps in order:
 
 - Relevant tests pass.
 - Relevant probes pass for touched seams.
+- Any intentionally deferred or incomplete app work is tracked in a GitHub issue before the task/PR is considered done.
 - ExecPlan progress and logs are updated for meaningful milestones.
 - `CHANGELOG.md` and `LESSONS_LEARNED.md` are updated with concise entries.
 - No secrets are committed; env changes are reflected in `app/.env.example` only.

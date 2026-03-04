@@ -29,6 +29,15 @@ function createDeps(overrides: Partial<MeetingWorkflowDeps> = {}): MeetingWorkfl
 				firstMeetingAt: null,
 				lastMeetingAt: null
 			}),
+		ensureUserProfile: async () =>
+			ok<UserProfile>({
+				id: 'user-1',
+				displayName: 'trap',
+				cleanTime: '19 days',
+				meetingCount: 2,
+				firstMeetingAt: null,
+				lastMeetingAt: null
+			}),
 		createMeeting: async (input) =>
 			ok<MeetingRecord>({
 				id: 'meeting-1',
