@@ -118,6 +118,10 @@ Tests must prove behavior, not just code path execution.
 
 ## Progress
 
+- [x] (2026-03-04 09:54Z) Autonomous merge-train pass completed with zero open PRs: merged #43, #44, #45, created/merged replacement #46 for stale-base #41, created/merged #47 (landing/auth/setup UI redesign), and created/merged #48 (existing-account auth UX).
+- [x] (2026-03-04 09:01Z) CSDD tooling suite was hardened before merge: fixed seam-registry parsing/validation, seam freshness misconfiguration handling, MCP CLI invocation/argument safety, ESLint seam-rule edge cases and tests, and removed placeholder freshness fallback step in CI.
+- [x] (2026-03-04 09:43Z) High-priority UI redesign landed (issue #36 closed): new landing/auth visual hierarchy, typography system, atmospheric background treatment, progress rail/styled SetupFlow, and broader mood options (issue #37 closed).
+- [x] (2026-03-04 09:53Z) Existing-account auth UX improvements landed (issue #39 closed): collision-aware error mapping, anti-enumeration-safe magic-link success messaging, and route-level tests for known auth-message mappings.
 - [ ] (2026-02-21 00:00Z) Milestone 11 complete with no carryover: CharacterProfile contract/schema/adapters/tests upgraded to required writing-system fields (`lie`, `voiceExamples` tuple, `discomfortRegister`, `programRelationship`, `lostThing`, `cleanTimeStart`).
 - [ ] (2026-02-21 00:00Z) Milestone 12 complete with no carryover: `style-constitution.ts` introduced and injected into all generation and quality-validation prompts; forbidden prompt patterns removed (`exact sentence count`, forced physical action, archetype injection, empty placeholders).
 - [ ] (2026-02-21 00:00Z) Milestone 13 complete with no carryover: voice-example pipeline implemented (7 candidates, 4-axis scoring, threshold filtering, persistence) with tests.
@@ -170,6 +174,10 @@ Tests must prove behavior, not just code path execution.
 
 ## Surprises & Discoveries
 
+- Observation: `gh pr edit` can fail in this repo context due classic project-card GraphQL deprecation paths, while `gh pr create/merge/comment` continue to work normally.
+  Evidence: `gh pr edit 46 --body-file ...` failed with `repository.pullRequest.projectCards` deprecation error; fallback workflow used PR comments/body-at-create instead.
+- Observation: Full local verify remains green after the visual overhaul, including Playwright e2e, with only non-blocking warnings about `NO_COLOR` and a rollup `codeSplitting` option warning in webserver startup logs.
+  Evidence: `npm run verify` completed with contracts/core/composition/e2e passing after the redesign and auth UX changes.
 - Observation: Existing `app/node_modules` was platform-skewed and initially broke Vitest with missing Linux Rollup binary.
   Evidence: `npm run test:unit -- --run` failed with `Cannot find module @rollup/rollup-linux-x64-gnu`; running `npm install` resolved this, then unit tests passed.
 - Observation: First dev-server response was delayed by initial compilation, which can make immediate probe calls fail if startup is not warm.
@@ -212,6 +220,14 @@ Tests must prove behavior, not just code path execution.
   Evidence: Vercel runtime share stream returned `UPSTREAM_ERROR` with xAI `403`; comparing local vs Vercel `XAI_API_KEY` fingerprints showed mismatch, and key rotation + redeploy restored SSE chunk streaming.
 
 ## Decision Log
+
+- Decision: Return anti-enumeration-safe magic-link success messaging for known existing-account/provider-collision errors instead of exposing provider-specific failures.
+  Rationale: Existing-account paths were producing generic/confusing failures; this keeps user guidance clear while avoiding account existence leakage.
+  Date/Author: 2026-03-04 (Codex)
+
+- Decision: Replace stale-base PR #41 with a clean mainline port PR (#46), then close #41 as superseded.
+  Rationale: #41 targeted a non-main base and risked carrying unrelated history; cherry-picking the relevant commit into a fresh branch produced safer, reviewable integration.
+  Date/Author: 2026-03-04 (Codex)
 
 - Decision: Re-scope active work into vertical milestones (11-19) that cannot carry leftovers.
   Rationale: Prior milestone tracking allowed partially complete slices to be marked complete with deferred follow-up. The writing-engine spec requires production-safe behavior per slice (contract + logic + wiring + tests + docs) before proceeding.
