@@ -4,6 +4,7 @@ import {
 	setSessionKindCookie,
 	setSupabaseSessionCookies
 } from '$lib/server/auth/public-auth';
+import { SeamErrorCodes } from '$lib/core/seam';
 import type { AuthCallbackOtpType, AuthSignInPayload } from '$lib/seams/auth/contract';
 import { redirect } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
@@ -43,6 +44,13 @@ function upstreamMessageFromSeamError(error: { message: string; details?: Record
 	return error.message;
 }
 
+function noticeCodeFromCallbackError(code: string): string {
+	if (code === SeamErrorCodes.INPUT_INVALID || code === SeamErrorCodes.UNAUTHORIZED) {
+		return 'magic-link-cancelled';
+	}
+	return 'auth-failed';
+}
+
 export const GET: RequestHandler = async ({ url, cookies, locals }) => {
 	const providerError = url.searchParams.get('error');
 	if (providerError) {
@@ -64,7 +72,7 @@ export const GET: RequestHandler = async ({ url, cookies, locals }) => {
 			code: completionResult.error.code,
 			message: upstreamMessageFromSeamError(completionResult.error)
 		});
-		return toRedirect('auth-failed');
+		return toRedirect(noticeCodeFromCallbackError(completionResult.error.code));
 	}
 
 	setSupabaseSessionCookies(cookies, {

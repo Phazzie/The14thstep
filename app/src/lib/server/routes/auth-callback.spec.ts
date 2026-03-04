@@ -145,7 +145,7 @@ describe('auth callback route', () => {
 		expect(calls.delete).toEqual(expect.arrayContaining(['sb-access-token', 'sb-refresh-token', 'app-session-kind']));
 	});
 
-	it('redirects auth-failed when seam callback completion fails', async () => {
+	it('redirects magic-link-cancelled when seam callback completion is unauthorized', async () => {
 		const auth = createAuthSeamStub();
 		auth.completeAuthCallback.mockResolvedValue(
 			err(SeamErrorCodes.UNAUTHORIZED, 'bad callback', { upstreamMessage: 'bad code' })
@@ -159,12 +159,12 @@ describe('auth callback route', () => {
 				locals: { seams: { auth, database: { ensureUserProfile: vi.fn() } } }
 			} as never)
 		).rejects.toSatisfy((error: unknown) => {
-			expectRedirectLike(error, 303, '/?auth=auth-failed');
+			expectRedirectLike(error, 303, '/?auth=magic-link-cancelled');
 			return true;
 		});
 	});
 
-	it('redirects auth-failed when completion params are missing', async () => {
+	it('redirects magic-link-cancelled when completion params are missing', async () => {
 		const auth = createAuthSeamStub();
 		auth.completeAuthCallback.mockResolvedValue(
 			err(SeamErrorCodes.INPUT_INVALID, 'missing callback params')
@@ -174,6 +174,25 @@ describe('auth callback route', () => {
 		await expect(
 			GET({
 				url: new URL('http://localhost/auth/callback'),
+				cookies,
+				locals: { seams: { auth, database: {} } }
+			} as never)
+		).rejects.toSatisfy((error: unknown) => {
+			expectRedirectLike(error, 303, '/?auth=magic-link-cancelled');
+			return true;
+		});
+	});
+
+	it('redirects auth-failed when callback completion hits upstream failures', async () => {
+		const auth = createAuthSeamStub();
+		auth.completeAuthCallback.mockResolvedValue(
+			err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, 'provider unavailable')
+		);
+		const { cookies } = createCookieJar();
+
+		await expect(
+			GET({
+				url: new URL('http://localhost/auth/callback?code=abc123'),
 				cookies,
 				locals: { seams: { auth, database: {} } }
 			} as never)
