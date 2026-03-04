@@ -139,10 +139,32 @@ describe('landing auth route actions', () => {
 		} as never);
 
 		expect(result).toMatchObject({
-			authSuccess: 'Check your email for a sign-in link.',
+			authSuccess: 'If that email is registered, we sent a sign-in link.',
 			authEmail: 'person@example.com'
 		});
 		expect(authClient.auth.signInWithOtp).toHaveBeenCalled();
+	});
+
+	it('sendMagicLink returns anti-enumeration success message for already-registered collisions', async () => {
+		const authClient = createAuthClientStub();
+		authClient.auth.signInWithOtp.mockResolvedValue({
+			data: {},
+			error: {
+				status: 400,
+				message: 'User already registered'
+			}
+		});
+		createClientMock.mockReturnValue(authClient as never);
+
+		const result = await actions.sendMagicLink?.({
+			request: makeRequest({ magicEmail: 'person@example.com' }),
+			url: new URL('http://localhost/')
+		} as never);
+
+		expect(result).toMatchObject({
+			authSuccess: 'If that email is registered, we sent a sign-in link.',
+			authEmail: 'person@example.com'
+		});
 	});
 
 	it('sendMagicLink prefers canonical origin for callback redirect when configured', async () => {
@@ -202,6 +224,50 @@ describe('landing auth route actions', () => {
 		expect(calls.delete.map((call) => call.name)).toEqual(
 			expect.arrayContaining(['sb-access-token', 'sb-refresh-token', 'app-session-kind'])
 		);
+	});
+
+	it('signIn returns existing-account guidance for already-registered collisions', async () => {
+		const authClient = createAuthClientStub();
+		authClient.auth.signInWithPassword.mockResolvedValue({
+			data: { session: null, user: null },
+			error: { status: 400, message: 'User already registered' }
+		});
+		createClientMock.mockReturnValue(authClient as never);
+
+		const result = await actions.signIn?.({
+			request: makeRequest({ email: 'john@example.com', password: 'secret' }),
+			cookies: createCookieJar().cookies,
+			locals: { seams: { database: {} } }
+		} as never);
+
+		expect(result).toMatchObject({
+			status: 401,
+			data: {
+				authMessage: 'That email already has an account. Try signing in or request a magic link.'
+			}
+		});
+	});
+
+	it('signIn returns method-collision guidance when provider reports linked identity', async () => {
+		const authClient = createAuthClientStub();
+		authClient.auth.signInWithPassword.mockResolvedValue({
+			data: { session: null, user: null },
+			error: { status: 400, message: 'Identity is already linked to a different provider' }
+		});
+		createClientMock.mockReturnValue(authClient as never);
+
+		const result = await actions.signIn?.({
+			request: makeRequest({ email: 'john@example.com', password: 'secret' }),
+			cookies: createCookieJar().cookies,
+			locals: { seams: { database: {} } }
+		} as never);
+
+		expect(result).toMatchObject({
+			status: 401,
+			data: {
+				authMessage: 'That email is linked to a different sign-in method. Try another sign-in option.'
+			}
+		});
 	});
 
 	it('join bootstraps profile only when getUserById returns NOT_FOUND', async () => {
