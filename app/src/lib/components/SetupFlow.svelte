@@ -39,6 +39,16 @@
 	});
 
 	const totalSteps = 4;
+	const moodOptions = [
+		{ value: 'anxious', label: 'Anxious' },
+		{ value: 'hopeful', label: 'Hopeful' },
+		{ value: 'angry', label: 'Angry' },
+		{ value: 'numb', label: 'Numb' },
+		{ value: 'grateful', label: 'Grateful' },
+		{ value: 'burned out', label: 'Burned Out' },
+		{ value: 'restless', label: 'Restless' },
+		{ value: 'ashamed', label: 'Ashamed' }
+	];
 
 	function nextStep() {
 		if (step < totalSteps) step = (step + 1) as StepId;
@@ -61,6 +71,9 @@
 	<header>
 		<h1>The 14th Step</h1>
 		<p>Step {step} of {totalSteps}</p>
+		<div class="step-rail" style={`--progress:${(step / totalSteps) * 100}%`} aria-hidden="true">
+			<span></span>
+		</div>
 		{#if startupSaying}
 			<blockquote class="startup-saying">{startupSaying}</blockquote>
 		{/if}
@@ -91,11 +104,9 @@
 		{#if step === 3}
 			<label for="mood">Mood</label>
 			<select id="mood" bind:value={mood}>
-				<option value="anxious">Anxious</option>
-				<option value="hopeful">Hopeful</option>
-				<option value="angry">Angry</option>
-				<option value="numb">Numb</option>
-				<option value="grateful">Grateful</option>
+				{#each moodOptions as moodOption (moodOption.value)}
+					<option value={moodOption.value}>{moodOption.label}</option>
+				{/each}
 			</select>
 		{/if}
 
@@ -122,41 +133,58 @@
 
 <style>
 	.setup-shell {
-		border: 1px solid rgba(148, 163, 184, 0.25);
-		border-radius: 1rem;
+		border: 1px solid rgba(177, 193, 220, 0.22);
+		border-radius: 1.1rem;
 		background:
-			linear-gradient(180deg, rgba(17, 24, 39, 0.92), rgba(3, 7, 18, 0.92)),
-			radial-gradient(circle at top right, rgba(245, 158, 11, 0.16), transparent 48%);
-		padding: 1.1rem;
-		backdrop-filter: blur(2px);
+			linear-gradient(180deg, rgba(17, 24, 39, 0.84), rgba(5, 9, 16, 0.9)),
+			radial-gradient(circle at 94% 2%, rgba(246, 163, 27, 0.2), transparent 42%);
+		padding: 1.12rem;
+		backdrop-filter: blur(4px);
 		box-shadow:
-			0 18px 32px rgba(0, 0, 0, 0.45),
+			0 22px 34px rgba(0, 0, 0, 0.4),
 			inset 0 1px 0 rgba(255, 255, 255, 0.05);
+		animation: shellRise 560ms ease-out;
 	}
 
 	header h1 {
 		margin: 0;
-		color: #f8fafc;
-		font-size: 1.55rem;
-		font-weight: 800;
-		letter-spacing: 0.02em;
+		color: #fff7dd;
+		font-size: 1.56rem;
+		font-weight: 600;
 	}
 
 	header p {
 		margin: 0.35rem 0 0;
-		color: #fbbf24;
-		font-size: 0.88rem;
+		color: #ffd486;
+		font-size: 0.82rem;
 		text-transform: uppercase;
 		letter-spacing: 0.12em;
+	}
+
+	.step-rail {
+		margin-top: 0.58rem;
+		height: 0.32rem;
+		border-radius: 999px;
+		background: rgba(77, 88, 112, 0.4);
+		overflow: hidden;
+	}
+
+	.step-rail span {
+		display: block;
+		height: 100%;
+		width: var(--progress);
+		background: linear-gradient(90deg, #f6a31b, #ffd176);
+		border-radius: inherit;
+		transition: width 220ms ease;
 	}
 
 	.startup-saying {
 		margin: 0.9rem 0 0;
 		padding: 0.7rem 0.75rem;
-		border-left: 3px solid rgba(250, 204, 21, 0.85);
-		background: rgba(15, 23, 42, 0.62);
-		color: #e2e8f0;
-		font-size: 0.93rem;
+		border-left: 3px solid rgba(255, 209, 118, 0.9);
+		background: rgba(13, 20, 34, 0.68);
+		color: #e8eefc;
+		font-size: 0.89rem;
 		line-height: 1.45;
 		font-style: italic;
 	}
@@ -172,27 +200,28 @@
 
 	.setup-form {
 		display: grid;
-		gap: 0.72rem;
+		gap: 0.66rem;
 		margin-top: 1rem;
 	}
 
 	.setup-form label {
-		color: #cbd5e1;
-		font-size: 0.84rem;
-		font-weight: 600;
-		letter-spacing: 0.02em;
+		color: #dbe7ff;
+		font-size: 0.77rem;
+		font-weight: 700;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
 	}
 
 	.setup-form input,
 	.setup-form select,
 	.setup-form textarea {
 		width: 100%;
-		border: 1px solid rgba(100, 116, 139, 0.45);
+		border: 1px solid rgba(159, 178, 210, 0.28);
 		border-radius: 0.68rem;
-		background: rgba(2, 6, 23, 0.85);
+		background: rgba(6, 9, 15, 0.85);
 		color: #f8fafc;
 		font-size: 0.95rem;
-		padding: 0.7rem 0.8rem;
+		padding: 0.68rem 0.8rem;
 		outline: none;
 		transition: border-color 120ms ease, box-shadow 120ms ease;
 	}
@@ -205,15 +234,15 @@
 	.setup-form input:focus,
 	.setup-form select:focus,
 	.setup-form textarea:focus {
-		border-color: rgba(250, 204, 21, 0.9);
-		box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.2);
+		border-color: rgba(246, 163, 27, 0.9);
+		box-shadow: 0 0 0 3px rgba(246, 163, 27, 0.2);
 	}
 
 	.toggle {
 		display: flex;
 		align-items: center;
 		gap: 0.45rem;
-		font-size: 0.9rem;
+		font-size: 0.88rem;
 	}
 
 	.toggle input {
@@ -232,9 +261,10 @@
 		border: 0;
 		border-radius: 0.68rem;
 		padding: 0.72rem 1rem;
-		font-size: 0.92rem;
+		font-size: 0.84rem;
 		font-weight: 700;
-		letter-spacing: 0.02em;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
 		cursor: pointer;
 		transition: transform 120ms ease, filter 120ms ease, opacity 120ms ease;
 	}
@@ -247,8 +277,8 @@
 
 	.actions button:last-child {
 		flex: 1.4;
-		background: linear-gradient(120deg, #f59e0b, #fcd34d);
-		color: #0f172a;
+		background: linear-gradient(125deg, #f08b14, #ffd176);
+		color: #0d1623;
 	}
 
 	.actions button:disabled {
@@ -260,5 +290,16 @@
 	.actions button:not(:disabled):hover {
 		transform: translateY(-1px);
 		filter: brightness(1.03);
+	}
+
+	@keyframes shellRise {
+		from {
+			transform: translateY(7px);
+			opacity: 0;
+		}
+		to {
+			transform: translateY(0);
+			opacity: 1;
+		}
 	}
 </style>
