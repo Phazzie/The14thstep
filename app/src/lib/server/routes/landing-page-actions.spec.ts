@@ -16,13 +16,45 @@ function buildJoinRequest(fields: Record<string, string>) {
 	});
 }
 
-function joinWith(fields: Record<string, string>, userId: string | null = null) {
+function createCookieJar() {
+	const store = new Map<string, string>();
+	return {
+		get(name: string) {
+			return store.get(name);
+		},
+		set(name: string, value: string) {
+			store.set(name, value);
+		},
+		delete(name: string) {
+			store.delete(name);
+		}
+	};
+}
+
+function joinWith(
+	fields: Record<string, string>,
+	options: {
+		userId?: string | null;
+		database?: Record<string, unknown>;
+	} = {}
+) {
+	const userId = options.userId ?? null;
+	const database =
+		options.database ??
+		({
+			getUserById: vi.fn(async () => ({
+				ok: true,
+				value: { id: userId ?? 'user-1' }
+			}))
+		} satisfies Record<string, unknown>);
+
 	return actions.join({
 		request: buildJoinRequest(fields),
+		cookies: createCookieJar(),
 		locals: {
 			userId,
 			seams: {
-				database: {},
+				database,
 				grokAi: {}
 			}
 		}
@@ -42,13 +74,13 @@ describe('landing page actions', () => {
 		});
 
 		expect(createMeetingMock).not.toHaveBeenCalled();
-		expect(result).toMatchObject({
-			status: 400,
-			data: {
-				message: 'A user ID is required to start a meeting.'
-			}
+			expect(result).toMatchObject({
+				status: 400,
+				data: {
+					message: 'Continue as guest or sign in before starting a meeting.'
+				}
+			});
 		});
-	});
 
 	it('returns 400 when required setup fields are missing', async () => {
 		const createMeetingMock = vi.mocked(createMeeting);
@@ -58,9 +90,8 @@ describe('landing page actions', () => {
 			userName: '',
 			cleanTime: '22 days',
 			mood: 'anxious',
-			mind: '',
-			userId: 'user-123'
-		});
+			mind: ''
+		}, { userId: 'user-123' });
 
 		expect(createMeetingMock).not.toHaveBeenCalled();
 		expect(result).toMatchObject({
@@ -82,16 +113,12 @@ describe('landing page actions', () => {
 			}
 		});
 
-		const result = await joinWith(
-			{
-				userName: 'Lane',
-				cleanTime: '22 days',
-				mood: 'anxious',
-				mind: 'Trying not to spiral',
-				userId: 'missing-user'
-			},
-			null
-		);
+		const result = await joinWith({
+			userName: 'Lane',
+			cleanTime: '22 days',
+			mood: 'anxious',
+			mind: 'Trying not to spiral'
+		}, { userId: 'user-123' });
 
 		expect(createMeetingMock).toHaveBeenCalledTimes(1);
 		expect(result).toMatchObject({
