@@ -115,6 +115,160 @@ describe('POST /meeting/[id]/user-share', () => {
 		expect(payload.value.phaseState.currentPhase).toBe('opening');
 	});
 
+	it('normalizes triage payload tokens and stays conservative on low-confidence non-crisis outputs', async () => {
+		const generateShare = vi.fn().mockResolvedValueOnce({
+			ok: true,
+			value: { shareText: '{"crisis":"false","confidence":"LOW","reason":"ambiguous self-harm cue"}' }
+		});
+		const appendShare = vi.fn().mockImplementation(async (input: { significanceScore: number }) => ({
+			ok: true,
+			value: {
+				id: 'share-2b',
+				meetingId: 'meeting-1',
+				characterId: null,
+				isUserShare: true,
+				content: 'I do not know if I can keep doing this.',
+				significanceScore: input.significanceScore,
+				sequenceOrder: 2,
+				createdAt: '2026-02-19T00:00:01.500Z'
+			}
+		}));
+		const updateMeetingPhase = vi.fn().mockResolvedValue({ ok: true, value: undefined });
+
+		const request = new Request('http://localhost/meeting/meeting-1/user-share', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				content: 'I do not know if I can keep doing this.',
+				sequenceOrder: 2
+			})
+		});
+
+		const response = await POST({
+			params: { id: 'meeting-1' },
+			request,
+			locals: {
+				seams: {
+					grokAi: { generateShare } as never,
+					database: {
+						appendShare,
+						getMeetingPhase: async () => ({ ok: true, value: null }),
+						updateMeetingPhase
+					} as never,
+					auth: {} as never
+				}
+			}
+		} as never);
+
+		expect(response.status).toBe(200);
+		expect(appendShare.mock.calls[0][0].significanceScore).toBe(10);
+		const payload = await response.json();
+		expect(payload.ok).toBe(true);
+		expect(payload.value.crisis).toBe(true);
+	});
+
+	it('accepts normalized medium-confidence non-crisis outputs without forcing crisis', async () => {
+		const generateShare = vi.fn().mockResolvedValueOnce({
+			ok: true,
+			value: { shareText: '{"crisis":"false","confidence":"Medium","reason":"distress without direct intent"}' }
+		});
+		const appendShare = vi.fn().mockImplementation(async (input: { significanceScore: number }) => ({
+			ok: true,
+			value: {
+				id: 'share-2c',
+				meetingId: 'meeting-1',
+				characterId: null,
+				isUserShare: true,
+				content: 'I had a rough night but I am here.',
+				significanceScore: input.significanceScore,
+				sequenceOrder: 3,
+				createdAt: '2026-02-19T00:00:01.900Z'
+			}
+		}));
+		const updateMeetingPhase = vi.fn().mockResolvedValue({ ok: true, value: undefined });
+
+		const request = new Request('http://localhost/meeting/meeting-1/user-share', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				content: 'I had a rough night but I am here.',
+				sequenceOrder: 3
+			})
+		});
+
+		const response = await POST({
+			params: { id: 'meeting-1' },
+			request,
+			locals: {
+				seams: {
+					grokAi: { generateShare } as never,
+					database: {
+						appendShare,
+						getMeetingPhase: async () => ({ ok: true, value: null }),
+						updateMeetingPhase
+					} as never,
+					auth: {} as never
+				}
+			}
+		} as never);
+
+		expect(response.status).toBe(200);
+		expect(appendShare.mock.calls[0][0].significanceScore).toBe(3);
+		const payload = await response.json();
+		expect(payload.ok).toBe(true);
+		expect(payload.value.crisis).toBe(false);
+	});
+
+	it('fails conservative when confidence token is malformed', async () => {
+		const generateShare = vi.fn().mockResolvedValueOnce({
+			ok: true,
+			value: { shareText: '{"crisis":false,"confidence":"maybe","reason":"unclear wording"}' }
+		});
+		const appendShare = vi.fn().mockImplementation(async (input: { significanceScore: number }) => ({
+			ok: true,
+			value: {
+				id: 'share-2d',
+				meetingId: 'meeting-1',
+				characterId: null,
+				isUserShare: true,
+				content: 'I am not sure what happens next.',
+				significanceScore: input.significanceScore,
+				sequenceOrder: 4,
+				createdAt: '2026-02-19T00:00:02.200Z'
+			}
+		}));
+		const updateMeetingPhase = vi.fn().mockResolvedValue({ ok: true, value: undefined });
+
+		const response = await POST({
+			params: { id: 'meeting-1' },
+			request: new Request('http://localhost/meeting/meeting-1/user-share', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					content: 'I am not sure what happens next.',
+					sequenceOrder: 4
+				})
+			}),
+			locals: {
+				seams: {
+					grokAi: { generateShare } as never,
+					database: {
+						appendShare,
+						getMeetingPhase: async () => ({ ok: true, value: null }),
+						updateMeetingPhase
+					} as never,
+					auth: {} as never
+				}
+			}
+		} as never);
+
+		expect(response.status).toBe(200);
+		expect(appendShare.mock.calls[0][0].significanceScore).toBe(10);
+		const payload = await response.json();
+		expect(payload.ok).toBe(true);
+		expect(payload.value.crisis).toBe(true);
+	});
+
 	it('skips phase persistence when phase load fails to avoid overwriting in-flight state', async () => {
 		const generateShare = vi.fn().mockResolvedValueOnce({
 			ok: true,

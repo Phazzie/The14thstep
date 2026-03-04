@@ -12,6 +12,24 @@ function createGrokMock(shareText: string): GrokAiPort {
 describe('scanForCallbacks', () => {
 	it('parses candidate callbacks and persists them', async () => {
 		const createCallback = vi.fn(async () => ok({ id: 'cb1' }));
+		let capturedPrompt = '';
+		const grokAi: GrokAiPort = {
+			generateShare: async (input) => {
+				capturedPrompt = input.prompt;
+				return ok({
+					shareText: JSON.stringify([
+						{
+							originShareId: 'share-1',
+							characterId: 'marcus',
+							originalText: 'coffee cup line',
+							callbackType: 'quirk_habit',
+							scope: 'character',
+							potentialScore: 8
+						}
+					])
+				});
+			}
+		};
 
 		const result = await scanForCallbacks({
 			meetingId: 'meeting-1',
@@ -24,18 +42,7 @@ describe('scanForCallbacks', () => {
 					interactionType: 'standard'
 				}
 			],
-			grokAi: createGrokMock(
-				JSON.stringify([
-					{
-						originShareId: 'share-1',
-						characterId: 'marcus',
-						originalText: 'coffee cup line',
-						callbackType: 'quirk_habit',
-						scope: 'character',
-						potentialScore: 8
-					}
-				])
-			),
+			grokAi,
 			database: { createCallback }
 		});
 
@@ -45,6 +52,8 @@ describe('scanForCallbacks', () => {
 			expect(result.value.saved).toBe(1);
 		}
 		expect(createCallback).toHaveBeenCalledTimes(1);
+		expect(capturedPrompt).toContain('Return JSON array only');
+		expect(capturedPrompt).toContain('Only include lines that are concrete, quotable');
 	});
 
 	it('returns contract violation for malformed JSON', async () => {

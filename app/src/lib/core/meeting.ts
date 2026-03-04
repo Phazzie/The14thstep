@@ -153,9 +153,11 @@ function buildCloseSummaryPrompt(topic: string, lastShares: Array<{ speakerName:
 		.join('\n');
 
 	return [
-		'Write a concise meeting summary in plain language.',
+		'Write a closeout summary in plain, room-authentic language.',
 		`Topic: ${topic}`,
-		'Capture major themes without therapy-speak.',
+		'Target one paragraph (4-6 spoken-style sentences).',
+		'Capture concrete moments, pressure points, and what remained unresolved.',
+		'No therapy-speak, no inspirational slogans, and no moralized lesson ending.',
 		`Recent shares:\n${transcript}`
 	].join('\n\n');
 }

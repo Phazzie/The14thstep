@@ -61,10 +61,13 @@ function buildScannerPrompt(meetingId: string, shares: CompletedShare[]): string
 	return [
 		'Identify callback-worthy moments from completed meeting shares.',
 		`Meeting ID: ${meetingId}`,
-		'Return JSON array only. No markdown. Each item must include:',
+		'Return JSON array only. No markdown, no code fences, no prose before/after JSON.',
+		'Each item must include exactly these keys:',
 		'originShareId, characterId, originalText, callbackType, scope, potentialScore.',
 		`Allowed callbackType values: ${CALLBACK_TYPES.join(', ')}`,
 		"Allowed scope values: character, room. potentialScore must be integer 1-10.",
+		'Only include lines that are concrete, quotable, and likely to be referenced again; skip generic encouragement or summary language.',
+		'originShareId must match a provided share id. characterId must match a speaker from provided shares.',
 		`Shares:\n${serializedShares}`
 	].join('\n\n');
 }
