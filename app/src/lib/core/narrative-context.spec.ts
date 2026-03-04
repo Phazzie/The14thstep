@@ -67,14 +67,16 @@ describe('getMeetingNarrativeContext', () => {
 	});
 
 	it('caches generated narrative context for a meeting', async () => {
-		const generateShare = vi.fn(async () =>
-			ok({
+		let capturedPrompt = '';
+		const generateShare = vi.fn(async (input: { prompt: string }) => {
+			capturedPrompt = input.prompt;
+			return ok({
 				shareText: JSON.stringify({
 					roomFrame: 'Rain taps the windows while the room settles.',
 					emotionalUndercurrent: 'People sound guarded but willing to stay in the discomfort.'
 				})
-			})
-		);
+			});
+		});
 		const grokAi = createGrokMock(generateShare);
 
 		const first = await getMeetingNarrativeContext({
@@ -95,6 +97,9 @@ describe('getMeetingNarrativeContext', () => {
 		});
 
 		expect(generateShare).toHaveBeenCalledTimes(1);
+		expect(capturedPrompt).toContain('STYLE CONSTITUTION');
+		expect(capturedPrompt).toContain('EDITORIAL REALITY CHECKS');
+		expect(capturedPrompt).toContain('no clinical phrasing');
 		expect(first.source).toBe('generated');
 		expect(second.contextLine).toBe(first.contextLine);
 	});
@@ -117,5 +122,7 @@ describe('getMeetingNarrativeContext', () => {
 		expect(context.source).toBe('fallback');
 		expect(context.contextLine.toLowerCase()).toContain('room frame');
 		expect(context.contextLine.toLowerCase()).toContain('undercurrent');
+		expect(context.roomFrame).toContain('folding chairs');
+		expect(context.emotionalUndercurrent).toContain('without pretending to have easy answers');
 	});
 });
