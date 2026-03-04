@@ -1,5 +1,5 @@
 import { THERAPY_SPEAK_EXACT_PHRASES } from './therapy-blocklist';
-import { STYLE_CONSTITUTION } from './style-constitution';
+import { EDITORIAL_REALITY_CHECKS, STYLE_CONSTITUTION } from './style-constitution';
 import type { CallbackRecord, CharacterProfile } from './types';
 import type { MeetingNarrativeContext } from './narrative-context';
 
@@ -50,6 +50,7 @@ export function buildCharacterSharePrompt(
 		renderCharacterFoundation(character),
 		`Quirk cue (optional, never forced): ${character.quirk}`,
 		`STYLE CONSTITUTION:\n${STYLE_CONSTITUTION}`,
+		`EDITORIAL REALITY CHECKS:\n${EDITORIAL_REALITY_CHECKS}`,
 		renderOptionalSection('YOUR HISTORY', context.heavyMemoryLines),
 		renderOptionalSection('CONTINUITY NOTES', context.continuityLines),
 		renderOptionalSection('CALLBACK OPPORTUNITIES THIS MEETING', context.callbackLines),
@@ -213,13 +214,14 @@ export function buildQualityValidationPrompt(
 		`Discomfort register: ${character.discomfortRegister ?? 'Not documented yet.'}`,
 		`Program relationship: ${character.programRelationship ?? 'Not documented yet.'}`,
 		`STYLE CONSTITUTION:\n${STYLE_CONSTITUTION}`,
+		`EDITORIAL REALITY CHECKS:\n${EDITORIAL_REALITY_CHECKS}`,
 		`Topic: ${context.topic}`,
 		`Recent shares:\n${renderShares(context.recentShares)}`,
 		`Candidate share:\n${candidateShare}`,
 		`Callbacks referenced:\n${callbackText}`,
 		`Therapy-speak phrases to reject:\n${THERAPY_SPEAK_EXACT_PHRASES.join(' | ')}`,
 		'Return JSON with keys: pass (boolean), reasons (string[]), voiceConsistency (0-10), authenticity (0-10), therapySpeakDetected (boolean).',
-		'Fail if therapy-speak appears, if voice drifts, if language is abstract/clinical, or if style constitution rules are violated.'
+		'Fail if therapy-speak appears, if voice drifts, if language is abstract/clinical, or if editorial reality checks are violated (lesson ending, metaphor explanation, generic voice).'
 	].join('\n\n');
 }
 
@@ -234,6 +236,7 @@ export function buildVoiceCandidatePrompt(
 		renderCharacterFoundation(character),
 		`Quirk cue (optional, never forced): ${character.quirk}`,
 		`STYLE CONSTITUTION:\n${STYLE_CONSTITUTION}`,
+		`EDITORIAL REALITY CHECKS:\n${EDITORIAL_REALITY_CHECKS}`,
 		`MEETING CONTEXT:\nTopic: ${topic}`,
 		`Room frame: ${narrativeContext.roomFrame}`,
 		`Emotional undercurrent: ${narrativeContext.emotionalUndercurrent}`,
