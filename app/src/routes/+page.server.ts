@@ -47,8 +47,21 @@ function maskEmail(email: string): string {
 
 function authFailureMessage(rawMessage: string | undefined): string {
 	const normalized = rawMessage?.toLowerCase() ?? '';
+	if (
+		normalized.includes('already registered') ||
+		normalized.includes('already exists') ||
+		normalized.includes('user_already_exists')
+	) {
+		return 'That email already has an account. Try signing in or request a magic link.';
+	}
+	if (
+		normalized.includes('identity is already linked') ||
+		normalized.includes('provider') && normalized.includes('different')
+	) {
+		return 'That email is linked to a different sign-in method. Try another sign-in option.';
+	}
 	if (normalized.includes('invalid login credentials')) {
-		return 'Sign in failed. Double-check your email and password.';
+		return 'Sign in failed. Double-check your email and password, or request a magic link.';
 	}
 	if (normalized.includes('email not confirmed')) {
 		return 'Sign in failed. Confirm your email first, then try again.';
@@ -57,6 +70,18 @@ function authFailureMessage(rawMessage: string | undefined): string {
 		return 'Sign in failed. Your sign-in link expired. Request a new one.';
 	}
 	return 'Sign in failed. Check your credentials and try again.';
+}
+
+function shouldReturnMagicLinkSoftSuccess(error: unknown): boolean {
+	if (typeof error !== 'object' || error === null) return false;
+	const record = error as Record<string, unknown>;
+	const rawMessage = typeof record.message === 'string' ? record.message.toLowerCase() : '';
+	return (
+		rawMessage.includes('already registered') ||
+		rawMessage.includes('already exists') ||
+		rawMessage.includes('user_already_exists') ||
+		rawMessage.includes('identity is already linked')
+	);
 }
 
 function meetingStartFailureMessage(status: number): string {
@@ -71,7 +96,10 @@ function meetingStartFailureMessage(status: number): string {
 function noticeFromQuery(url: URL): { authNotice: string | null; authNoticeKind: 'success' | 'error' | null } {
 	const code = url.searchParams.get('auth');
 	if (code === 'magic-link-sent') {
-		return { authNotice: 'Check your email for a sign-in link.', authNoticeKind: 'success' };
+		return {
+			authNotice: 'If that email is registered, we sent a sign-in link.',
+			authNoticeKind: 'success'
+		};
 	}
 	if (code === 'signed-in') {
 		return { authNotice: 'You are signed in.', authNoticeKind: 'success' };
@@ -224,6 +252,12 @@ export const actions: Actions = {
 					authEmail: email
 				});
 			}
+			if (shouldReturnMagicLinkSoftSuccess(sendResult.error)) {
+				return {
+					authSuccess: 'If that email is registered, we sent a sign-in link.',
+					authEmail: email
+				};
+			}
 			return fail(503, {
 				authMessage: "Couldn't send a sign-in link right now. Try again.",
 				authEmail: email
@@ -231,7 +265,7 @@ export const actions: Actions = {
 		}
 
 		return {
-			authSuccess: 'Check your email for a sign-in link.',
+			authSuccess: 'If that email is registered, we sent a sign-in link.',
 			authEmail: email
 		};
 	},

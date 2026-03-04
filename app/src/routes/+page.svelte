@@ -74,7 +74,7 @@
 					</button>
 				</form>
 				<form method="POST" action="?/sendMagicLink" class="auth-form auth-grid">
-					<label for="magicEmail">Email me a sign-in link</label>
+					<label for="magicEmail">Email me a sign-in link (if this account exists)</label>
 					<input
 						id="magicEmail"
 						name="magicEmail"
