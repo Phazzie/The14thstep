@@ -21,6 +21,10 @@ describe('narrative-context quality parsing', () => {
 \`\`\``);
 
 		expect(parsed).not.toBeNull();
+		expect(parsed?.moralizingEnding).toBe(false);
+		expect(parsed?.overexplainsImage).toBe(false);
+		expect(parsed?.genericAcrossCharacters).toBe(false);
+		expect(parsed?.emotionLabelingWithoutScene).toBe(false);
 		expect(parsed && passesQualityValidationThresholds(parsed)).toBe(true);
 	});
 
@@ -36,6 +40,15 @@ describe('narrative-context quality parsing', () => {
 	it('fails thresholds when therapy speak is detected even if pass and scores are high', () => {
 		const parsed = parseQualityValidation(
 			'{"pass":true,"voiceConsistency":9,"authenticity":9,"therapySpeakDetected":true}'
+		);
+
+		expect(parsed).not.toBeNull();
+		expect(parsed && passesQualityValidationThresholds(parsed)).toBe(false);
+	});
+
+	it('fails thresholds when any editorial anti-pattern flag is true', () => {
+		const parsed = parseQualityValidation(
+			'{"pass":true,"voiceConsistency":9,"authenticity":9,"therapySpeakDetected":false,"moralizingEnding":true}'
 		);
 
 		expect(parsed).not.toBeNull();

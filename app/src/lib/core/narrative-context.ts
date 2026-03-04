@@ -27,6 +27,10 @@ export interface QualityValidationResult {
 	voiceConsistency: number;
 	authenticity: number;
 	therapySpeakDetected: boolean;
+	moralizingEnding: boolean;
+	overexplainsImage: boolean;
+	genericAcrossCharacters: boolean;
+	emotionLabelingWithoutScene: boolean;
 	reasons: string[];
 }
 
@@ -140,6 +144,10 @@ export function parseQualityValidation(raw: string): QualityValidationResult | n
 		voiceConsistency,
 		authenticity,
 		therapySpeakDetected: parsed.therapySpeakDetected === true,
+		moralizingEnding: parsed.moralizingEnding === true,
+		overexplainsImage: parsed.overexplainsImage === true,
+		genericAcrossCharacters: parsed.genericAcrossCharacters === true,
+		emotionLabelingWithoutScene: parsed.emotionLabelingWithoutScene === true,
 		reasons
 	};
 }
@@ -148,6 +156,10 @@ export function passesQualityValidationThresholds(input: QualityValidationResult
 	return (
 		input.pass &&
 		!input.therapySpeakDetected &&
+		!input.moralizingEnding &&
+		!input.overexplainsImage &&
+		!input.genericAcrossCharacters &&
+		!input.emotionLabelingWithoutScene &&
 		input.voiceConsistency >= QUALITY_MIN_SCORE &&
 		input.authenticity >= QUALITY_MIN_SCORE
 	);
