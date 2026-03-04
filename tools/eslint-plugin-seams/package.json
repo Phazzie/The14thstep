@@ -1,0 +1,13 @@
+{
+  "name": "eslint-plugin-seams",
+  "version": "1.0.0",
+  "description": "ESLint plugin to enforce Seam-Driven Development boundaries",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "test": "node test-rule.js"
+  },
+  "peerDependencies": {
+    "eslint": "^8.57.1 || ^9.0.0"
+  }
+}

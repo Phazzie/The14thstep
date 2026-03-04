@@ -1,0 +1,30 @@
+name: Continuous Seam Freshness Check
+
+on:
+  schedule:
+    # Run every day at midnight UTC
+    - cron: '0 0 * * *'
+  workflow_dispatch: # allow manual trigger
+
+jobs:
+  check_freshness:
+    name: Check Seam Fixture Freshness
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Tools
+        run: |
+          cd tools/seam-cli
+          npm install
+
+      - name: Verify Freshness
+        run: |
+          node tools/seam-cli/index.js freshness

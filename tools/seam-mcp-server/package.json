@@ -1,0 +1,17 @@
+{
+  "name": "seam-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP Server for Continuous Seam-Driven Development",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node test-client.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.6.0"
+  }
+}
