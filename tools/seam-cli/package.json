@@ -8,7 +8,11 @@
   },
   "type": "module",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "test:freshness": "node index.js freshness"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "dependencies": {
     "commander": "^11.0.0",

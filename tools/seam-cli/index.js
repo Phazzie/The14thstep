@@ -25,7 +25,26 @@ function loadRegistry() {
     console.error(chalk.red(`Error: seam-registry.json not found at ${REGISTRY_PATH}`));
     process.exit(1);
   }
-  return JSON.parse(fs.readFileSync(REGISTRY_PATH, 'utf-8'));
+
+  try {
+    const raw = fs.readFileSync(REGISTRY_PATH, 'utf-8');
+    const parsed = JSON.parse(raw);
+
+    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.seams)) {
+      console.error(
+        chalk.red(
+          `Error: Invalid seam registry at ${REGISTRY_PATH}. Expected an object with a "seams" array.`
+        )
+      );
+      process.exit(1);
+    }
+
+    return parsed;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(chalk.red(`Error: Failed to parse seam registry at ${REGISTRY_PATH}: ${message}`));
+    process.exit(1);
+  }
 }
 
 program
@@ -91,7 +110,7 @@ program
        const fullPath = path.join(REPO_ROOT, fixturePath);
        if (fs.existsSync(fullPath)) {
          console.log(chalk.gray(`Reading fixture: ${fixturePath}`));
-         const baseName = path.basename(fixturePath, '.json').replace(/[^a-zA-Z0-A]/g, '_');
+         const baseName = path.basename(fixturePath, '.json').replace(/[^a-zA-Z0-9]/g, '_');
          mockContent += `// From ${fixturePath}\n`;
          mockContent += `// To use this, create functions matching the contract that return these payloads.\n\n`;
        }
@@ -114,29 +133,49 @@ program
 
     console.log(chalk.blue('Checking seam fixture freshness...'));
 
-    registry.seams.forEach(seam => {
-      if (seam.io && seam.freshnessDays && seam.freshnessFixtures) {
-         const thresholdMs = seam.freshnessDays * 24 * 60 * 60 * 1000;
+    registry.seams.forEach((seam) => {
+      if (!seam.io) return;
 
-         seam.freshnessFixtures.forEach(fixturePath => {
-           const fullPath = path.join(REPO_ROOT, fixturePath);
-           if (!fs.existsSync(fullPath)) {
-             console.log(chalk.red(`[STALE] ${seam.id}: Fixture missing at ${fixturePath}`));
-             hasStale = true;
-           } else {
-             const stats = fs.statSync(fullPath);
-             const ageMs = now - stats.mtimeMs;
-             const ageDays = (ageMs / (1000 * 60 * 60 * 24)).toFixed(1);
-
-             if (ageMs > thresholdMs) {
-                console.log(chalk.red(`[STALE] ${seam.id}: Fixture ${path.basename(fixturePath)} is ${ageDays} days old (limit: ${seam.freshnessDays} days).`));
-                hasStale = true;
-             } else {
-                console.log(chalk.green(`[FRESH] ${seam.id}: Fixture ${path.basename(fixturePath)} is ${ageDays} days old.`));
-             }
-           }
-         });
+      if (typeof seam.freshnessDays !== 'number' || !Number.isFinite(seam.freshnessDays) || seam.freshnessDays <= 0) {
+        console.log(chalk.red(`[STALE] ${seam.id}: Invalid configuration. "freshnessDays" must be a positive number.`));
+        hasStale = true;
+        return;
       }
+
+      if (!Array.isArray(seam.freshnessFixtures) || seam.freshnessFixtures.length === 0) {
+        console.log(chalk.red(`[STALE] ${seam.id}: Invalid configuration. "freshnessFixtures" must be a non-empty array.`));
+        hasStale = true;
+        return;
+      }
+
+      const thresholdMs = seam.freshnessDays * 24 * 60 * 60 * 1000;
+
+      seam.freshnessFixtures.forEach((fixturePath) => {
+        if (typeof fixturePath !== 'string' || fixturePath.trim().length === 0) {
+          console.log(chalk.red(`[STALE] ${seam.id}: Fixture path must be a non-empty string.`));
+          hasStale = true;
+          return;
+        }
+
+        const fullPath = path.join(REPO_ROOT, fixturePath);
+        if (!fs.existsSync(fullPath)) {
+          console.log(chalk.red(`[STALE] ${seam.id}: Fixture missing at ${fixturePath}`));
+          hasStale = true;
+          return;
+        }
+
+        const stats = fs.statSync(fullPath);
+        const ageMs = now - stats.mtimeMs;
+        const ageDays = (ageMs / (1000 * 60 * 60 * 24)).toFixed(1);
+
+        if (ageMs > thresholdMs) {
+          console.log(chalk.red(`[STALE] ${seam.id}: Fixture ${path.basename(fixturePath)} is ${ageDays} days old (limit: ${seam.freshnessDays} days).`));
+          hasStale = true;
+          return;
+        }
+
+        console.log(chalk.green(`[FRESH] ${seam.id}: Fixture ${path.basename(fixturePath)} is ${ageDays} days old.`));
+      });
     });
 
     if (hasStale) {

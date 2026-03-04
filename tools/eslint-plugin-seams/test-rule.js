@@ -15,6 +15,10 @@ ruleTester.run('no-impure-core', rule, {
       code: "import fs from 'fs';",
       filename: "/app/src/lib/server/adapter.js",
     },
+    {
+      code: "import helper from '../../../server/helper';",
+      filename: "/app/src/lib/utils/non-core.js",
+    },
   ],
   invalid: [
     {
@@ -26,6 +30,16 @@ ruleTester.run('no-impure-core', rule, {
       code: "import fs from 'fs';",
       filename: "/app/src/lib/core/io.js",
       errors: [{ messageId: 'noNodeIO' }],
+    },
+    {
+      code: "import fs from 'node:fs';",
+      filename: "/app/src/lib/core/io-node-prefix.js",
+      errors: [{ messageId: 'noNodeIO' }],
+    },
+    {
+      code: "import db from '../../../server/database/adapter';",
+      filename: "/app/src/lib/core/impure-relative.js",
+      errors: [{ messageId: 'noServerImport' }],
     },
   ],
 });

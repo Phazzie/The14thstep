@@ -28,19 +28,3 @@ jobs:
       - name: Verify Freshness
         run: |
           node tools/seam-cli/index.js freshness
-
-      - name: Fallback Record (If Stale)
-        # If freshness fails, try to run all probes to update fixtures
-        # Note: In a real CI, this requires environment variables for API keys
-        if: failure()
-        env:
-          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: |
-          echo "Freshness check failed! Attempting to re-record probes..."
-          # A real script might extract stale seamIds and record them iteratively
-          # node tools/seam-cli/index.js record grok-ai
-          # node tools/seam-cli/index.js record database
-          # ...
-          echo "Automated re-recording not fully implemented without active keys."

@@ -23,19 +23,33 @@ module.exports = {
     }
 
     const BANNED_NODE_MODULES = new Set([
-      'fs', 'fs/promises', 'net', 'child_process', 'http', 'https', 'crypto', 'path'
+      'fs',
+      'fs/promises',
+      'net',
+      'child_process',
+      'http',
+      'https',
+      'crypto',
+      'path',
+      'os',
+      'dns',
+      'dgram',
+      'tls',
+      'readline',
+      'worker_threads'
     ]);
 
     return {
       ImportDeclaration(node) {
         const importPath = node.source.value;
+        const normalizedImport = importPath.startsWith('node:') ? importPath.slice(5) : importPath;
+        const normalizedPathLike = importPath.replace(/\\/g, '/');
 
         // Check for server imports
         if (
-          importPath.includes('src/lib/server') ||
-          importPath.includes('$lib/server') ||
-          importPath.includes('../server') ||
-          importPath.includes('../../server')
+          normalizedPathLike.includes('src/lib/server') ||
+          normalizedPathLike.includes('$lib/server') ||
+          /(^|\/)server(\/|$)/.test(normalizedPathLike)
         ) {
           context.report({
             node,
@@ -44,12 +58,12 @@ module.exports = {
         }
 
         // Check for Node I/O imports
-        if (BANNED_NODE_MODULES.has(importPath) || importPath.startsWith('node:')) {
+        if (BANNED_NODE_MODULES.has(normalizedImport)) {
           context.report({
             node,
             messageId: 'noNodeIO',
             data: {
-              module: importPath
+              module: normalizedImport
             }
           });
         }

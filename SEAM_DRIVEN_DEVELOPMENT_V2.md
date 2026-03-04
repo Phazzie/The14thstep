@@ -13,6 +13,9 @@ The core SDD order remains:
 
 CSDD introduces automation and strict enforcement at every stage:
 
+### Definition Of Done Gate
+Before advancing to the next seam or lifecycle stage, all seam-relevant probes and tests must pass. Each cycle must also record meaningful outcomes and test results in `plans/the-14th-step-execplan.md`, `decision-log.md`, `CHANGELOG.md`, and `LESSONS_LEARNED.md`.
+
 ### 1. Pure Core Enforcement (Linter)
 The `src/lib/core/` directory must remain pure. It cannot make network calls, access the database, or read from the file system. In CSDD, this is no longer a gentleman's agreement—it is strictly enforced by a custom AST-aware ESLint plugin (`eslint-plugin-seams`). If a core module imports from `src/lib/server/` or Node's `fs`/`net`, the build fails.
 
