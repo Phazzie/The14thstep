@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CORE_CHARACTERS } from './characters';
-import { STYLE_CONSTITUTION } from './style-constitution';
+import { EDITORIAL_REALITY_CHECKS, STYLE_CONSTITUTION } from './style-constitution';
 import {
 	buildCharacterSharePrompt,
 	buildCrisisTriagePrompt,
@@ -37,6 +37,7 @@ describe('prompt templates', () => {
 		expect(prompt).toContain('CALLBACK OPPORTUNITIES THIS MEETING');
 		expect(prompt).toContain('Staying when I want to leave');
 		expect(prompt).toContain(STYLE_CONSTITUTION);
+		expect(prompt).toContain(EDITORIAL_REALITY_CHECKS);
 		expect(prompt).not.toContain('Write exactly');
 		expect(prompt).not.toContain('physical action');
 		expect(prompt).not.toContain('The Chair');
@@ -100,6 +101,8 @@ describe('prompt templates', () => {
 		expect(prompt).toContain('therapySpeakDetected');
 		expect(prompt).toContain('I hear you.');
 		expect(prompt).toContain(STYLE_CONSTITUTION);
+		expect(prompt).toContain(EDITORIAL_REALITY_CHECKS);
+		expect(prompt).toContain('lesson ending');
 	});
 
 	it('builds ritual opening prompt with character voice and meeting context', () => {
