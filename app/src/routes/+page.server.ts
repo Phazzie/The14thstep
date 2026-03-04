@@ -26,6 +26,36 @@ function resolveAnonKey(env: NodeJS.ProcessEnv): string {
 	);
 }
 
+function maskEmail(email: string): string {
+	const [local, domain] = email.split('@');
+	if (!domain) return '[invalid-email]';
+	if (local.length <= 2) return `**@${domain}`;
+	return `${local.slice(0, 2)}***@${domain}`;
+}
+
+function authFailureMessage(rawMessage: string | undefined): string {
+	const normalized = rawMessage?.toLowerCase() ?? '';
+	if (normalized.includes('invalid login credentials')) {
+		return 'Sign in failed. Double-check your email and password.';
+	}
+	if (normalized.includes('email not confirmed')) {
+		return 'Sign in failed. Confirm your email first, then try again.';
+	}
+	if (normalized.includes('expired')) {
+		return 'Sign in failed. Your sign-in link expired. Request a new one.';
+	}
+	return 'Sign in failed. Check your credentials and try again.';
+}
+
+function meetingStartFailureMessage(status: number): string {
+	if (status === 400) return 'Name, clean time, mood, and mind are required.';
+	if (status === 401) return 'Your session is no longer valid. Sign in again or provide a user ID.';
+	if (status === 404) return 'We could not find that account. Sign in again or provide a valid user ID.';
+	if (status === 429) return 'Too many requests right now. Please try again in a minute.';
+	if (status === 503) return 'Meeting services are temporarily unavailable. Please retry shortly.';
+	return 'Unable to start the meeting right now.';
+}
+
 export const load: PageServerLoad = async ({ locals }) => {
 	return {
 		userId: locals.userId
@@ -60,7 +90,10 @@ export const actions: Actions = {
 			password
 		});
 		if (signInResult.error || !signInResult.data.session) {
-			return fail(401, { authMessage: 'Sign in failed. Check your email and password.' });
+			console.warn(
+				`[auth.signIn] failed email=${maskEmail(email)} code=${signInResult.error?.code ?? 'unknown'} status=${signInResult.error?.status ?? 'unknown'} message=${signInResult.error?.message ?? 'missing_session'}`
+			);
+			return fail(401, { authMessage: authFailureMessage(signInResult.error?.message) });
 		}
 
 		const secure = process.env.NODE_ENV === 'production';
@@ -136,10 +169,10 @@ export const actions: Actions = {
 
 		if (!result.ok) {
 			const status = statusFromSeamCode(result.error.code);
-			const message =
-				status === 400
-					? 'Name, clean time, mood, and mind are required.'
-					: 'Unable to start the meeting right now.';
+			console.warn(
+				`[meeting.join] createMeeting failed code=${result.error.code} status=${status} message=${result.error.message}`
+			);
+			const message = meetingStartFailureMessage(status);
 			return fail(status, { message, values });
 		}
 
