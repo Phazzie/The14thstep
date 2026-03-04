@@ -31,6 +31,7 @@ interface MockResponses {
 	meetingCountSelect?: QueryResponse;
 	shareSingle?: QueryResponse;
 	heavyMemorySelect?: QueryResponse;
+	// Optional specific rows to return from the characters mock instead of default generated ones
 	characterRows?: Array<{ id: string; name: string }>;
 	charactersSelect?: QueryResponse;
 	characterInsertSelect?: QueryResponse;
@@ -216,6 +217,14 @@ function createHarness(responses: MockResponses = {}) {
 					select: () => ({
 						in: async (_column: string, names: string[]) => {
 							if (charactersSelect) return charactersSelect;
+							// If explicit character rows are provided, prioritize filtering them
+							if (responses.characterRows) {
+								return {
+									data: responses.characterRows.filter((row) => names.includes(row.name)),
+									error: null,
+									status: 200
+								};
+							}
 							return {
 								data: characterRows.filter((row) => names.includes(row.name)),
 								error: null,
@@ -774,6 +783,7 @@ describe('database supabase adapter', () => {
 	it('translates slug ids to UUID for writes and maps UUID back to slug on reads', async () => {
 		const marcusDbId = '00000000-0000-4000-8000-000000000001';
 		const { adapter, shareInsertSpy } = createHarness({
+			characterRows: [{ id: marcusDbId, name: 'Marcus' }],
 			shareSingle: {
 				data: {
 					id: '2f5dcf63-cf80-4e09-8e3e-13f93da72cf3',
