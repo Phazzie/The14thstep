@@ -1,9 +1,47 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Spectral:ital,wght@0,400;0,600;1,400&display=swap');
 
 :root {
 	color-scheme: dark;
+	--ink-0: #05060a;
+	--ink-1: #0d1017;
+	--ink-2: #161c29;
+	--mist: #ccd4e4;
+	--muted: #97a2b8;
+	--signal: #f6a31b;
+	--signal-soft: #ffdd8b;
+	--line: rgba(177, 193, 220, 0.22);
+	--glass: rgba(11, 15, 24, 0.74);
 }
 
 body {
-	@apply bg-gray-900 text-gray-100;
+	@apply text-gray-100;
+	margin: 0;
+	min-height: 100vh;
+	font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+	background:
+		radial-gradient(circle at 82% 18%, rgba(246, 163, 27, 0.18), transparent 42%),
+		radial-gradient(circle at 18% 74%, rgba(80, 148, 255, 0.12), transparent 38%),
+		linear-gradient(165deg, var(--ink-0), var(--ink-1) 45%, var(--ink-2));
+	background-attachment: fixed;
+}
+
+body::before {
+	content: '';
+	position: fixed;
+	inset: 0;
+	pointer-events: none;
+	background-image:
+		linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+		linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+	background-size: 26px 26px;
+	mask-image: radial-gradient(circle at center, rgba(0, 0, 0, 0.58), transparent 100%);
+	opacity: 0.35;
+}
+
+h1,
+h2,
+h3 {
+	font-family: 'Spectral', Georgia, serif;
+	letter-spacing: 0.02em;
 }
