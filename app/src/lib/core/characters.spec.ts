@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CORE_CHARACTERS, validateCharacterNarrativeFields } from './characters';
+import { CORE_CHARACTERS, CRISIS_RESPONDER_ID, getCoreCharacterById, validateCharacterNarrativeFields } from './characters';
 import type { CharacterProfile } from './types';
 
 describe('character narrative field validation', () => {
@@ -34,5 +34,11 @@ describe('character narrative field validation', () => {
 		expect(result.missingFields).toContain('voiceExamples');
 		expect(result.missingFields).toContain('lie');
 		expect(result.missingFields).toContain('cleanTimeStart');
+	});
+
+	it('resolves the designated crisis responder by id independent of array order', () => {
+		const shuffled = [...CORE_CHARACTERS].reverse();
+		const responder = getCoreCharacterById(CRISIS_RESPONDER_ID, shuffled);
+		expect(responder?.id).toBe('marcus');
 	});
 });

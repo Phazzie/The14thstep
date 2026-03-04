@@ -1,11 +1,10 @@
 import {
 	clearAllAuthCookies,
-	createPublicSupabaseAuthClient,
 	normalizeEmailToDisplayName,
 	setSessionKindCookie,
 	setSupabaseSessionCookies
 } from '$lib/server/auth/public-auth';
-import type { EmailOtpType, User } from '@supabase/supabase-js';
+import type { AuthCallbackOtpType, AuthSignInPayload } from '$lib/seams/auth/contract';
 import { redirect } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
@@ -13,16 +12,16 @@ function toRedirect(code: string): never {
 	throw redirect(303, `/?auth=${encodeURIComponent(code)}`);
 }
 
-function resolveDisplayNameFromAuthUser(user: User | null): string {
-	const metadata = (user?.user_metadata ?? {}) as Record<string, unknown>;
+function resolveDisplayNameFromAuthPayload(payload: AuthSignInPayload): string {
+	const metadata = payload.userMetadata;
 	const fullName = typeof metadata.full_name === 'string' ? metadata.full_name.trim() : '';
 	if (fullName) return fullName;
 	const name = typeof metadata.name === 'string' ? metadata.name.trim() : '';
 	if (name) return name;
-	return normalizeEmailToDisplayName(user?.email ?? null);
+	return normalizeEmailToDisplayName(payload.email ?? null);
 }
 
-function toEmailOtpType(value: string | null): EmailOtpType | null {
+function toEmailOtpType(value: string | null): AuthCallbackOtpType | null {
 	if (
 		value === 'signup' ||
 		value === 'invite' ||
@@ -36,6 +35,14 @@ function toEmailOtpType(value: string | null): EmailOtpType | null {
 	return null;
 }
 
+function upstreamMessageFromSeamError(error: { message: string; details?: Record<string, unknown> }): string {
+	const upstream = error.details?.upstreamMessage;
+	if (typeof upstream === 'string' && upstream.trim().length > 0) {
+		return upstream;
+	}
+	return error.message;
+}
+
 export const GET: RequestHandler = async ({ url, cookies, locals }) => {
 	const providerError = url.searchParams.get('error');
 	if (providerError) {
@@ -46,82 +53,31 @@ export const GET: RequestHandler = async ({ url, cookies, locals }) => {
 		return toRedirect('magic-link-cancelled');
 	}
 
-	const authClient = createPublicSupabaseAuthClient();
-	if (!authClient) {
-		console.warn('auth callback missing public auth config');
+	const completionResult = await locals.seams.auth.completeAuthCallback({
+		code: url.searchParams.get('code'),
+		tokenHash: url.searchParams.get('token_hash'),
+		otpType: toEmailOtpType(url.searchParams.get('type'))
+	});
+
+	if (!completionResult.ok) {
+		console.warn('auth callback completion failed', {
+			code: completionResult.error.code,
+			message: upstreamMessageFromSeamError(completionResult.error)
+		});
 		return toRedirect('auth-failed');
 	}
 
-	const code = url.searchParams.get('code');
-	const tokenHash = url.searchParams.get('token_hash');
-	const rawType = url.searchParams.get('type');
-	let session: { access_token: string; refresh_token: string } | null = null;
-	let user: User | null = null;
-
-	if (code) {
-		try {
-			const exchange = await authClient.auth.exchangeCodeForSession(code);
-			if (!exchange.error) {
-				session = exchange.data.session;
-				user = exchange.data.user ?? exchange.data.session?.user ?? null;
-			} else {
-				console.warn('auth callback code exchange failed', {
-					status: exchange.error.status ?? null,
-					code: exchange.error.code ?? null
-				});
-			}
-		} catch (error) {
-			console.warn('auth callback code exchange threw', {
-				error: error instanceof Error ? error.message : String(error)
-			});
-		}
-	}
-
-	if (!session && tokenHash) {
-		const otpType = toEmailOtpType(rawType);
-		if (!otpType) {
-			console.warn('auth callback token_hash missing/invalid type', { type: rawType ?? null });
-			return toRedirect('auth-failed');
-		}
-
-		try {
-			const verify = await authClient.auth.verifyOtp({
-				token_hash: tokenHash,
-				type: otpType
-			});
-			if (verify.error) {
-				console.warn('auth callback otp verify failed', {
-					status: verify.error.status ?? null,
-					code: verify.error.code ?? null
-				});
-				return toRedirect('auth-failed');
-			}
-			session = verify.data.session;
-			user = verify.data.user ?? verify.data.session?.user ?? null;
-		} catch (error) {
-			console.warn('auth callback otp verify threw', {
-				error: error instanceof Error ? error.message : String(error)
-			});
-			return toRedirect('auth-failed');
-		}
-	} else if (!session && !code) {
-		console.warn('auth callback missing completion params');
-		return toRedirect('auth-failed');
-	}
-
-	if (!session || !user?.id) {
-		console.warn('auth callback missing session or user after completion');
-		return toRedirect('auth-failed');
-	}
-
-	setSupabaseSessionCookies(cookies, session);
+	setSupabaseSessionCookies(cookies, {
+		access_token: completionResult.value.accessToken,
+		refresh_token: completionResult.value.refreshToken
+	});
 	setSessionKindCookie(cookies, 'member');
 
 	let profileResult;
 	try {
 		profileResult = await locals.seams.database.ensureUserProfile({
-			id: user.id,
-			displayName: resolveDisplayNameFromAuthUser(user),
+			id: completionResult.value.userId,
+			displayName: resolveDisplayNameFromAuthPayload(completionResult.value),
 			cleanTime: null,
 			isAnonymous: false
 		});

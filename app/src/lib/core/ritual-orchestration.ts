@@ -48,6 +48,7 @@ export function initializeMeetingPhase(): MeetingPhaseState {
 		currentPhase: MeetingPhaseEnum.SETUP,
 		phaseStartedAt: new Date(),
 		roundNumber: undefined,
+		preCrisisPhase: undefined,
 		charactersSpokenThisRound: [],
 		userHasSharedInRound: false
 	};
@@ -78,6 +79,7 @@ export function transitionToNextPhase(
 	transitionTrigger: 'share_complete' | 'user_input' | 'round_complete' | 'meeting_start'
 ): SeamResult<MeetingPhaseState> {
 	const currentPhase = currentState.currentPhase;
+	let nextPreCrisisPhase: MeetingPhase | undefined;
 
 	// Determine next phase based on current phase and trigger
 	let nextPhase: MeetingPhase | null = null;
@@ -136,6 +138,7 @@ export function transitionToNextPhase(
 				nextPhase = MeetingPhaseEnum.POST_MEETING;
 			} else if (transitionTrigger === 'user_input') {
 				nextPhase = MeetingPhaseEnum.CRISIS_MODE;
+				nextPreCrisisPhase = currentPhase;
 			}
 			break;
 
@@ -148,11 +151,18 @@ export function transitionToNextPhase(
 			);
 
 		case MeetingPhaseEnum.CRISIS_MODE:
-			// Crisis mode can transition to any sharing round or closing
+			// Recover to the phase that crisis interrupted when possible.
 			if (transitionTrigger === 'share_complete') {
-				// For now, transition back to where we came from or to closing
-				// This is simplified - in practice, would track pre-crisis phase
-				nextPhase = MeetingPhaseEnum.CLOSING;
+				const recoveryTarget = currentState.preCrisisPhase;
+				if (
+					recoveryTarget &&
+					recoveryTarget !== MeetingPhaseEnum.CRISIS_MODE &&
+					isValidTransition(MeetingPhaseEnum.CRISIS_MODE, recoveryTarget)
+				) {
+					nextPhase = recoveryTarget;
+				} else {
+					nextPhase = MeetingPhaseEnum.CLOSING;
+				}
 			}
 			break;
 	}
@@ -179,6 +189,7 @@ export function transitionToNextPhase(
 		currentPhase: nextPhase,
 		phaseStartedAt: new Date(),
 		roundNumber: getRoundNumber(nextPhase),
+		preCrisisPhase: nextPhase === MeetingPhaseEnum.CRISIS_MODE ? nextPreCrisisPhase : undefined,
 		charactersSpokenThisRound: [],
 		userHasSharedInRound: false
 	};

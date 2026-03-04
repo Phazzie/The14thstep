@@ -43,15 +43,22 @@ function toPostMeetingPhaseState(current: MeetingPhaseState): MeetingPhaseState 
 	};
 }
 
-async function getCurrentPhaseState(meetingId: string, locals: App.Locals): Promise<MeetingPhaseState> {
+async function getCurrentPhaseState(
+	meetingId: string,
+	locals: App.Locals
+): Promise<{ phaseState: MeetingPhaseState; meetingExists: boolean }> {
 	let phaseState = initializeMeetingPhase();
+	let meetingExists = true;
 	const persistedPhaseState = await locals.seams.database.getMeetingPhase(meetingId);
 	if (persistedPhaseState.ok && persistedPhaseState.value) {
 		phaseState = persistedPhaseState.value;
 	} else if (!persistedPhaseState.ok) {
+		if (persistedPhaseState.error.code === SeamErrorCodes.NOT_FOUND) {
+			meetingExists = false;
+		}
 		console.warn(`[close] getMeetingPhase failed for meeting=${meetingId}: ${persistedPhaseState.error.message}`);
 	}
-	return phaseState;
+	return { phaseState, meetingExists };
 }
 
 async function persistPhaseState(meetingId: string, phaseState: MeetingPhaseState, locals: App.Locals) {
@@ -230,7 +237,11 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 	if (!sharesResult.ok) {
 		return json(sharesResult, { status: toStatus(sharesResult.error.code) });
 	}
-	const currentPhaseState = await getCurrentPhaseState(meetingId, locals);
+	const phaseLookup = await getCurrentPhaseState(meetingId, locals);
+	if (!phaseLookup.meetingExists) {
+		return json(err(SeamErrorCodes.NOT_FOUND, 'Meeting not found'), { status: 404 });
+	}
+	const currentPhaseState = phaseLookup.phaseState;
 	const closingPhaseState =
 		currentPhaseState.currentPhase === MeetingPhase.POST_MEETING
 			? currentPhaseState

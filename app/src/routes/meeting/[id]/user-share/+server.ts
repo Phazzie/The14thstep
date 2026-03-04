@@ -37,9 +37,10 @@ interface UserShareRequest {
 async function getCurrentPhaseState(
 	meetingId: string,
 	locals: App.Locals
-): Promise<{ phaseState: MeetingPhaseState; phaseLoaded: boolean }> {
+): Promise<{ phaseState: MeetingPhaseState; phaseLoaded: boolean; meetingExists: boolean }> {
 	let phaseState = initializeMeetingPhase();
 	let phaseLoaded = false;
+	let meetingExists = true;
 	const persistedPhaseState = await locals.seams.database.getMeetingPhase(meetingId);
 	if (persistedPhaseState.ok) {
 		phaseLoaded = true;
@@ -47,6 +48,9 @@ async function getCurrentPhaseState(
 			phaseState = persistedPhaseState.value;
 		}
 	} else if (!persistedPhaseState.ok) {
+		if (persistedPhaseState.error.code === SeamErrorCodes.NOT_FOUND) {
+			meetingExists = false;
+		}
 		console.warn(`[user-share] getMeetingPhase failed for meeting=${meetingId}: ${persistedPhaseState.error.message}`);
 	}
 
@@ -61,7 +65,7 @@ async function getCurrentPhaseState(
 		}
 	}
 
-	return { phaseState, phaseLoaded };
+	return { phaseState, phaseLoaded, meetingExists };
 }
 
 async function persistPhaseState(meetingId: string, phaseState: MeetingPhaseState, locals: App.Locals) {
@@ -209,7 +213,13 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 
 	const input = inputResult.value;
 	const interactionType = input.interactionType ?? 'standard';
-	const { phaseState: currentPhaseState, phaseLoaded } = await getCurrentPhaseState(meetingId, locals);
+	const { phaseState: currentPhaseState, phaseLoaded, meetingExists } = await getCurrentPhaseState(
+		meetingId,
+		locals
+	);
+	if (!meetingExists) {
+		return json(err(SeamErrorCodes.NOT_FOUND, 'Meeting not found'), { status: 404 });
+	}
 	if (phaseLoaded && currentPhaseState.currentPhase === MeetingPhase.POST_MEETING) {
 		return json(err(SeamErrorCodes.INPUT_INVALID, 'User shares are unavailable after the meeting closes'), {
 			status: 409

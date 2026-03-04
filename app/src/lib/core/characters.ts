@@ -161,6 +161,15 @@ export const CORE_CHARACTERS: CoreCharacterProfile[] = [
 	}
 ];
 
+export const CRISIS_RESPONDER_ID = 'marcus' as const;
+
+export function getCoreCharacterById(
+	id: string,
+	candidates: readonly CoreCharacterProfile[] = CORE_CHARACTERS
+): CoreCharacterProfile | undefined {
+	return candidates.find((character) => character.id === id);
+}
+
 export const VISITOR_NAME_POOL = [
 	'Danny',
 	'Keisha',

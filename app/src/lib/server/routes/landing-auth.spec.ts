@@ -1,13 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SeamErrorCodes, err, ok } from '$lib/core/seam';
 
-const { createClientMock, createMeetingMock } = vi.hoisted(() => ({
-	createClientMock: vi.fn(),
+const { createMeetingMock } = vi.hoisted(() => ({
 	createMeetingMock: vi.fn()
-}));
-
-vi.mock('@supabase/supabase-js', () => ({
-	createClient: createClientMock
 }));
 
 vi.mock('$lib/core/meeting', () => ({
@@ -52,20 +47,19 @@ function makeRequest(form: Record<string, string>) {
 	return { formData: async () => formData } as Request;
 }
 
-function createAuthClientStub() {
+function createAuthSeamStub() {
 	return {
-		auth: {
-			signInAnonymously: vi.fn(),
-			signInWithOtp: vi.fn(),
-			signInWithPassword: vi.fn()
-		}
+		getSession: vi.fn(),
+		signInGuest: vi.fn(),
+		sendMagicLink: vi.fn(),
+		signInWithPassword: vi.fn(),
+		completeAuthCallback: vi.fn(),
+		signOut: vi.fn()
 	};
 }
 
 beforeEach(() => {
 	vi.clearAllMocks();
-	process.env.SUPABASE_URL = 'https://example.supabase.co';
-	process.env.SUPABASE_ANON_KEY = 'anon-key';
 	delete process.env.CANONICAL_ORIGIN;
 	delete process.env.PUBLIC_APP_ORIGIN;
 	delete process.env.PUBLIC_SITE_URL;
@@ -91,29 +85,32 @@ describe('landing auth route actions', () => {
 
 	it('continueGuest creates anonymous session, bootstraps profile, and redirects', async () => {
 		const { cookies, calls } = createCookieJar();
-		const authClient = createAuthClientStub();
-		authClient.auth.signInAnonymously.mockResolvedValue({
-			data: {
-				session: { access_token: 'access', refresh_token: 'refresh', user: { id: 'guest-1' } },
-				user: { id: 'guest-1' }
-			},
-			error: null
-		});
-		createClientMock.mockReturnValue(authClient as never);
+		const auth = createAuthSeamStub();
+		auth.signInGuest.mockResolvedValue(
+			ok({
+				userId: 'guest-1',
+				email: null,
+				accessToken: 'access',
+				refreshToken: 'refresh',
+				userMetadata: {}
+			})
+		);
 
-		const ensureUserProfile = vi.fn(async () => ok({
-			id: 'guest-1',
-			displayName: 'Guest',
-			cleanTime: null,
-			meetingCount: 0,
-			firstMeetingAt: null,
-			lastMeetingAt: null
-		}));
+		const ensureUserProfile = vi.fn(async () =>
+			ok({
+				id: 'guest-1',
+				displayName: 'Guest',
+				cleanTime: null,
+				meetingCount: 0,
+				firstMeetingAt: null,
+				lastMeetingAt: null
+			})
+		);
 
 		await expect(
 			actions.continueGuest?.({
 				cookies,
-				locals: { seams: { database: { ensureUserProfile } } }
+				locals: { seams: { auth, database: { ensureUserProfile } } }
 			} as never)
 		).rejects.toSatisfy((error: unknown) => {
 			expectRedirectLike(error, 303, '/');
@@ -129,36 +126,32 @@ describe('landing auth route actions', () => {
 	});
 
 	it('sendMagicLink returns success state and preserves email', async () => {
-		const authClient = createAuthClientStub();
-		authClient.auth.signInWithOtp.mockResolvedValue({ data: {}, error: null });
-		createClientMock.mockReturnValue(authClient as never);
+		const auth = createAuthSeamStub();
+		auth.sendMagicLink.mockResolvedValue(ok({ success: true }));
 
 		const result = await actions.sendMagicLink?.({
 			request: makeRequest({ magicEmail: 'person@example.com' }),
-			url: new URL('http://localhost/')
+			url: new URL('http://localhost/'),
+			locals: { seams: { auth } }
 		} as never);
 
 		expect(result).toMatchObject({
 			authSuccess: 'If that email is registered, we sent a sign-in link.',
 			authEmail: 'person@example.com'
 		});
-		expect(authClient.auth.signInWithOtp).toHaveBeenCalled();
+		expect(auth.sendMagicLink).toHaveBeenCalled();
 	});
 
 	it('sendMagicLink returns anti-enumeration success message for already-registered collisions', async () => {
-		const authClient = createAuthClientStub();
-		authClient.auth.signInWithOtp.mockResolvedValue({
-			data: {},
-			error: {
-				status: 400,
-				message: 'User already registered'
-			}
-		});
-		createClientMock.mockReturnValue(authClient as never);
+		const auth = createAuthSeamStub();
+		auth.sendMagicLink.mockResolvedValue(
+			err(SeamErrorCodes.INPUT_INVALID, 'failed', { upstreamMessage: 'User already registered' })
+		);
 
 		const result = await actions.sendMagicLink?.({
 			request: makeRequest({ magicEmail: 'person@example.com' }),
-			url: new URL('http://localhost/')
+			url: new URL('http://localhost/'),
+			locals: { seams: { auth } }
 		} as never);
 
 		expect(result).toMatchObject({
@@ -169,45 +162,41 @@ describe('landing auth route actions', () => {
 
 	it('sendMagicLink prefers canonical origin for callback redirect when configured', async () => {
 		process.env.CANONICAL_ORIGIN = 'https://14thstep.com';
-		const authClient = createAuthClientStub();
-		authClient.auth.signInWithOtp.mockResolvedValue({ data: {}, error: null });
-		createClientMock.mockReturnValue(authClient as never);
+		const auth = createAuthSeamStub();
+		auth.sendMagicLink.mockResolvedValue(ok({ success: true }));
 
 		await actions.sendMagicLink?.({
 			request: makeRequest({ magicEmail: 'person@example.com' }),
-			url: new URL('https://weird-proxy.example/')
+			url: new URL('https://weird-proxy.example/'),
+			locals: { seams: { auth } }
 		} as never);
 
-		expect(authClient.auth.signInWithOtp).toHaveBeenCalledWith(
+		expect(auth.sendMagicLink).toHaveBeenCalledWith(
 			expect.objectContaining({
-				options: expect.objectContaining({
-					emailRedirectTo: 'https://14thstep.com/auth/callback'
-				})
+				emailRedirectTo: 'https://14thstep.com/auth/callback'
 			})
 		);
 	});
 
 	it('signIn clears cookies and fails when profile bootstrap fails', async () => {
 		const { cookies, calls } = createCookieJar();
-		const authClient = createAuthClientStub();
-		authClient.auth.signInWithPassword.mockResolvedValue({
-			data: {
-				session: {
-					access_token: 'access',
-					refresh_token: 'refresh',
-					user: { id: 'user-1', email: 'john@example.com', user_metadata: {} }
-				},
-				user: { id: 'user-1', email: 'john@example.com', user_metadata: {} }
-			},
-			error: null
-		});
-		createClientMock.mockReturnValue(authClient as never);
+		const auth = createAuthSeamStub();
+		auth.signInWithPassword.mockResolvedValue(
+			ok({
+				userId: 'user-1',
+				email: 'john@example.com',
+				accessToken: 'access',
+				refreshToken: 'refresh',
+				userMetadata: {}
+			})
+		);
 
 		const result = await actions.signIn?.({
 			request: makeRequest({ email: 'john@example.com', password: 'secret' }),
 			cookies,
 			locals: {
 				seams: {
+					auth,
 					database: {
 						ensureUserProfile: vi.fn(async () =>
 							err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, 'down')
@@ -227,17 +216,15 @@ describe('landing auth route actions', () => {
 	});
 
 	it('signIn returns existing-account guidance for already-registered collisions', async () => {
-		const authClient = createAuthClientStub();
-		authClient.auth.signInWithPassword.mockResolvedValue({
-			data: { session: null, user: null },
-			error: { status: 400, message: 'User already registered' }
-		});
-		createClientMock.mockReturnValue(authClient as never);
+		const auth = createAuthSeamStub();
+		auth.signInWithPassword.mockResolvedValue(
+			err(SeamErrorCodes.UNAUTHORIZED, 'failed', { upstreamMessage: 'User already registered' })
+		);
 
 		const result = await actions.signIn?.({
 			request: makeRequest({ email: 'john@example.com', password: 'secret' }),
 			cookies: createCookieJar().cookies,
-			locals: { seams: { database: {} } }
+			locals: { seams: { auth, database: {} } }
 		} as never);
 
 		expect(result).toMatchObject({
@@ -249,17 +236,17 @@ describe('landing auth route actions', () => {
 	});
 
 	it('signIn returns method-collision guidance when provider reports linked identity', async () => {
-		const authClient = createAuthClientStub();
-		authClient.auth.signInWithPassword.mockResolvedValue({
-			data: { session: null, user: null },
-			error: { status: 400, message: 'Identity is already linked to a different provider' }
-		});
-		createClientMock.mockReturnValue(authClient as never);
+		const auth = createAuthSeamStub();
+		auth.signInWithPassword.mockResolvedValue(
+			err(SeamErrorCodes.UNAUTHORIZED, 'failed', {
+				upstreamMessage: 'Identity is already linked to a different provider'
+			})
+		);
 
 		const result = await actions.signIn?.({
 			request: makeRequest({ email: 'john@example.com', password: 'secret' }),
 			cookies: createCookieJar().cookies,
-			locals: { seams: { database: {} } }
+			locals: { seams: { auth, database: {} } }
 		} as never);
 
 		expect(result).toMatchObject({

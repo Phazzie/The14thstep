@@ -1,4 +1,4 @@
-import { CORE_CHARACTERS } from '$lib/core/characters';
+import { CRISIS_RESPONDER_ID, getCoreCharacterById } from '$lib/core/characters';
 import { addShare } from '$lib/core/meeting';
 import { initializeMeetingPhase } from '$lib/core/ritual-orchestration';
 import { buildMarcusCrisisPrompt } from '$lib/core/prompt-templates';
@@ -23,19 +23,28 @@ function enterCrisisMode(current: MeetingPhaseState): MeetingPhaseState {
 	return {
 		...current,
 		currentPhase: MeetingPhase.CRISIS_MODE,
+		preCrisisPhase:
+			current.currentPhase !== MeetingPhase.CRISIS_MODE ? current.currentPhase : current.preCrisisPhase,
 		phaseStartedAt: new Date()
 	};
 }
 
-async function getCurrentPhaseState(meetingId: string, locals: App.Locals): Promise<MeetingPhaseState> {
+async function getCurrentPhaseState(
+	meetingId: string,
+	locals: App.Locals
+): Promise<{ phaseState: MeetingPhaseState; meetingExists: boolean }> {
 	let phaseState = initializeMeetingPhase();
+	let meetingExists = true;
 	const persistedPhaseState = await locals.seams.database.getMeetingPhase(meetingId);
 	if (persistedPhaseState.ok && persistedPhaseState.value) {
 		phaseState = persistedPhaseState.value;
 	} else if (!persistedPhaseState.ok) {
+		if (persistedPhaseState.error.code === SeamErrorCodes.NOT_FOUND) {
+			meetingExists = false;
+		}
 		console.warn(`[crisis] getMeetingPhase failed for meeting=${meetingId}: ${persistedPhaseState.error.message}`);
 	}
-	return phaseState;
+	return { phaseState, meetingExists };
 }
 
 async function persistPhaseState(meetingId: string, phaseState: MeetingPhaseState, locals: App.Locals) {
@@ -120,7 +129,12 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 	}
 
 	const input = inputResult.value;
-	let phaseState = await getCurrentPhaseState(meetingId, locals);
+	const phaseLookup = await getCurrentPhaseState(meetingId, locals);
+	if (!phaseLookup.meetingExists) {
+		return json(err(SeamErrorCodes.NOT_FOUND, 'Meeting not found'), { status: 404 });
+	}
+
+	let phaseState = phaseLookup.phaseState;
 	if (phaseState.currentPhase === MeetingPhase.POST_MEETING) {
 		return json(err(SeamErrorCodes.INPUT_INVALID, 'Meeting is already closed'), { status: 409 });
 	}
@@ -129,7 +143,7 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 		await persistPhaseState(meetingId, phaseState, locals);
 	}
 
-	const designatedCharacter = CORE_CHARACTERS.find((character) => character.id === 'marcus') ?? CORE_CHARACTERS[0];
+	const designatedCharacter = getCoreCharacterById(CRISIS_RESPONDER_ID);
 	if (!designatedCharacter) {
 		return json(err(SeamErrorCodes.NOT_FOUND, 'Crisis responder is unavailable'), { status: 404 });
 	}

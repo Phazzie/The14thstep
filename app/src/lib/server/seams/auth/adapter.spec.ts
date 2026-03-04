@@ -142,4 +142,138 @@ describe('auth server adapter', () => {
 			expect(result.value.email).toBe('chunked@example.com');
 		}
 	});
+
+	it('maps guest sign-in to auth payload', async () => {
+		const adapter = createAuthAdapter({
+			publicClient: {
+				auth: {
+					signInAnonymously: vi.fn().mockResolvedValue({
+						data: {
+							session: {
+								access_token: 'access',
+								refresh_token: 'refresh',
+								user: { id: 'guest-1', email: 'guest@example.com', user_metadata: { role: 'guest' } }
+							},
+							user: { id: 'guest-1', email: 'guest@example.com', user_metadata: { role: 'guest' } }
+						},
+						error: null
+					}),
+					signInWithOtp: vi.fn(),
+					signInWithPassword: vi.fn(),
+					exchangeCodeForSession: vi.fn(),
+					verifyOtp: vi.fn()
+				}
+			}
+		});
+
+		const result = await adapter.signInGuest();
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value).toMatchObject({
+				userId: 'guest-1',
+				email: 'guest@example.com',
+				accessToken: 'access',
+				refreshToken: 'refresh'
+			});
+		}
+	});
+
+	it('maps magic-link throttling to RATE_LIMITED', async () => {
+		const adapter = createAuthAdapter({
+			publicClient: {
+				auth: {
+					signInAnonymously: vi.fn(),
+					signInWithOtp: vi.fn().mockResolvedValue({
+						data: {},
+						error: { status: 429, code: 'over_request_rate_limit', message: 'Too many requests' }
+					}),
+					signInWithPassword: vi.fn(),
+					exchangeCodeForSession: vi.fn(),
+					verifyOtp: vi.fn()
+				}
+			}
+		});
+
+		const result = await adapter.sendMagicLink({
+			email: 'person@example.com',
+			emailRedirectTo: 'https://example.com/auth/callback'
+		});
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe(SeamErrorCodes.RATE_LIMITED);
+			expect(result.error.details).toMatchObject({ upstreamStatus: 429 });
+		}
+	});
+
+	it('maps password sign-in failures to unauthorized with upstream details', async () => {
+		const adapter = createAuthAdapter({
+			publicClient: {
+				auth: {
+					signInAnonymously: vi.fn(),
+					signInWithOtp: vi.fn(),
+					signInWithPassword: vi.fn().mockResolvedValue({
+						data: { session: null, user: null },
+						error: { status: 401, code: 'invalid_credentials', message: 'Invalid login credentials' }
+					}),
+					exchangeCodeForSession: vi.fn(),
+					verifyOtp: vi.fn()
+				}
+			}
+		});
+
+		const result = await adapter.signInWithPassword({
+			email: 'person@example.com',
+			password: 'secret'
+		});
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe(SeamErrorCodes.UNAUTHORIZED);
+			expect(result.error.details).toMatchObject({
+				upstreamCode: 'invalid_credentials',
+				upstreamStatus: 401,
+				upstreamMessage: 'Invalid login credentials'
+			});
+		}
+	});
+
+	it('falls back to otp verification during callback completion', async () => {
+		const exchangeCodeForSession = vi.fn().mockResolvedValue({
+			data: { session: null, user: null },
+			error: { status: 400, code: 'bad_code', message: 'invalid code' }
+		});
+		const verifyOtp = vi.fn().mockResolvedValue({
+			data: {
+				session: {
+					access_token: 'access',
+					refresh_token: 'refresh',
+					user: { id: 'user-1', email: 'user@example.com', user_metadata: { name: 'User' } }
+				},
+				user: { id: 'user-1', email: 'user@example.com', user_metadata: { name: 'User' } }
+			},
+			error: null
+		});
+		const adapter = createAuthAdapter({
+			publicClient: {
+				auth: {
+					signInAnonymously: vi.fn(),
+					signInWithOtp: vi.fn(),
+					signInWithPassword: vi.fn(),
+					exchangeCodeForSession,
+					verifyOtp
+				}
+			}
+		});
+
+		const result = await adapter.completeAuthCallback({
+			code: 'abc123',
+			tokenHash: 't1',
+			otpType: 'magiclink'
+		});
+		expect(exchangeCodeForSession).toHaveBeenCalledWith('abc123');
+		expect(verifyOtp).toHaveBeenCalledWith({ token_hash: 't1', type: 'magiclink' });
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value.userId).toBe('user-1');
+		}
+	});
 });

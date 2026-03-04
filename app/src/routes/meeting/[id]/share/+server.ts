@@ -166,10 +166,19 @@ function revivePhaseState(value: unknown): MeetingPhaseState | null {
 		roundNumber = value.roundNumber;
 	}
 
+	let preCrisisPhase: MeetingPhase | undefined;
+	if (value.preCrisisPhase !== undefined && value.preCrisisPhase !== null) {
+		if (typeof value.preCrisisPhase !== 'string') return null;
+		if (!Object.values(MeetingPhase).includes(value.preCrisisPhase as MeetingPhase)) return null;
+		if ((value.preCrisisPhase as MeetingPhase) === MeetingPhase.CRISIS_MODE) return null;
+		preCrisisPhase = value.preCrisisPhase as MeetingPhase;
+	}
+
 	return {
 		currentPhase: value.currentPhase as MeetingPhase,
 		phaseStartedAt,
 		roundNumber,
+		preCrisisPhase,
 		charactersSpokenThisRound,
 		userHasSharedInRound: value.userHasSharedInRound
 	};
@@ -571,6 +580,11 @@ function createShareStream(
 					} else if (persistedPhaseStateResult.ok) {
 						phaseLoaded = true;
 					} else if (!persistedPhaseStateResult.ok) {
+						if (persistedPhaseStateResult.error.code === SeamErrorCodes.NOT_FOUND) {
+							controller.enqueue(sseChunk('error', err(SeamErrorCodes.NOT_FOUND, 'Meeting not found')));
+							controller.close();
+							return;
+						}
 						console.warn(
 							`[share] getMeetingPhase failed for meeting=${meetingId}: ${persistedPhaseStateResult.error.message}`
 						);
@@ -912,6 +926,9 @@ async function handleShareRequest(
 		}
 	}
 	if (!persistedPhaseStateResult.ok) {
+		if (persistedPhaseStateResult.error.code === SeamErrorCodes.NOT_FOUND) {
+			return json(err(SeamErrorCodes.NOT_FOUND, 'Meeting not found'), { status: 404 });
+		}
 		console.warn(
 			`[share] getMeetingPhase pre-check failed for meeting=${meetingId}: ${persistedPhaseStateResult.error.message}`
 		);
