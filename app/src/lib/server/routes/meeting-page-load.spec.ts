@@ -106,4 +106,25 @@ describe('meeting page server load', () => {
 			true
 		);
 	});
+
+	it('throws 404 when meeting phase lookup reports missing meeting', async () => {
+		await expect(
+			load({
+				params: { id: 'missing-meeting' },
+				locals: {
+					userId: 'user-1',
+					seams: {
+						database: {
+							getMeetingShares: async () => ({ ok: true, value: [] }),
+							getMeetingPhase: async () => ({
+								ok: false,
+								error: { code: 'NOT_FOUND', message: 'missing' }
+							})
+						}
+					}
+				},
+				url: new URL('http://localhost/meeting/missing-meeting?mind=staying%20present')
+			} as never)
+		).rejects.toMatchObject({ status: 404 });
+	});
 });

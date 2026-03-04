@@ -133,10 +133,48 @@ describe('POST /meeting/[id]/crisis', () => {
 		expect(response.status).toBe(200);
 		expect(updateMeetingPhase).toHaveBeenCalledTimes(1);
 		expect(updateMeetingPhase.mock.calls[0][1].currentPhase).toBe('crisis_mode');
+		expect(updateMeetingPhase.mock.calls[0][1].preCrisisPhase).toBe('closing');
 		const payload = await response.json();
 		expect(payload.ok).toBe(true);
 		expect(payload.value.phaseState.currentPhase).toBe('crisis_mode');
+		expect(payload.value.phaseState.preCrisisPhase).toBe('closing');
 
 		vi.useRealTimers();
+	});
+
+	it('returns 404 when meeting phase lookup reports NOT_FOUND', async () => {
+		const request = new Request('http://localhost/meeting/missing/crisis', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				userText: 'I am spiraling',
+				userName: 'You',
+				sequenceOrder: 1
+			})
+		});
+
+		const response = await POST({
+			params: { id: 'missing' },
+			request,
+			locals: {
+				seams: {
+					grokAi: { generateShare: vi.fn() } as never,
+					database: {
+						appendShare: vi.fn(),
+						getMeetingPhase: async () => ({
+							ok: false,
+							error: { code: 'NOT_FOUND', message: 'missing meeting' }
+						}),
+						updateMeetingPhase: vi.fn()
+					} as never,
+					auth: {} as never
+				}
+			}
+		} as never);
+
+		expect(response.status).toBe(404);
+		const payload = await response.json();
+		expect(payload.ok).toBe(false);
+		expect(payload.error.code).toBe('NOT_FOUND');
 	});
 });

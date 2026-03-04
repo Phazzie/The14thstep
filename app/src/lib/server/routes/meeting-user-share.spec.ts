@@ -217,4 +217,39 @@ describe('POST /meeting/[id]/user-share', () => {
 		expect(payload.ok).toBe(false);
 		expect(payload.error.message).toContain('after the meeting closes');
 	});
+
+	it('returns 404 when meeting phase lookup reports NOT_FOUND', async () => {
+		const request = new Request('http://localhost/meeting/missing/user-share', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				content: 'too late share',
+				sequenceOrder: 4
+			})
+		});
+
+		const response = await POST({
+			params: { id: 'missing' },
+			request,
+			locals: {
+				seams: {
+					grokAi: { generateShare: vi.fn() } as never,
+					database: {
+						appendShare: vi.fn(),
+						getMeetingPhase: async () => ({
+							ok: false,
+							error: { code: 'NOT_FOUND', message: 'missing meeting' }
+						}),
+						updateMeetingPhase: vi.fn()
+					} as never,
+					auth: {} as never
+				}
+			}
+		} as never);
+
+		expect(response.status).toBe(404);
+		const payload = await response.json();
+		expect(payload.ok).toBe(false);
+		expect(payload.error.code).toBe('NOT_FOUND');
+	});
 });

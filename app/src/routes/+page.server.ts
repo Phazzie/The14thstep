@@ -2,14 +2,12 @@ import { createMeeting } from '$lib/core/meeting';
 import { SeamErrorCodes } from '$lib/core/seam';
 import {
 	clearAllAuthCookies,
-	createPublicSupabaseAuthClient,
 	normalizeEmailToDisplayName,
 	readSessionKindCookie,
 	setSessionKindCookie,
 	setSupabaseSessionCookies
 } from '$lib/server/auth/public-auth';
 import { fail, redirect } from '@sveltejs/kit';
-import type { User } from '@supabase/supabase-js';
 import type { Actions, PageServerLoad } from './$types';
 
 function asTrimmedString(value: FormDataEntryValue | null): string {
@@ -29,13 +27,16 @@ function isValidEmail(value: string): boolean {
 	return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-function resolveDisplayNameFromAuthUser(user: User | null, fallbackEmail?: string | null): string {
-	const metadata = (user?.user_metadata ?? {}) as Record<string, unknown>;
+function resolveDisplayNameFromAuthPayload(
+	payload: { email: string | null; userMetadata: Record<string, unknown> },
+	fallbackEmail?: string | null
+): string {
+	const metadata = payload.userMetadata;
 	const fullName = typeof metadata.full_name === 'string' ? metadata.full_name.trim() : '';
 	if (fullName) return fullName;
 	const name = typeof metadata.name === 'string' ? metadata.name.trim() : '';
 	if (name) return name;
-	return normalizeEmailToDisplayName(user?.email ?? fallbackEmail ?? null);
+	return normalizeEmailToDisplayName(payload.email ?? fallbackEmail ?? null);
 }
 
 function maskEmail(email: string): string {
@@ -72,15 +73,13 @@ function authFailureMessage(rawMessage: string | undefined): string {
 	return 'Sign in failed. Check your credentials and try again.';
 }
 
-function shouldReturnMagicLinkSoftSuccess(error: unknown): boolean {
-	if (typeof error !== 'object' || error === null) return false;
-	const record = error as Record<string, unknown>;
-	const rawMessage = typeof record.message === 'string' ? record.message.toLowerCase() : '';
+function shouldReturnMagicLinkSoftSuccess(rawMessage: string | undefined): boolean {
+	const normalized = rawMessage?.toLowerCase() ?? '';
 	return (
-		rawMessage.includes('already registered') ||
-		rawMessage.includes('already exists') ||
-		rawMessage.includes('user_already_exists') ||
-		rawMessage.includes('identity is already linked')
+		normalized.includes('already registered') ||
+		normalized.includes('already exists') ||
+		normalized.includes('user_already_exists') ||
+		normalized.includes('identity is already linked')
 	);
 }
 
@@ -113,14 +112,12 @@ function noticeFromQuery(url: URL): { authNotice: string | null; authNoticeKind:
 	return { authNotice: null, authNoticeKind: null };
 }
 
-function friendlyAuthConfigError() {
-	return fail(500, { authMessage: 'Sign-in is not configured on this environment.' });
-}
-
-function isRateLimited(error: unknown): boolean {
-	if (typeof error !== 'object' || error === null) return false;
-	const record = error as Record<string, unknown>;
-	return record.status === 429 || record.code === 'over_request_rate_limit';
+function upstreamMessageFromSeamError(error: { message: string; details?: Record<string, unknown> }): string {
+	const upstream = error.details?.upstreamMessage;
+	if (typeof upstream === 'string' && upstream.trim().length > 0) {
+		return upstream;
+	}
+	return error.message;
 }
 
 function isProductionRuntime(env: NodeJS.ProcessEnv = process.env): boolean {
@@ -187,21 +184,22 @@ export const load: PageServerLoad = async ({ locals, cookies, url }) => {
 
 export const actions: Actions = {
 	continueGuest: async ({ cookies, locals }) => {
-		const authClient = createPublicSupabaseAuthClient();
-		if (!authClient) return friendlyAuthConfigError();
-
-		const signInResult = await authClient.auth.signInAnonymously();
-		const session = signInResult.data.session;
-		const user = signInResult.data.user ?? session?.user ?? null;
-		if (signInResult.error || !session || !user?.id) {
-			return fail(503, { authMessage: "Couldn't start a guest session right now. Try again." });
+		const signInResult = await locals.seams.auth.signInGuest();
+		if (!signInResult.ok) {
+			const status = statusFromSeamCode(signInResult.error.code);
+			return fail(status, {
+				authMessage: "Couldn't start a guest session right now. Try again."
+			});
 		}
 
-		setSupabaseSessionCookies(cookies, session);
+		setSupabaseSessionCookies(cookies, {
+			access_token: signInResult.value.accessToken,
+			refresh_token: signInResult.value.refreshToken
+		});
 		setSessionKindCookie(cookies, 'guest');
 
 		const bootstrap = await ensureProfileBootstrap(locals, {
-			id: user.id,
+			id: signInResult.value.userId,
 			displayName: 'Guest',
 			cleanTime: null,
 			isAnonymous: true
@@ -214,20 +212,12 @@ export const actions: Actions = {
 		throw redirect(303, '/');
 	},
 
-	sendMagicLink: async ({ request, url }) => {
+	sendMagicLink: async ({ request, url, locals }) => {
 		const formData = await request.formData();
 		const email = asTrimmedString(formData.get('magicEmail'));
 
 		if (!email || !isValidEmail(email)) {
 			return fail(400, { authMessage: 'Enter a valid email address.', authEmail: email });
-		}
-
-		const authClient = createPublicSupabaseAuthClient();
-		if (!authClient) {
-			return fail(500, {
-				authMessage: 'Sign-in is not configured on this environment.',
-				authEmail: email
-			});
 		}
 
 		const redirectOrigin = resolveCanonicalOrigin(url);
@@ -238,21 +228,21 @@ export const actions: Actions = {
 			});
 		}
 
-		const sendResult = await authClient.auth.signInWithOtp({
+		const sendResult = await locals.seams.auth.sendMagicLink({
 			email,
-			options: {
-				emailRedirectTo: `${redirectOrigin}/auth/callback`
-			}
+			emailRedirectTo: `${redirectOrigin}/auth/callback`
 		});
 
-		if (sendResult.error) {
-			if (isRateLimited(sendResult.error)) {
+		if (!sendResult.ok) {
+			const status = statusFromSeamCode(sendResult.error.code);
+			const upstreamMessage = upstreamMessageFromSeamError(sendResult.error);
+			if (status === 429) {
 				return fail(429, {
 					authMessage: 'Please wait a minute before requesting another sign-in link.',
 					authEmail: email
 				});
 			}
-			if (shouldReturnMagicLinkSoftSuccess(sendResult.error)) {
+			if (shouldReturnMagicLinkSoftSuccess(upstreamMessage)) {
 				return {
 					authSuccess: 'If that email is registered, we sent a sign-in link.',
 					authEmail: email
@@ -279,30 +269,28 @@ export const actions: Actions = {
 			return fail(400, { authMessage: 'Email and password are required.' });
 		}
 
-		const authClient = createPublicSupabaseAuthClient();
-		if (!authClient) {
-			return friendlyAuthConfigError();
-		}
-
-		const signInResult = await authClient.auth.signInWithPassword({
+		const signInResult = await locals.seams.auth.signInWithPassword({
 			email,
 			password
 		});
-		const session = signInResult.data.session;
-		const user = signInResult.data.user ?? session?.user ?? null;
-		if (signInResult.error || !session || !user?.id) {
+		if (!signInResult.ok) {
+			const status = statusFromSeamCode(signInResult.error.code);
+			const upstreamMessage = upstreamMessageFromSeamError(signInResult.error);
 			console.warn(
-				`[auth.signIn] failed email=${maskEmail(email)} code=${signInResult.error?.code ?? 'unknown'} status=${signInResult.error?.status ?? 'unknown'} message=${signInResult.error?.message ?? 'missing_session'}`
+				`[auth.signIn] failed email=${maskEmail(email)} code=${signInResult.error.code} status=${status} message=${upstreamMessage}`
 			);
-			return fail(401, { authMessage: authFailureMessage(signInResult.error?.message) });
+			return fail(status, { authMessage: authFailureMessage(upstreamMessage) });
 		}
 
-		setSupabaseSessionCookies(cookies, session);
+		setSupabaseSessionCookies(cookies, {
+			access_token: signInResult.value.accessToken,
+			refresh_token: signInResult.value.refreshToken
+		});
 		setSessionKindCookie(cookies, 'member');
 
 		const bootstrap = await ensureProfileBootstrap(locals, {
-			id: user.id,
-			displayName: resolveDisplayNameFromAuthUser(user, email),
+			id: signInResult.value.userId,
+			displayName: resolveDisplayNameFromAuthPayload(signInResult.value, email),
 			cleanTime: null,
 			isAnonymous: false
 		});

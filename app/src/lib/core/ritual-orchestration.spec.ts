@@ -182,6 +182,47 @@ describe('ritual-orchestration', () => {
 			expect(result.ok).toBe(true);
 			if (result.ok) {
 				expect(result.value.currentPhase).toBe(MeetingPhase.CRISIS_MODE);
+				expect(result.value.preCrisisPhase).toBe(MeetingPhase.CLOSING);
+			}
+		});
+
+		it('recovers from CRISIS_MODE to the stored pre-crisis sharing phase', () => {
+			const result = transitionToNextPhase(
+				{
+					currentPhase: MeetingPhase.CRISIS_MODE,
+					phaseStartedAt: new Date('2026-02-22T00:00:00.000Z'),
+					roundNumber: undefined,
+					preCrisisPhase: MeetingPhase.SHARING_ROUND_2,
+					charactersSpokenThisRound: ['marcus'],
+					userHasSharedInRound: true
+				},
+				'share_complete'
+			);
+
+			expect(result.ok).toBe(true);
+			if (result.ok) {
+				expect(result.value.currentPhase).toBe(MeetingPhase.SHARING_ROUND_2);
+				expect(result.value.preCrisisPhase).toBeUndefined();
+			}
+		});
+
+		it('falls back to CLOSING when CRISIS_MODE has no resumable pre-crisis phase', () => {
+			const result = transitionToNextPhase(
+				{
+					currentPhase: MeetingPhase.CRISIS_MODE,
+					phaseStartedAt: new Date('2026-02-22T00:00:00.000Z'),
+					roundNumber: undefined,
+					preCrisisPhase: MeetingPhase.INTRODUCTIONS,
+					charactersSpokenThisRound: [],
+					userHasSharedInRound: false
+				},
+				'share_complete'
+			);
+
+			expect(result.ok).toBe(true);
+			if (result.ok) {
+				expect(result.value.currentPhase).toBe(MeetingPhase.CLOSING);
+				expect(result.value.preCrisisPhase).toBeUndefined();
 			}
 		});
 

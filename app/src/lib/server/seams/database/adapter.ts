@@ -223,10 +223,18 @@ function mapMeetingPhaseStateValue(value: unknown): MeetingPhaseState | null {
 		roundNumber = parsedRoundNumber;
 	}
 
+	let preCrisisPhase: MeetingPhase | undefined;
+	if (value.preCrisisPhase !== undefined && value.preCrisisPhase !== null) {
+		if (!isMeetingPhase(value.preCrisisPhase)) return null;
+		if (value.preCrisisPhase === MeetingPhase.CRISIS_MODE) return null;
+		preCrisisPhase = value.preCrisisPhase;
+	}
+
 	return {
 		currentPhase: value.currentPhase,
 		phaseStartedAt,
 		roundNumber,
+		preCrisisPhase,
 		charactersSpokenThisRound: [...value.charactersSpokenThisRound],
 		userHasSharedInRound
 	};
@@ -238,6 +246,7 @@ function serializeMeetingPhaseState(
 	currentPhase: MeetingPhase;
 	phaseStartedAt: string;
 	roundNumber?: number;
+	preCrisisPhase?: MeetingPhase;
 	charactersSpokenThisRound: string[];
 	userHasSharedInRound: boolean;
 }> {
@@ -250,6 +259,7 @@ function serializeMeetingPhaseState(
 		currentPhase: parsed.currentPhase,
 		phaseStartedAt: parsed.phaseStartedAt.toISOString(),
 		...(parsed.roundNumber !== undefined ? { roundNumber: parsed.roundNumber } : {}),
+		...(parsed.preCrisisPhase !== undefined ? { preCrisisPhase: parsed.preCrisisPhase } : {}),
 		charactersSpokenThisRound: parsed.charactersSpokenThisRound,
 		userHasSharedInRound: parsed.userHasSharedInRound
 	});
@@ -767,7 +777,8 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 			if (response.data === null) {
 				return err(SeamErrorCodes.NOT_FOUND, 'getMeetingPhase record not found', {
 					method: 'getMeetingPhase',
-					provider: 'supabase'
+					provider: 'supabase',
+					meetingId
 				});
 			}
 			if (!isObject(response.data)) {

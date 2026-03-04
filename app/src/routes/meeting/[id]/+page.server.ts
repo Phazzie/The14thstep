@@ -1,6 +1,7 @@
 import { CORE_CHARACTERS } from '$lib/core/characters';
 import { detectCrisisContent, isMeetingInCrisis } from '$lib/core/crisis-engine';
 import { initializeMeetingPhase } from '$lib/core/ritual-orchestration';
+import { SeamErrorCodes } from '$lib/core/seam';
 import type { MeetingPhaseState } from '$lib/core/types';
 import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
@@ -32,6 +33,9 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
 
 	const persistedPhaseState = await locals.seams.database.getMeetingPhase(meetingId);
 	if (!persistedPhaseState.ok) {
+		if (persistedPhaseState.error.code === SeamErrorCodes.NOT_FOUND) {
+			throw error(404, 'Meeting not found');
+		}
 		console.warn(
 			`[meeting page] getMeetingPhase failed for meeting=${meetingId}: ${persistedPhaseState.error.message}`
 		);

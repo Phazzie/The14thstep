@@ -100,4 +100,39 @@ describe('POST /meeting/[id]/close', () => {
 		expect(payload.value.summary).toBe('Closing summary.');
 		expect(payload.value.phaseState.currentPhase).toBe('post_meeting');
 	});
+
+	it('returns 404 when meeting phase lookup reports NOT_FOUND', async () => {
+		const request = new Request('http://localhost/meeting/missing/close', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ topic: 'staying' })
+		});
+
+		const response = await POST({
+			params: { id: 'missing' },
+			request,
+			locals: {
+				userId: null,
+				seams: {
+					auth: {} as never,
+					grokAi: { generateShare: vi.fn() } as never,
+					database: {
+						getMeetingPhase: async () => ({
+							ok: false,
+							error: { code: 'NOT_FOUND', message: 'missing meeting' }
+						}),
+						updateMeetingPhase: vi.fn(),
+						getMeetingShares: vi.fn().mockResolvedValue({ ok: true, value: [] }),
+						completeMeeting: vi.fn(),
+						createCallback: vi.fn()
+					} as never
+				}
+			}
+		} as never);
+
+		expect(response.status).toBe(404);
+		const payload = await response.json();
+		expect(payload.ok).toBe(false);
+		expect(payload.error.code).toBe('NOT_FOUND');
+	});
 });

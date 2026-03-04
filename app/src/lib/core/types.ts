@@ -110,6 +110,7 @@ export interface MeetingPhaseState {
 	currentPhase: MeetingPhase;
 	phaseStartedAt: Date;
 	roundNumber?: number;
+	preCrisisPhase?: MeetingPhase;
 	charactersSpokenThisRound: string[]; // UUIDs
 	userHasSharedInRound: boolean;
 }

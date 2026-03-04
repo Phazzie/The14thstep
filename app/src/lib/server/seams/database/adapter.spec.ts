@@ -534,6 +534,7 @@ describe('database supabase adapter', () => {
 			currentPhase: MeetingPhase.SHARING_ROUND_1,
 			phaseStartedAt,
 			roundNumber: 1,
+			preCrisisPhase: MeetingPhase.CLOSING,
 			charactersSpokenThisRound: ['marcus'],
 			userHasSharedInRound: false
 		});
@@ -545,6 +546,7 @@ describe('database supabase adapter', () => {
 				currentPhase: 'sharing_round_1',
 				phaseStartedAt: phaseStartedAt.toISOString(),
 				roundNumber: 1,
+				preCrisisPhase: 'closing',
 				charactersSpokenThisRound: ['marcus'],
 				userHasSharedInRound: false
 			}
@@ -559,6 +561,7 @@ describe('database supabase adapter', () => {
 						currentPhase: 'crisis_mode',
 						phaseStartedAt: '2026-02-22T22:05:00.000Z',
 						roundNumber: 2,
+						preCrisisPhase: 'sharing_round_2',
 						charactersSpokenThisRound: ['marcus'],
 						userHasSharedInRound: true
 					}
@@ -575,6 +578,7 @@ describe('database supabase adapter', () => {
 			expect(result.value?.currentPhase).toBe(MeetingPhase.CRISIS_MODE);
 			expect(result.value?.phaseStartedAt).toBeInstanceOf(Date);
 			expect(result.value?.phaseStartedAt.toISOString()).toBe('2026-02-22T22:05:00.000Z');
+			expect(result.value?.preCrisisPhase).toBe(MeetingPhase.SHARING_ROUND_2);
 			expect(result.value?.userHasSharedInRound).toBe(true);
 		}
 	});
@@ -584,8 +588,9 @@ describe('database supabase adapter', () => {
 			meetingPhaseMaybeSingle: {
 				data: {
 					phase_state: {
-						currentPhase: 'not_a_real_phase',
+						currentPhase: 'crisis_mode',
 						phaseStartedAt: '2026-02-22T22:05:00.000Z',
+						preCrisisPhase: 'crisis_mode',
 						charactersSpokenThisRound: [],
 						userHasSharedInRound: false
 					}
@@ -630,6 +635,10 @@ describe('database supabase adapter', () => {
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe(SeamErrorCodes.NOT_FOUND);
+			expect(result.error.details).toMatchObject({
+				method: 'getMeetingPhase',
+				meetingId: 'missing-meeting'
+			});
 		}
 	});
 
