@@ -89,4 +89,57 @@ describe('auth server adapter', () => {
 			expect(signOutResult.error.code).toBe(SeamErrorCodes.INPUT_INVALID);
 		}
 	});
+
+	it('returns unauthorized when chunked auth cookies are incomplete', async () => {
+		const token = toJwtWithExp(1893456000);
+		const getUser = vi.fn();
+		const adapter = createAuthAdapter({
+			client: {
+				auth: {
+					getUser,
+					admin: {
+						signOut: vi.fn().mockResolvedValue({ data: null, error: null })
+					}
+				}
+			}
+		});
+
+		const result = await adapter.getSession(`sb-project-auth-token.0=${token.slice(0, 12)}`);
+
+		expect(result.ok).toBe(false);
+		expect(getUser).not.toHaveBeenCalled();
+		if (!result.ok) {
+			expect(result.error.code).toBe(SeamErrorCodes.UNAUTHORIZED);
+			expect(result.error.details).toMatchObject({ reason: 'session_token_missing' });
+		}
+	});
+
+	it('reassembles chunked auth cookies and resolves session', async () => {
+		const token = toJwtWithExp(1893456000);
+		const getUser = vi.fn().mockResolvedValue({
+			data: { user: { id: 'user-456', email: 'chunked@example.com' } },
+			error: null
+		});
+		const adapter = createAuthAdapter({
+			client: {
+				auth: {
+					getUser,
+					admin: {
+						signOut: vi.fn().mockResolvedValue({ data: null, error: null })
+					}
+				}
+			}
+		});
+		const split = Math.floor(token.length / 2);
+		const cookieHeader = `sb-project-auth-token.0=${token.slice(0, split)}; sb-project-auth-token.1=${token.slice(split)}`;
+
+		const result = await adapter.getSession(cookieHeader);
+
+		expect(result.ok).toBe(true);
+		expect(getUser).toHaveBeenCalledWith(token);
+		if (result.ok) {
+			expect(result.value.userId).toBe('user-456');
+			expect(result.value.email).toBe('chunked@example.com');
+		}
+	});
 });
