@@ -20,6 +20,8 @@ All notable changes to this repository are documented in this file.
 ### Fixed
 
 - Hardened guest auth against cookie forgery by signing guest access tokens server-side and validating signatures before resolving `locals.userId` in `app/src/lib/server/seams/auth/adapter.ts`.
+- Tightened sign-out token handling to reject bare UUIDs and accept only validated signed guest tokens or verified Clerk member tokens in `app/src/lib/server/seams/auth/adapter.ts`.
+- Callback success path now normalizes auth state by clearing stale guest Supabase cookies and forcing `app-session-kind=member` in `app/src/routes/auth/callback/+server.ts`.
 - Improved accessibility with live region semantics and expansion state metadata in `app/src/lib/components/SystemMessage.svelte` and `app/src/lib/components/ShareMessage.svelte`.
 - Corrected landing heading hierarchy by promoting the primary title to an `<h1>` in `app/src/routes/+page.svelte`.
 
