@@ -139,6 +139,15 @@ describe('auth server adapter', () => {
 		}
 	});
 
+	it('rejects bare uuid signOut token', async () => {
+		const adapter = createAuthAdapter({ env: makeEnv() });
+		const result = await adapter.signOut('fca1e4e8-9a8e-4d67-bd87-cf8405917ca7');
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe(SeamErrorCodes.UNAUTHORIZED);
+		}
+	});
+
 	it('revoke member session for valid clerk token', async () => {
 		verifyTokenMock.mockResolvedValue({ sid: 'sess_123' });
 		revokeSessionMock.mockResolvedValue({ id: 'sess_123' });

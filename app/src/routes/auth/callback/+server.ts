@@ -1,11 +1,12 @@
 import { redirect } from '@sveltejs/kit';
+import { clearSupabaseSessionCookies, setSessionKindCookie } from '$lib/server/auth/public-auth';
 import type { RequestHandler } from './$types';
 
 function toRedirect(code: string): never {
 	throw redirect(303, `/?auth=${encodeURIComponent(code)}`);
 }
 
-export const GET: RequestHandler = async ({ url }) => {
+export const GET: RequestHandler = async ({ url, cookies }) => {
 	const providerError = url.searchParams.get('error');
 	if (providerError) {
 		console.warn('auth callback provider error', {
@@ -14,6 +15,9 @@ export const GET: RequestHandler = async ({ url }) => {
 		});
 		return toRedirect('auth-failed');
 	}
+
+	clearSupabaseSessionCookies(cookies);
+	setSessionKindCookie(cookies, 'member');
 
 	return toRedirect('signed-in');
 };

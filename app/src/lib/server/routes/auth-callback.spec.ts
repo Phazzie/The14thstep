@@ -45,6 +45,8 @@ describe('auth callback route', () => {
 
 	it('redirects successful callbacks to signed-in notice', async () => {
 		const { cookies } = createCookieJar();
+		cookies.set('app-session-kind', 'guest');
+		cookies.set('sb-access-token', 'legacy-token');
 
 		await expect(
 			GET({
@@ -56,5 +58,7 @@ describe('auth callback route', () => {
 			expectRedirectLike(error, 303, '/?auth=signed-in');
 			return true;
 		});
+		expect(cookies.get('app-session-kind')).toBe('member');
+		expect(cookies.get('sb-access-token')).toBeUndefined();
 	});
 });
