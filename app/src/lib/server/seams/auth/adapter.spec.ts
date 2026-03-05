@@ -266,6 +266,36 @@ describe('auth server adapter', () => {
 		}
 	});
 
+	it('maps otp_expired without a status to UNAUTHORIZED', async () => {
+		const verifyOtp = vi.fn().mockResolvedValue({
+			data: { session: null, user: null },
+			error: { code: 'otp_expired', message: 'Token has expired or is invalid' }
+		});
+		const adapter = createAuthAdapter({
+			publicClient: {
+				auth: {
+					signInAnonymously: vi.fn(),
+					signInWithOtp: vi.fn(),
+					signInWithPassword: vi.fn(),
+					exchangeCodeForSession: vi.fn(),
+					verifyOtp
+				}
+			}
+		});
+
+		const result = await adapter.completeAuthCallback({
+			code: null,
+			tokenHash: 't1',
+			otpType: 'magiclink'
+		});
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe(SeamErrorCodes.UNAUTHORIZED);
+			expect(result.error.details).toMatchObject({ upstreamCode: 'otp_expired' });
+		}
+	});
+
 	it('falls back to otp verification during callback completion', async () => {
 		const exchangeCodeForSession = vi.fn().mockResolvedValue({
 			data: { session: null, user: null },

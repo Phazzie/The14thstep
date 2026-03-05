@@ -45,7 +45,11 @@ function upstreamMessageFromSeamError(error: { message: string; details?: Record
 }
 
 function noticeCodeFromCallbackError(code: string): string {
-	if (code === SeamErrorCodes.INPUT_INVALID || code === SeamErrorCodes.UNAUTHORIZED) {
+	if (
+		code === SeamErrorCodes.INPUT_INVALID ||
+		code === SeamErrorCodes.UNAUTHORIZED ||
+		code === SeamErrorCodes.UPSTREAM_ERROR
+	) {
 		return 'magic-link-cancelled';
 	}
 	return 'auth-failed';
