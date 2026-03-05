@@ -2,6 +2,19 @@
 
 This file captures practical lessons we want future work to reuse.
 
+## 2026-03-05
+
+### Process
+
+- Running hater-style subagent review before commit paid off immediately: it surfaced a high-severity auth flaw (forged guest identity) that test-green verification alone did not catch.
+- Large auth migrations are safer when paired with the full verify chain (`check`, unit, composition, e2e) in the same session; partial lanes were insufficient to trust rollout readiness.
+
+### Technical
+
+- Guest-mode identity must never rely on unsigned client cookies. A signed token (HMAC) check in the auth seam is required before mapping any cookie value to `locals.userId`.
+- Hosted third-party auth can coexist with seam-driven architecture if route actions stop owning provider-specific flows and move to provider-neutral outcomes (`signed-in`, `signed-out`, `auth-failed` notices).
+- Accessibility regressions can hide in redesign work; basic ARIA state (`aria-expanded`, `aria-controls`) and live region semantics (`role="status"/"alert"`) should be treated as part of done criteria, not post-polish work.
+
 ## 2026-02-21
 
 ### Process

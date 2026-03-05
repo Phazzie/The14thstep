@@ -2,6 +2,33 @@
 
 All notable changes to this repository are documented in this file.
 
+## [2026-03-05]
+
+### Changed
+
+- Replaced the member auth runtime path with Clerk-backed session handling in `app/src/lib/server/seams/auth/adapter.ts` and shifted landing auth UI to hosted Clerk entry in `app/src/routes/+page.svelte` and `app/src/routes/+page.server.ts`.
+- Simplified callback completion behavior for hosted auth in `app/src/routes/auth/callback/+server.ts`.
+- Refactored seam bootstrapping in `app/src/hooks.server.ts` to reuse module-level adapter singletons.
+- Redesigned landing and meeting interfaces (`app/src/routes/+page.svelte`, `app/src/routes/meeting/[id]/+page.svelte`, `app/src/lib/components/*.svelte`, `app/src/app.css`) to ship the new visual direction.
+
+### Added
+
+- Clerk dependency surface in `app/package.json` (`@clerk/backend`, `@clerk/clerk-js`).
+- Database migration `app/supabase/migrations/20260305_000002_decouple_users_from_supabase_auth.sql` to remove direct FK coupling from `public.users` to Supabase `auth.users`.
+- Clerk environment variable documentation in `app/.env.example` and runbook updates in `app/README.md`.
+
+### Fixed
+
+- Hardened guest auth against cookie forgery by signing guest access tokens server-side and validating signatures before resolving `locals.userId` in `app/src/lib/server/seams/auth/adapter.ts`.
+- Improved accessibility with live region semantics and expansion state metadata in `app/src/lib/components/SystemMessage.svelte` and `app/src/lib/components/ShareMessage.svelte`.
+- Corrected landing heading hierarchy by promoting the primary title to an `<h1>` in `app/src/routes/+page.svelte`.
+
+### Verified
+
+- `npm run check`
+- `npm run test:unit -- --run`
+- `npm run verify`
+
 ## [2026-02-23]
 
 ### Changed

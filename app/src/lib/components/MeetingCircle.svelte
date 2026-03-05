@@ -18,26 +18,81 @@
 	} = $props();
 </script>
 
-<section>
-	<h2 class="text-base font-semibold text-gray-100">Meeting Circle</h2>
-	<ul class="mt-3 flex flex-wrap gap-3">
+<section class="circle-panel" aria-label="Meeting circle">
+	<h2>The Circle</h2>
+	<ul>
 		{#each characters as character (character.id)}
-			<li
-				class={`min-h-11 min-w-11 rounded-xl border px-3 py-2 text-sm ${
-					activeCharacterId === character.id
-						? 'border-amber-400 bg-amber-500/20 text-amber-100'
-						: 'border-gray-700 bg-gray-800 text-gray-100'
-				}`}
-			>
-				<p class="font-semibold">{character.name}</p>
-				<p class="text-xs text-gray-300">{character.cleanTime}</p>
+			<li class:active={activeCharacterId === character.id}>
+				<p class="name">{character.name}</p>
+				<p class="meta">{character.cleanTime}</p>
 				{#if activeCharacterId === character.id}
-					<p class="text-xs font-medium text-amber-300">Speaking</p>
+					<p class="speaking">Speaking</p>
 				{/if}
 			</li>
 		{/each}
 	</ul>
 	{#if crisisMode}
-		<p class="mt-3 text-sm text-rose-200">Crisis mode active: regular share cycle is paused.</p>
+		<p class="crisis-line" role="status">Crisis support active. Regular share cycle is paused.</p>
 	{/if}
 </section>
+
+<style>
+	.circle-panel h2 {
+		margin: 0;
+		font-size: 0.95rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: #ffdca2;
+	}
+
+	.circle-panel ul {
+		list-style: none;
+		padding: 0;
+		margin: 0.72rem 0 0;
+		display: grid;
+		gap: 0.45rem;
+	}
+
+	.circle-panel li {
+		padding: 0.56rem 0.62rem;
+		border-radius: 0.72rem;
+		border: 1px solid rgba(125, 149, 187, 0.3);
+		background: rgba(11, 20, 36, 0.74);
+	}
+
+	.circle-panel li.active {
+		border-color: rgba(255, 192, 103, 0.66);
+		box-shadow: inset 3px 0 0 #f7a423;
+	}
+
+	.name {
+		margin: 0;
+		font-weight: 700;
+		color: #e8f2ff;
+	}
+
+	.meta {
+		margin: 0.14rem 0 0;
+		font-size: 0.78rem;
+		color: #a4b5d2;
+	}
+
+	.speaking {
+		margin: 0.24rem 0 0;
+		font-size: 0.72rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: #ffd797;
+	}
+
+	.crisis-line {
+		margin: 0.72rem 0 0;
+		padding: 0.58rem 0.62rem;
+		border-radius: 0.65rem;
+		background: rgba(128, 28, 46, 0.22);
+		border: 1px solid rgba(252, 165, 165, 0.42);
+		color: #fecaca;
+		font-size: 0.82rem;
+	}
+</style>
