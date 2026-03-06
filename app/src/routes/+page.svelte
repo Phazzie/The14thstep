@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import SetupFlow from '$lib/components/SetupFlow.svelte';
+	import { onMount } from 'svelte';
+	import type { Clerk as ClerkInstance } from '@clerk/clerk-js';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form } = $props<{ data?: PageData; form?: ActionData }>();
@@ -8,56 +10,84 @@
 	const sessionKind = $derived(data?.sessionKind ?? null);
 	const authNotice = $derived(data?.authNotice ?? null);
 	const authNoticeKind = $derived(data?.authNoticeKind ?? null);
+	const clerkPublishableKey = $derived(data?.clerkPublishableKey?.trim() ?? '');
 	const authError = $derived(form && 'authMessage' in form ? form.authMessage : null);
-	const authSuccess = $derived(form && 'authSuccess' in form ? form.authSuccess : null);
-	const authEmail = $derived(form && 'authEmail' in form ? form.authEmail : '');
+
+	let clerkReady = $state(false);
+	let clerkLoadError = $state<string | null>(null);
+	let openingSignIn = $state(false);
+	let openingSignUp = $state(false);
+	let clerk: ClerkInstance | null = null;
+
+	onMount(async () => {
+		const key = clerkPublishableKey;
+		if (!key) {
+			clerkLoadError = 'Member sign-in is temporarily unavailable.';
+			return;
+		}
+
+		try {
+			const { Clerk } = await import('@clerk/clerk-js');
+			const instance = new Clerk(key);
+			await instance.load();
+			clerk = instance;
+			clerkReady = true;
+		} catch (cause) {
+			clerkLoadError = cause instanceof Error ? cause.message : 'Unable to load sign-in.';
+		}
+	});
+
+	async function openSignIn() {
+		if (!clerk) {
+			clerkLoadError = 'Member sign-in is not ready yet.';
+			return;
+		}
+		openingSignIn = true;
+		try {
+			await clerk.redirectToSignIn();
+		} catch (cause) {
+			clerkLoadError = cause instanceof Error ? cause.message : 'Unable to open sign-in.';
+			openingSignIn = false;
+		}
+	}
+
+	async function openSignUp() {
+		if (!clerk) {
+			clerkLoadError = 'Account creation is not ready yet.';
+			return;
+		}
+		openingSignUp = true;
+		try {
+			await clerk.redirectToSignUp();
+		} catch (cause) {
+			clerkLoadError = cause instanceof Error ? cause.message : 'Unable to open sign-up.';
+			openingSignUp = false;
+		}
+	}
 </script>
 
 <main class="landing-shell">
-	<section class="hero-card">
-		<div class="hero-meta">
-			<p class="hero-kicker">Recovery Meeting Simulator</p>
-			<p class="hero-status">Room Live - 24/7</p>
-		</div>
-		<div class="hero-image-wrap">
-			<img
-				src="/images/recoverymeetingui.jpg"
-				alt="Recovery room mood board with coffee, smoke break outside, and late-night meeting energy."
-			/>
-			<div class="hero-overlay">
-				<p class="hero-title">The 14th Step</p>
-				<p class="hero-copy">Fake meeting. Real night. No bullshit.</p>
-				<div class="hero-tags">
-					<span>Zero preachy tone</span>
-					<span>Continuity memory</span>
-					<span>Crisis-aware pacing</span>
-				</div>
-			</div>
-		</div>
-		<ul class="hero-facts">
-			<li>Speak or pass anytime.</li>
-			<li>Join in under a minute.</li>
-			<li>Guest mode works without an account.</li>
-		</ul>
-	</section>
+	<section class="landing-stage">
+		<p class="kicker">Recovery Meeting Simulator</p>
+		<h1 class="landing-title">The 14th Step</h1>
+		<p class="tagline">Fake meeting. Real night. No bullshit.</p>
+		<p class="subline">Practice the room. Then go to the real one.</p>
 
-	<section class="main-pane">
-		<section class="account-card">
-			<div class="card-head">
-				<h2>Start a Meeting</h2>
-				<p class="meta-line">You can stay guest, or use magic-link continuity.</p>
-			</div>
+		<div class="tag-pills" aria-label="Room principles">
+			<span>Zero preachy tone</span>
+			<span>Speak or pass anytime</span>
+			<span>No fake sympathy</span>
+		</div>
+
+		<section class="auth-panel" aria-label="Authentication controls">
 			{#if userId}
 				<p class="session-pill">
-					{sessionKind === 'guest' ? 'Guest session active' : 'Signed in'}
+					{sessionKind === 'guest' ? 'Guest session active' : 'Member session active'}
 				</p>
 				<form method="POST" action="?/signOut" class="auth-form">
-					<button type="submit" class="ghost-btn full-width">
-						Sign Out
-					</button>
+					<button type="submit" class="secondary-btn full">Sign Out</button>
 				</form>
 			{:else}
-				<p class="helper-line">Guest sessions stay in this browser until you sign out or clear storage.</p>
 				{#if authNotice}
 					<p class:auth-alert={authNoticeKind === 'error'} class:auth-success={authNoticeKind === 'success'} role="status">
 						{authNotice}
@@ -66,46 +96,30 @@
 				{#if authError}
 					<p class="auth-alert" role="alert">{authError}</p>
 				{/if}
-				{#if authSuccess}
-					<p class="auth-success" role="status">{authSuccess}</p>
+				{#if clerkLoadError}
+					<p class="auth-alert" role="alert">{clerkLoadError}</p>
 				{/if}
-				<form method="POST" action="?/continueGuest" class="auth-form">
-					<button type="submit" class="auth-btn full-width">
-						Continue as Guest
+				<div class="auth-actions">
+					<button
+						type="button"
+						class="primary-btn full"
+						onclick={openSignIn}
+						disabled={!clerkReady || openingSignIn || openingSignUp}
+					>
+						{openingSignIn ? 'Opening sign in...' : 'Sign In'}
 					</button>
+					<button
+						type="button"
+						class="secondary-btn full"
+						onclick={openSignUp}
+						disabled={!clerkReady || openingSignIn || openingSignUp}
+					>
+						{openingSignUp ? 'Opening sign up...' : 'Create Account'}
+					</button>
+				</div>
+				<form method="POST" action="?/continueGuest" class="auth-form">
+					<button type="submit" class="ghost-btn full">Continue as Guest</button>
 				</form>
-				<form method="POST" action="?/sendMagicLink" class="auth-form auth-grid">
-					<label for="magicEmail">Email me a sign-in link (if this account exists)</label>
-					<input
-						id="magicEmail"
-						name="magicEmail"
-						type="email"
-						required
-						autocomplete="email"
-						value={authEmail}
-						placeholder="you@example.com"
-					/>
-					<button type="submit" class="ghost-btn full-width">Send Sign-In Link</button>
-				</form>
-				<details class="more-auth">
-					<summary>Use password instead (existing account)</summary>
-					<form method="POST" action="?/signIn" class="auth-form auth-grid">
-						<label for="email">Email</label>
-						<input id="email" name="email" type="email" required autocomplete="email" />
-						<label for="password">Password</label>
-						<input
-							id="password"
-							name="password"
-							type="password"
-							required
-							autocomplete="current-password"
-						/>
-						<button type="submit" class="ghost-btn full-width">Sign In with Password</button>
-					</form>
-					<p class="helper-line">
-						New here? Use the magic link above first, then set a password later from your account flow.
-					</p>
-				</details>
 			{/if}
 			<p class="legal-links">
 				<a href={resolve('/privacy')}>Privacy</a>
@@ -113,325 +127,212 @@
 				<a href={resolve('/terms')}>Terms</a>
 			</p>
 		</section>
+	</section>
+
+	<section class="setup-stage">
 		<SetupFlow {form} />
 	</section>
 </main>
 
 <style>
 	.landing-shell {
-		max-width: 1200px;
+		max-width: 1220px;
 		margin: 0 auto;
-		padding: 1.4rem 1rem 1.8rem;
+		padding: 1.3rem 1rem 1.8rem;
 		display: grid;
-		grid-template-columns: minmax(280px, 1fr) minmax(370px, 1.2fr);
-		gap: 1.1rem;
+		grid-template-columns: minmax(280px, 1fr) minmax(380px, 1.1fr);
+		gap: 1rem;
 	}
 
-	.hero-card {
-		border: 1px solid var(--line);
-		border-radius: 1.1rem;
-		background: linear-gradient(170deg, rgba(14, 18, 29, 0.9), rgba(9, 12, 18, 0.74));
-		padding: 0.8rem;
-		box-shadow:
-			0 24px 40px rgba(0, 0, 0, 0.46),
-			inset 0 1px 0 rgba(255, 255, 255, 0.08);
-		animation: cardRise 520ms ease-out;
-	}
-
-	.hero-meta {
-		display: flex;
-		justify-content: space-between;
-		align-items: baseline;
-		padding: 0.1rem 0.3rem 0.7rem;
-	}
-
-	.hero-kicker {
-		margin: 0;
-		color: var(--mist);
-		font-size: 0.78rem;
-		letter-spacing: 0.14em;
-		text-transform: uppercase;
-	}
-
-	.hero-status {
-		margin: 0;
-		color: var(--signal-soft);
-		font-size: 0.74rem;
-		letter-spacing: 0.1em;
-		text-transform: uppercase;
-	}
-
-	.hero-image-wrap {
+	.landing-stage {
 		position: relative;
 		overflow: hidden;
-		border-radius: 0.85rem;
+		padding: 1.4rem;
+		border-radius: 1.2rem;
+		border: 1px solid rgba(230, 188, 103, 0.24);
+		background:
+			radial-gradient(circle at 84% 14%, rgba(255, 169, 60, 0.15), transparent 44%),
+			linear-gradient(165deg, rgba(11, 16, 27, 0.95), rgba(8, 10, 17, 0.92));
+		box-shadow:
+			0 26px 48px rgba(0, 0, 0, 0.46),
+			inset 0 1px 0 rgba(255, 255, 255, 0.04);
 	}
 
-	.hero-image-wrap img {
-		display: block;
-		width: 100%;
-		height: 376px;
-		object-fit: cover;
-		filter: saturate(0.95) contrast(1.04);
-		transform: scale(1.01);
-	}
-
-	.hero-overlay {
-		position: absolute;
-		inset: auto 0 0 0;
-		padding: 1rem 0.95rem;
-		background: linear-gradient(180deg, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.83));
-	}
-
-	.hero-title {
+	.kicker {
 		margin: 0;
-		font-size: 1.52rem;
+		font-size: 0.76rem;
+		text-transform: uppercase;
+		letter-spacing: 0.14em;
+		color: #f7d38a;
+	}
+
+	.landing-title {
+		margin: 0.55rem 0 0;
+		font-size: clamp(2.2rem, 5vw, 4rem);
+		line-height: 1;
+		letter-spacing: 0.03em;
+		font-weight: 700;
+		color: #fff3da;
+	}
+
+	.tagline {
+		margin: 0.7rem 0 0;
+		font-size: clamp(1rem, 2vw, 1.2rem);
 		font-weight: 600;
-		color: #f8fafc;
-		letter-spacing: 0.02em;
+		color: #ffd88d;
 	}
 
-	.hero-copy {
-		margin: 0.26rem 0 0;
-		color: var(--signal-soft);
-		font-size: 0.92rem;
-		font-weight: 500;
+	.subline {
+		margin: 0.45rem 0 0;
+		max-width: 34ch;
+		font-size: 0.93rem;
+		color: var(--mist);
 	}
 
-	.hero-tags {
+	.tag-pills {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 0.35rem;
-		margin-top: 0.65rem;
+		gap: 0.45rem;
+		margin-top: 0.9rem;
 	}
 
-	.hero-tags span {
-		padding: 0.26rem 0.46rem;
+	.tag-pills span {
+		padding: 0.35rem 0.55rem;
 		border-radius: 999px;
-		border: 1px solid rgba(255, 255, 255, 0.16);
-		background: rgba(17, 25, 40, 0.55);
-		color: #dbe7ff;
-		font-size: 0.7rem;
-		letter-spacing: 0.05em;
+		font-size: 0.72rem;
 		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		border: 1px solid rgba(255, 255, 255, 0.13);
+		background: rgba(15, 25, 43, 0.52);
+		color: #d8e7ff;
 	}
 
-	.hero-facts {
-		list-style: none;
-		padding: 0.88rem 0.3rem 0.22rem;
-		margin: 0;
+	.auth-panel {
+		margin-top: 1.2rem;
+		padding: 1rem;
+		border-radius: 0.95rem;
+		border: 1px solid rgba(176, 195, 229, 0.2);
+		background: rgba(8, 14, 25, 0.67);
+	}
+
+	.auth-actions,
+	.auth-form {
 		display: grid;
-		gap: 0.4rem;
-		color: var(--mist);
-		font-size: 0.88rem;
+		gap: 0.55rem;
 	}
 
-	.hero-facts li::before {
-		content: '\25B8';
-		margin-right: 0.5rem;
-		color: var(--signal);
+	button {
+		font: inherit;
 	}
 
-	.main-pane {
-		display: grid;
-		gap: 1rem;
-		align-content: start;
+	.primary-btn,
+	.secondary-btn,
+	.ghost-btn {
+		min-height: 2.75rem;
+		padding: 0.65rem 0.9rem;
+		border-radius: 0.74rem;
+		border: 1px solid transparent;
+		font-weight: 700;
+		letter-spacing: 0.03em;
+		cursor: pointer;
+		transition: transform 120ms ease, box-shadow 140ms ease, border-color 140ms ease;
 	}
 
-	.account-card {
-		border: 1px solid var(--line);
-		border-radius: 1.1rem;
-		background: var(--glass);
-		backdrop-filter: blur(5px);
-		padding: 1rem 1rem 1.05rem;
-		box-shadow: 0 20px 32px rgba(0, 0, 0, 0.32);
-		animation: cardRise 560ms ease-out;
+	.primary-btn {
+		background: linear-gradient(90deg, #f29e20, #ffce72);
+		color: #261607;
 	}
 
-	.card-head {
-		display: grid;
-		gap: 0.25rem;
+	.secondary-btn {
+		background: rgba(22, 39, 67, 0.92);
+		border-color: rgba(143, 172, 221, 0.32);
+		color: #e3efff;
 	}
 
-	.account-card h2 {
-		margin: 0;
-		font-size: 1.24rem;
-		font-weight: 600;
-		color: #fff7dd;
+	.ghost-btn {
+		background: rgba(14, 22, 36, 0.8);
+		border-color: rgba(119, 146, 190, 0.32);
+		color: #d8e8ff;
 	}
 
-	.meta-line {
-		margin: 0;
-		color: #d8e2f5;
-		font-size: 0.88rem;
+	.primary-btn:hover,
+	.secondary-btn:hover,
+	.ghost-btn:hover {
+		transform: translateY(-1px);
 	}
 
-	.helper-line {
-		margin: 0.35rem 0 0;
-		color: var(--muted);
-		font-size: 0.82rem;
+	.primary-btn:disabled,
+	.secondary-btn:disabled,
+	.ghost-btn:disabled {
+		opacity: 0.55;
+		cursor: not-allowed;
+		transform: none;
+	}
+
+	.full {
+		width: 100%;
 	}
 
 	.session-pill {
-		margin: 0.72rem 0 0;
+		margin: 0 0 0.55rem;
 		display: inline-flex;
 		align-items: center;
-		padding: 0.3rem 0.58rem;
+		padding: 0.28rem 0.55rem;
 		border-radius: 999px;
-		background: rgba(30, 41, 59, 0.92);
-		border: 1px solid rgba(255, 255, 255, 0.15);
-		color: #f8fafc;
-		font-size: 0.75rem;
-		text-transform: uppercase;
-		letter-spacing: 0.08em;
-	}
-
-	.auth-alert {
-		margin: 0.65rem 0 0;
-		padding: 0.66rem 0.7rem;
-		border-radius: 0.65rem;
-		border: 1px solid rgba(255, 99, 132, 0.38);
-		background: rgba(127, 29, 29, 0.24);
-		color: #fecdd3;
-		font-size: 0.83rem;
-	}
-
-	.auth-success {
-		margin: 0.65rem 0 0;
-		padding: 0.66rem 0.7rem;
-		border-radius: 0.65rem;
-		border: 1px solid rgba(34, 197, 94, 0.35);
-		background: rgba(21, 128, 61, 0.12);
-		color: #dcfce7;
-		font-size: 0.83rem;
-	}
-
-	.auth-form {
-		margin-top: 0.7rem;
-	}
-
-	.auth-grid {
-		display: grid;
-		gap: 0.48rem;
-	}
-
-	.auth-grid label {
-		font-size: 0.77rem;
+		background: rgba(24, 40, 66, 0.88);
+		border: 1px solid rgba(149, 178, 226, 0.33);
+		font-size: 0.74rem;
 		font-weight: 700;
 		letter-spacing: 0.04em;
 		text-transform: uppercase;
-		color: var(--mist);
 	}
 
-	.auth-grid input {
-		border: 1px solid rgba(159, 178, 210, 0.28);
-		border-radius: 0.62rem;
-		background: rgba(6, 9, 15, 0.86);
-		color: #f8fafc;
-		padding: 0.65rem 0.75rem;
-		font-size: 0.9rem;
-		outline: none;
-		transition: border-color 120ms ease, box-shadow 120ms ease;
+	.auth-alert,
+	.auth-success {
+		margin: 0 0 0.55rem;
+		padding: 0.7rem 0.78rem;
+		border-radius: 0.72rem;
+		font-size: 0.88rem;
 	}
 
-	.auth-grid input:focus {
-		border-color: rgba(246, 163, 27, 0.92);
-		box-shadow: 0 0 0 3px rgba(246, 163, 27, 0.2);
+	.auth-alert {
+		border: 1px solid rgba(251, 113, 133, 0.44);
+		background: rgba(128, 20, 49, 0.24);
+		color: #fecdd3;
 	}
 
-	.auth-btn,
-	.ghost-btn {
-		appearance: none;
-		border: 0;
-		border-radius: 0.68rem;
-		padding: 0.68rem 0.92rem;
-		font-size: 0.86rem;
-		font-weight: 700;
-		letter-spacing: 0.06em;
-		text-transform: uppercase;
-		cursor: pointer;
-		transition: transform 120ms ease, filter 120ms ease;
-	}
-
-	.auth-btn {
-		margin-top: 0.25rem;
-		background: linear-gradient(125deg, #f08b14, #ffd176);
-		color: #0d1623;
-	}
-
-	.ghost-btn {
-		background: rgba(37, 48, 68, 0.95);
-		color: #eaf1ff;
-	}
-
-	.auth-btn:hover,
-	.ghost-btn:hover {
-		transform: translateY(-1px);
-		filter: brightness(1.04);
-	}
-
-	.full-width {
-		width: 100%;
-	}
-
-	.more-auth {
-		margin-top: 0.78rem;
-		border-top: 1px solid rgba(148, 163, 184, 0.22);
-		padding-top: 0.65rem;
-	}
-
-	.more-auth summary {
-		cursor: pointer;
-		color: #dae3f4;
-		font-size: 0.8rem;
-		font-weight: 600;
-		letter-spacing: 0.03em;
+	.auth-success {
+		border: 1px solid rgba(110, 231, 183, 0.42);
+		background: rgba(18, 70, 50, 0.26);
+		color: #d1fae5;
 	}
 
 	.legal-links {
-		margin: 0.9rem 0 0;
-		padding-top: 0.62rem;
-		border-top: 1px solid rgba(148, 163, 184, 0.18);
-		display: inline-flex;
+		margin: 0.86rem 0 0;
+		display: flex;
 		align-items: center;
-		gap: 0.5rem;
-		font-size: 0.78rem;
-		letter-spacing: 0.03em;
+		gap: 0.48rem;
+		font-size: 0.82rem;
 		color: var(--muted);
 	}
 
 	.legal-links a {
-		color: #d7e5ff;
+		color: inherit;
 		text-decoration: none;
 	}
 
 	.legal-links a:hover {
-		text-decoration: underline;
+		color: var(--signal-soft);
 	}
 
-	@keyframes cardRise {
-		from {
-			transform: translateY(6px);
-			opacity: 0;
-		}
-		to {
-			transform: translateY(0);
-			opacity: 1;
-		}
+	.setup-stage {
+		display: grid;
+		align-content: start;
 	}
 
-	@media (max-width: 900px) {
+	@media (max-width: 960px) {
 		.landing-shell {
 			grid-template-columns: 1fr;
-			padding-top: 1rem;
-		}
-
-		.hero-image-wrap img {
-			height: 260px;
-		}
-
-		.hero-meta {
-			padding-bottom: 0.6rem;
 		}
 	}
 </style>

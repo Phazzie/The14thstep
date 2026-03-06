@@ -18,39 +18,102 @@
 	} = $props();
 </script>
 
-<section class="space-y-2">
+<section class="input-shell">
 	{#if listeningOnly}
-		<p class="rounded-md border border-gray-700 bg-gray-800 p-3 text-sm text-gray-300">
-			Listening mode enabled. You can keep the room open and receive shares.
-		</p>
+		<p class="listening-note">Listening mode enabled. Keep the room open and receive shares.</p>
 	{:else}
-		<label for="user-share" class="text-sm font-semibold text-gray-100">Your Share</label>
+		<label for="user-share">Your Share</label>
 		<textarea
 			id="user-share"
-			rows="4"
-			class="w-full rounded-lg border border-gray-700 bg-gray-900 p-3 text-gray-100"
+			rows="5"
 			value={value}
 			oninput={(event) => onValueChange((event.currentTarget as HTMLTextAreaElement).value)}
 			placeholder={crisisMode ? "Take your time. We're here." : 'Type your share...'}
 			disabled={disabled}
 		></textarea>
-		<div class="flex flex-wrap gap-2">
-			<button
-				type="button"
-				onclick={onSubmit}
-				disabled={disabled || !value.trim()}
-				class="min-h-11 rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-			>
+		<div class="actions">
+			<button type="button" onclick={onSubmit} disabled={disabled || !value.trim()} class="submit-btn">
 				Submit Share
 			</button>
-			<button
-				type="button"
-				onclick={onPass}
-				disabled={disabled}
-				class="min-h-11 rounded-md bg-gray-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-			>
-				Pass
-			</button>
+			<button type="button" onclick={onPass} disabled={disabled} class="pass-btn">Pass</button>
 		</div>
 	{/if}
 </section>
+
+<style>
+	.input-shell {
+		display: grid;
+		gap: 0.52rem;
+	}
+
+	label {
+		font-size: 0.74rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		font-weight: 700;
+		color: #ffd7a0;
+	}
+
+	textarea {
+		width: 100%;
+		border: 1px solid rgba(140, 165, 205, 0.33);
+		border-radius: 0.78rem;
+		padding: 0.72rem;
+		font: inherit;
+		font-size: 0.94rem;
+		line-height: 1.5;
+		color: #edf2ff;
+		background: rgba(10, 17, 29, 0.88);
+		resize: vertical;
+	}
+
+	textarea:focus {
+		outline: 2px solid rgba(255, 187, 94, 0.72);
+		outline-offset: 1px;
+	}
+
+	.actions {
+		display: flex;
+		gap: 0.5rem;
+		flex-wrap: wrap;
+	}
+
+	.submit-btn,
+	.pass-btn {
+		min-height: 2.7rem;
+		padding: 0.6rem 0.88rem;
+		font: inherit;
+		font-size: 0.85rem;
+		font-weight: 700;
+		border-radius: 0.68rem;
+		cursor: pointer;
+	}
+
+	.submit-btn {
+		border: 1px solid rgba(104, 176, 224, 0.5);
+		background: rgba(17, 56, 85, 0.9);
+		color: #d8f3ff;
+	}
+
+	.pass-btn {
+		border: 1px solid rgba(148, 163, 184, 0.5);
+		background: rgba(27, 33, 45, 0.9);
+		color: #dbe6ff;
+	}
+
+	.submit-btn:disabled,
+	.pass-btn:disabled {
+		opacity: 0.52;
+		cursor: not-allowed;
+	}
+
+	.listening-note {
+		margin: 0;
+		padding: 0.68rem;
+		border-radius: 0.68rem;
+		border: 1px solid rgba(148, 163, 184, 0.45);
+		background: rgba(17, 24, 39, 0.84);
+		color: #dbe3f6;
+		font-size: 0.88rem;
+	}
+</style>

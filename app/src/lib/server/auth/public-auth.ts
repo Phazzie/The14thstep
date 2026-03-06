@@ -1,18 +1,9 @@
-import { createClient, type Session, type SupabaseClient } from '@supabase/supabase-js';
+import type { Session } from '@supabase/supabase-js';
 import type { Cookies } from '@sveltejs/kit';
 
 export type SessionKind = 'guest' | 'member';
 
 const SESSION_KIND_COOKIE = 'app-session-kind';
-
-function resolveAnonKey(env: NodeJS.ProcessEnv): string {
-	return (
-		env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() ??
-		env.SUPABASE_ANON_KEY?.trim() ??
-		env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ??
-		''
-	);
-}
 
 function secureCookieFlag(env: NodeJS.ProcessEnv): boolean {
 	return (env.NODE_ENV ?? '').trim() === 'production';
@@ -21,7 +12,7 @@ function secureCookieFlag(env: NodeJS.ProcessEnv): boolean {
 type CookieConfig = {
 	path: string;
 	httpOnly: boolean;
-	sameSite: 'lax';
+	sameSite: 'strict';
 	secure: boolean;
 };
 
@@ -29,7 +20,7 @@ function authCookieConfig(env: NodeJS.ProcessEnv): CookieConfig {
 	return {
 		path: '/',
 		httpOnly: true,
-		sameSite: 'lax',
+		sameSite: 'strict',
 		secure: secureCookieFlag(env)
 	};
 }
@@ -72,24 +63,14 @@ export function clearSupabaseSessionCookies(cookies: Cookies): void {
 	cookies.delete('sb-refresh-token', { path: '/' });
 }
 
-export function clearAllAuthCookies(cookies: Cookies): void {
-	clearSupabaseSessionCookies(cookies);
-	clearSessionKindCookie(cookies);
+export function clearClerkSessionCookie(cookies: Cookies): void {
+	cookies.delete('__session', { path: '/' });
 }
 
-export function createPublicSupabaseAuthClient(
-	env: NodeJS.ProcessEnv = process.env
-): SupabaseClient | null {
-	const supabaseUrl = env.SUPABASE_URL?.trim() ?? '';
-	const anonKey = resolveAnonKey(env);
-	if (!supabaseUrl || !anonKey) return null;
-
-	return createClient(supabaseUrl, anonKey, {
-		auth: {
-			autoRefreshToken: false,
-			persistSession: false
-		}
-	});
+export function clearAllAuthCookies(cookies: Cookies): void {
+	clearSupabaseSessionCookies(cookies);
+	clearClerkSessionCookie(cookies);
+	clearSessionKindCookie(cookies);
 }
 
 export function normalizeEmailToDisplayName(email: string | null | undefined): string {
@@ -99,4 +80,3 @@ export function normalizeEmailToDisplayName(email: string | null | undefined): s
 	const localPart = normalized.split('@')[0]?.trim();
 	return localPart && localPart.length > 0 ? localPart : 'Member';
 }
-

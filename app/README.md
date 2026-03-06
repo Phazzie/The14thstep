@@ -62,11 +62,12 @@ npm run test:e2e
 ### Break-glass checks
 
 1. Env parity:
-   - Verify `XAI_API_KEY`, `SUPABASE_URL`, and `SUPABASE_SERVICE_ROLE_KEY` are set in Vercel production.
+   - Verify `XAI_API_KEY`, `CLERK_SECRET_KEY`, `PUBLIC_CLERK_PUBLISHABLE_KEY`, `SUPABASE_URL`, and `SUPABASE_SERVICE_ROLE_KEY` are set in Vercel production.
    - If behavior drifts between local and production, compare secret fingerprints (never print raw keys in logs).
 2. Bootstrap data coherence:
-   - `auth.users.id` and `public.users.id` must both exist for test/probe users.
+   - `public.users.id` must exist for test/probe users.
    - Missing `public.users` profile row will surface as `meetings.user_id` FK failures during join.
+   - Member identities are resolved from Clerk session tokens and mapped to deterministic UUID user IDs in app code.
 3. Character identity readiness:
    - Ensure `public.characters` includes the 6 core characters (`Marcus`, `Heather`, `Meechie`, `Gemini`, `Gypsy`, `Chrystal`).
    - Missing core character rows can break slug-to-UUID mapping at persistence time.

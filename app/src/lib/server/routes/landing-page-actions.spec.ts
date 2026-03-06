@@ -124,7 +124,7 @@ describe('landing page actions', () => {
 		expect(result).toMatchObject({
 			status: 404,
 			data: {
-				message: 'We could not find that account. Sign in again or provide a valid user ID.'
+				message: 'We could not find that account. Sign in again or continue as guest.'
 			}
 		});
 	});

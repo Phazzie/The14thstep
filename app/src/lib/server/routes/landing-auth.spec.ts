@@ -60,18 +60,17 @@ function createAuthSeamStub() {
 
 beforeEach(() => {
 	vi.clearAllMocks();
-	delete process.env.CANONICAL_ORIGIN;
-	delete process.env.PUBLIC_APP_ORIGIN;
-	delete process.env.PUBLIC_SITE_URL;
 	delete process.env.NODE_ENV;
 	delete process.env.VERCEL_ENV;
 	delete process.env.PROBE_USER_ID;
+	delete process.env.PUBLIC_CLERK_PUBLISHABLE_KEY;
 });
 
 describe('landing auth route actions', () => {
-	it('load returns session kind and auth notice from query string', async () => {
+	it('load returns member session kind when user is present', async () => {
 		const { cookies } = createCookieJar();
 		cookies.set('app-session-kind', 'guest');
+		process.env.PUBLIC_CLERK_PUBLISHABLE_KEY = 'pk_test_123';
 
 		const result = await load({
 			locals: { userId: 'user-1' },
@@ -81,24 +80,25 @@ describe('landing auth route actions', () => {
 
 		expect((result as { sessionKind: string | null }).sessionKind).toBe('guest');
 		expect((result as { authNotice: string | null }).authNotice).toBe('You are signed in.');
+		expect((result as { clerkPublishableKeyConfigured: boolean }).clerkPublishableKeyConfigured).toBe(true);
 	});
 
-	it('continueGuest creates anonymous session, bootstraps profile, and redirects', async () => {
+	it('continueGuest creates disposable guest session and redirects', async () => {
 		const { cookies, calls } = createCookieJar();
 		const auth = createAuthSeamStub();
 		auth.signInGuest.mockResolvedValue(
 			ok({
-				userId: 'guest-1',
+				userId: 'fca1e4e8-9a8e-4d67-bd87-cf8405917ca7',
 				email: null,
-				accessToken: 'access',
-				refreshToken: 'refresh',
-				userMetadata: {}
+				accessToken: 'unused',
+				refreshToken: '',
+				userMetadata: { sessionKind: 'guest' }
 			})
 		);
 
 		const ensureUserProfile = vi.fn(async () =>
 			ok({
-				id: 'guest-1',
+				id: 'fca1e4e8-9a8e-4d67-bd87-cf8405917ca7',
 				displayName: 'Guest',
 				cleanTime: null,
 				meetingCount: 0,
@@ -118,162 +118,34 @@ describe('landing auth route actions', () => {
 		});
 
 		expect(ensureUserProfile).toHaveBeenCalledWith(
-			expect.objectContaining({ id: 'guest-1', displayName: 'Guest', isAnonymous: true })
+			expect.objectContaining({
+				id: 'fca1e4e8-9a8e-4d67-bd87-cf8405917ca7',
+				displayName: 'Guest',
+				isAnonymous: true
+			})
 		);
 		expect(calls.set.map((call) => call.name)).toEqual(
-			expect.arrayContaining(['sb-access-token', 'sb-refresh-token', 'app-session-kind'])
+			expect.arrayContaining(['sb-access-token', 'app-session-kind'])
 		);
 	});
 
-	it('sendMagicLink returns success state and preserves email', async () => {
+	it('signOut revokes member token when present and clears cookies', async () => {
+		const { cookies, calls, store } = createCookieJar();
+		store.set('__session', 'member-token');
 		const auth = createAuthSeamStub();
-		auth.sendMagicLink.mockResolvedValue(ok({ success: true }));
+		auth.signOut.mockResolvedValue(ok({ success: true }));
 
-		const result = await actions.sendMagicLink?.({
-			request: makeRequest({ magicEmail: 'person@example.com' }),
-			url: new URL('http://localhost/'),
-			locals: { seams: { auth } }
-		} as never);
-
-		expect(result).toMatchObject({
-			authSuccess: 'If that email is registered, we sent a sign-in link.',
-			authEmail: 'person@example.com'
+		await expect(
+			actions.signOut?.({ cookies, locals: { seams: { auth } } } as never)
+		).rejects.toSatisfy((error: unknown) => {
+			expectRedirectLike(error, 303, '/?auth=signed-out');
+			return true;
 		});
-		expect(auth.sendMagicLink).toHaveBeenCalled();
-	});
 
-	it('sendMagicLink returns anti-enumeration success message for already-registered collisions', async () => {
-		const auth = createAuthSeamStub();
-		auth.sendMagicLink.mockResolvedValue(
-			err(SeamErrorCodes.INPUT_INVALID, 'failed', { upstreamMessage: 'User already registered' })
-		);
-
-		const result = await actions.sendMagicLink?.({
-			request: makeRequest({ magicEmail: 'person@example.com' }),
-			url: new URL('http://localhost/'),
-			locals: { seams: { auth } }
-		} as never);
-
-		expect(result).toMatchObject({
-			authSuccess: 'If that email is registered, we sent a sign-in link.',
-			authEmail: 'person@example.com'
-		});
-	});
-
-	it('sendMagicLink returns retry guidance when provider rate limits requests', async () => {
-		const auth = createAuthSeamStub();
-		auth.sendMagicLink.mockResolvedValue(err(SeamErrorCodes.RATE_LIMITED, 'rate limited'));
-
-		const result = await actions.sendMagicLink?.({
-			request: makeRequest({ magicEmail: 'person@example.com' }),
-			url: new URL('http://localhost/'),
-			locals: { seams: { auth } }
-		} as never);
-
-		expect(result).toMatchObject({
-			status: 429,
-			data: {
-				authMessage: 'Please wait a minute before requesting another sign-in link.',
-				authEmail: 'person@example.com'
-			}
-		});
-	});
-
-	it('sendMagicLink prefers canonical origin for callback redirect when configured', async () => {
-		process.env.CANONICAL_ORIGIN = 'https://14thstep.com';
-		const auth = createAuthSeamStub();
-		auth.sendMagicLink.mockResolvedValue(ok({ success: true }));
-
-		await actions.sendMagicLink?.({
-			request: makeRequest({ magicEmail: 'person@example.com' }),
-			url: new URL('https://weird-proxy.example/'),
-			locals: { seams: { auth } }
-		} as never);
-
-		expect(auth.sendMagicLink).toHaveBeenCalledWith(
-			expect.objectContaining({
-				emailRedirectTo: 'https://14thstep.com/auth/callback'
-			})
-		);
-	});
-
-	it('signIn clears cookies and fails when profile bootstrap fails', async () => {
-		const { cookies, calls } = createCookieJar();
-		const auth = createAuthSeamStub();
-		auth.signInWithPassword.mockResolvedValue(
-			ok({
-				userId: 'user-1',
-				email: 'john@example.com',
-				accessToken: 'access',
-				refreshToken: 'refresh',
-				userMetadata: {}
-			})
-		);
-
-		const result = await actions.signIn?.({
-			request: makeRequest({ email: 'john@example.com', password: 'secret' }),
-			cookies,
-			locals: {
-				seams: {
-					auth,
-					database: {
-						ensureUserProfile: vi.fn(async () =>
-							err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, 'down')
-						)
-					}
-				}
-			}
-		} as never);
-
-		expect(result).toMatchObject({
-			status: 503,
-			data: { authMessage: "Couldn't finish account setup right now. Try again." }
-		});
+		expect(auth.signOut).toHaveBeenCalledWith('member-token');
 		expect(calls.delete.map((call) => call.name)).toEqual(
-			expect.arrayContaining(['sb-access-token', 'sb-refresh-token', 'app-session-kind'])
+			expect.arrayContaining(['sb-access-token', 'sb-refresh-token', '__session', 'app-session-kind'])
 		);
-	});
-
-	it('signIn returns existing-account guidance for already-registered collisions', async () => {
-		const auth = createAuthSeamStub();
-		auth.signInWithPassword.mockResolvedValue(
-			err(SeamErrorCodes.UNAUTHORIZED, 'failed', { upstreamMessage: 'User already registered' })
-		);
-
-		const result = await actions.signIn?.({
-			request: makeRequest({ email: 'john@example.com', password: 'secret' }),
-			cookies: createCookieJar().cookies,
-			locals: { seams: { auth, database: {} } }
-		} as never);
-
-		expect(result).toMatchObject({
-			status: 401,
-			data: {
-				authMessage: 'That email already has an account. Try signing in or request a magic link.'
-			}
-		});
-	});
-
-	it('signIn returns method-collision guidance when provider reports linked identity', async () => {
-		const auth = createAuthSeamStub();
-		auth.signInWithPassword.mockResolvedValue(
-			err(SeamErrorCodes.UNAUTHORIZED, 'failed', {
-				upstreamMessage: 'Identity is already linked to a different provider'
-			})
-		);
-
-		const result = await actions.signIn?.({
-			request: makeRequest({ email: 'john@example.com', password: 'secret' }),
-			cookies: createCookieJar().cookies,
-			locals: { seams: { auth, database: {} } }
-		} as never);
-
-		expect(result).toMatchObject({
-			status: 401,
-			data: {
-				authMessage: 'That email is linked to a different sign-in method. Try another sign-in option.'
-			}
-		});
 	});
 
 	it('join bootstraps profile only when getUserById returns NOT_FOUND', async () => {

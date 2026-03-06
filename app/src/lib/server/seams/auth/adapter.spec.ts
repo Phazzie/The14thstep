@@ -1,339 +1,160 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SeamErrorCodes } from '$lib/core/seam';
+
+const { verifyTokenMock, revokeSessionMock } = vi.hoisted(() => ({
+	verifyTokenMock: vi.fn(),
+	revokeSessionMock: vi.fn()
+}));
+
+vi.mock('@clerk/backend', () => ({
+	verifyToken: verifyTokenMock,
+	createClerkClient: () => ({
+		sessions: {
+			revokeSession: revokeSessionMock
+		}
+	})
+}));
+
 import { createAuthAdapter } from './adapter';
 
-function toJwtWithExp(exp: number): string {
-	const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' }), 'utf8').toString(
-		'base64url'
-	);
-	const payload = Buffer.from(JSON.stringify({ exp }), 'utf8').toString('base64url');
-	return `${header}.${payload}.signature`;
+function makeEnv(overrides: Partial<NodeJS.ProcessEnv> = {}): NodeJS.ProcessEnv {
+	return {
+		...process.env,
+		CLERK_SECRET_KEY: 'sk_test_123',
+		...overrides
+	};
 }
 
 describe('auth server adapter', () => {
-	it('returns a validated auth session for a valid cookie token', async () => {
-		const token = toJwtWithExp(1893456000);
-		const getUser = vi.fn().mockResolvedValue({
-			data: { user: { id: 'user-123', email: 'member@example.com' } },
-			error: null
-		});
-		const adapter = createAuthAdapter({
-			client: {
-				auth: {
-					getUser,
-					admin: {
-						signOut: vi.fn().mockResolvedValue({ data: null, error: null })
-					}
-				}
-			}
-		});
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
 
-		const result = await adapter.getSession(`foo=bar; sb-access-token=${token}`);
-
-		expect(result.ok).toBe(true);
-		expect(getUser).toHaveBeenCalledWith(token);
-		if (result.ok) {
-			expect(result.value).toEqual({
-				userId: 'user-123',
-				email: 'member@example.com',
-				expiresAt: '2030-01-01T00:00:00.000Z'
-			});
+	it('returns INPUT_INVALID for malformed getSession input', async () => {
+		const adapter = createAuthAdapter({ env: makeEnv() });
+		const result = await adapter.getSession('');
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe(SeamErrorCodes.INPUT_INVALID);
 		}
 	});
 
-	it('maps upstream auth failures to unauthorized', async () => {
-		const token = toJwtWithExp(1893456000);
-		const adapter = createAuthAdapter({
-			client: {
-				auth: {
-					getUser: vi.fn().mockResolvedValue({
-						data: { user: null },
-						error: { status: 401, code: 'bad_jwt', message: 'Invalid JWT' }
-					}),
-					admin: {
-						signOut: vi.fn().mockResolvedValue({ data: null, error: null })
-					}
-				}
-			}
-		});
+	it('returns guest session when guest cookies are present', async () => {
+		const adapter = createAuthAdapter({ env: makeEnv() });
+		const signIn = await adapter.signInGuest();
+		expect(signIn.ok).toBe(true);
+		if (!signIn.ok) return;
 
-		const result = await adapter.getSession(`sb-access-token=${token}`);
+		const result = await adapter.getSession(`app-session-kind=guest; sb-access-token=${signIn.value.accessToken}`);
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value.userId).toBe(signIn.value.userId);
+			expect(result.value.email).toBe('guest@local.invalid');
+		}
+	});
 
+	it('rejects forged guest session token', async () => {
+		const adapter = createAuthAdapter({ env: makeEnv() });
+		const result = await adapter.getSession(
+			'app-session-kind=guest; sb-access-token=fca1e4e8-9a8e-4d67-bd87-cf8405917ca7.fake'
+		);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe(SeamErrorCodes.UNAUTHORIZED);
 		}
 	});
 
-	it('rejects malformed inputs with INPUT_INVALID', async () => {
-		const adapter = createAuthAdapter({
-			client: {
-				auth: {
-					getUser: vi.fn(),
-					admin: {
-						signOut: vi.fn()
-					}
-				}
-			}
+	it('verifies clerk session token and maps clerk subject to stable uuid', async () => {
+		verifyTokenMock.mockResolvedValue({
+			sub: 'user_2abcxyz',
+			email: 'member@example.com',
+			exp: 1893456000
 		});
+		const adapter = createAuthAdapter({ env: makeEnv() });
 
-		const sessionResult = await adapter.getSession('');
-		expect(sessionResult.ok).toBe(false);
-		if (!sessionResult.ok) {
-			expect(sessionResult.error.code).toBe(SeamErrorCodes.INPUT_INVALID);
-		}
-
-		const signOutResult = await adapter.signOut('   ');
-		expect(signOutResult.ok).toBe(false);
-		if (!signOutResult.ok) {
-			expect(signOutResult.error.code).toBe(SeamErrorCodes.INPUT_INVALID);
+		const result = await adapter.getSession('__session=jwt-token');
+		expect(verifyTokenMock).toHaveBeenCalledWith('jwt-token', expect.objectContaining({ secretKey: 'sk_test_123' }));
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value.email).toBe('member@example.com');
+			expect(result.value.userId).toMatch(
+				/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+			);
 		}
 	});
 
-	it('returns unauthorized when chunked auth cookies are incomplete', async () => {
-		const token = toJwtWithExp(1893456000);
-		const getUser = vi.fn();
-		const adapter = createAuthAdapter({
-			client: {
-				auth: {
-					getUser,
-					admin: {
-						signOut: vi.fn().mockResolvedValue({ data: null, error: null })
-					}
-				}
-			}
-		});
+	it('returns unauthorized when clerk token is invalid', async () => {
+		verifyTokenMock.mockRejectedValue(new Error('invalid token'));
+		const adapter = createAuthAdapter({ env: makeEnv() });
 
-		const result = await adapter.getSession(`sb-project-auth-token.0=${token.slice(0, 12)}`);
-
+		const result = await adapter.getSession('__session=bad-token');
 		expect(result.ok).toBe(false);
-		expect(getUser).not.toHaveBeenCalled();
 		if (!result.ok) {
 			expect(result.error.code).toBe(SeamErrorCodes.UNAUTHORIZED);
-			expect(result.error.details).toMatchObject({ reason: 'session_token_missing' });
 		}
 	});
 
-	it('reassembles chunked auth cookies and resolves session', async () => {
-		const token = toJwtWithExp(1893456000);
-		const getUser = vi.fn().mockResolvedValue({
-			data: { user: { id: 'user-456', email: 'chunked@example.com' } },
-			error: null
-		});
-		const adapter = createAuthAdapter({
-			client: {
-				auth: {
-					getUser,
-					admin: {
-						signOut: vi.fn().mockResolvedValue({ data: null, error: null })
-					}
-				}
-			}
-		});
-		const split = Math.floor(token.length / 2);
-		const cookieHeader = `sb-project-auth-token.0=${token.slice(0, split)}; sb-project-auth-token.1=${token.slice(split)}`;
-
-		const result = await adapter.getSession(cookieHeader);
-
-		expect(result.ok).toBe(true);
-		expect(getUser).toHaveBeenCalledWith(token);
-		if (result.ok) {
-			expect(result.value.userId).toBe('user-456');
-			expect(result.value.email).toBe('chunked@example.com');
-		}
-	});
-
-	it('maps guest sign-in to auth payload', async () => {
-		const adapter = createAuthAdapter({
-			publicClient: {
-				auth: {
-					signInAnonymously: vi.fn().mockResolvedValue({
-						data: {
-							session: {
-								access_token: 'access',
-								refresh_token: 'refresh',
-								user: { id: 'guest-1', email: 'guest@example.com', user_metadata: { role: 'guest' } }
-							},
-							user: { id: 'guest-1', email: 'guest@example.com', user_metadata: { role: 'guest' } }
-						},
-						error: null
-					}),
-					signInWithOtp: vi.fn(),
-					signInWithPassword: vi.fn(),
-					exchangeCodeForSession: vi.fn(),
-					verifyOtp: vi.fn()
-				}
-			}
-		});
-
+	it('creates disposable guest sign-in payload', async () => {
+		const adapter = createAuthAdapter({ env: makeEnv() });
 		const result = await adapter.signInGuest();
 		expect(result.ok).toBe(true);
 		if (result.ok) {
-			expect(result.value).toMatchObject({
-				userId: 'guest-1',
-				email: 'guest@example.com',
-				accessToken: 'access',
-				refreshToken: 'refresh'
-			});
+			expect(result.value.userId).toMatch(
+				/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+			);
+			expect(result.value.accessToken).toContain('.');
+			expect(result.value.userMetadata).toMatchObject({ sessionKind: 'guest' });
 		}
 	});
 
-	it('maps magic-link throttling to RATE_LIMITED', async () => {
-		const adapter = createAuthAdapter({
-			publicClient: {
-				auth: {
-					signInAnonymously: vi.fn(),
-					signInWithOtp: vi.fn().mockResolvedValue({
-						data: {},
-						error: { status: 429, code: 'over_request_rate_limit', message: 'Too many requests' }
-					}),
-					signInWithPassword: vi.fn(),
-					exchangeCodeForSession: vi.fn(),
-					verifyOtp: vi.fn()
-				}
-			}
-		});
+	it('returns INPUT_INVALID for hosted-flow sign-in methods', async () => {
+		const adapter = createAuthAdapter({ env: makeEnv() });
 
-		const result = await adapter.sendMagicLink({
+		const magic = await adapter.sendMagicLink({
 			email: 'person@example.com',
 			emailRedirectTo: 'https://example.com/auth/callback'
 		});
-		expect(result.ok).toBe(false);
-		if (!result.ok) {
-			expect(result.error.code).toBe(SeamErrorCodes.RATE_LIMITED);
-			expect(result.error.details).toMatchObject({ upstreamStatus: 429 });
+		expect(magic.ok).toBe(false);
+		if (!magic.ok) {
+			expect(magic.error.code).toBe(SeamErrorCodes.INPUT_INVALID);
+		}
+
+		const password = await adapter.signInWithPassword({ email: 'person@example.com', password: 'secret' });
+		expect(password.ok).toBe(false);
+		if (!password.ok) {
+			expect(password.error.code).toBe(SeamErrorCodes.INPUT_INVALID);
 		}
 	});
 
-	it('maps email send rate-limit code to RATE_LIMITED even without numeric status', async () => {
-		const adapter = createAuthAdapter({
-			publicClient: {
-				auth: {
-					signInAnonymously: vi.fn(),
-					signInWithOtp: vi.fn().mockResolvedValue({
-						data: {},
-						error: { code: 'over_email_send_rate_limit', message: 'email rate limit exceeded' }
-					}),
-					signInWithPassword: vi.fn(),
-					exchangeCodeForSession: vi.fn(),
-					verifyOtp: vi.fn()
-				}
-			}
-		});
+	it('signOut is no-op success for signed guest token', async () => {
+		const adapter = createAuthAdapter({ env: makeEnv() });
+		const signIn = await adapter.signInGuest();
+		expect(signIn.ok).toBe(true);
+		if (!signIn.ok) return;
 
-		const result = await adapter.sendMagicLink({
-			email: 'person@example.com',
-			emailRedirectTo: 'https://example.com/auth/callback'
-		});
-		expect(result.ok).toBe(false);
-		if (!result.ok) {
-			expect(result.error.code).toBe(SeamErrorCodes.RATE_LIMITED);
-			expect(result.error.details).toMatchObject({
-				upstreamCode: 'over_email_send_rate_limit',
-				upstreamMessage: 'email rate limit exceeded'
-			});
-		}
-	});
-
-	it('maps password sign-in failures to unauthorized with upstream details', async () => {
-		const adapter = createAuthAdapter({
-			publicClient: {
-				auth: {
-					signInAnonymously: vi.fn(),
-					signInWithOtp: vi.fn(),
-					signInWithPassword: vi.fn().mockResolvedValue({
-						data: { session: null, user: null },
-						error: { status: 401, code: 'invalid_credentials', message: 'Invalid login credentials' }
-					}),
-					exchangeCodeForSession: vi.fn(),
-					verifyOtp: vi.fn()
-				}
-			}
-		});
-
-		const result = await adapter.signInWithPassword({
-			email: 'person@example.com',
-			password: 'secret'
-		});
-		expect(result.ok).toBe(false);
-		if (!result.ok) {
-			expect(result.error.code).toBe(SeamErrorCodes.UNAUTHORIZED);
-			expect(result.error.details).toMatchObject({
-				upstreamCode: 'invalid_credentials',
-				upstreamStatus: 401,
-				upstreamMessage: 'Invalid login credentials'
-			});
-		}
-	});
-
-	it('maps otp_expired without a status to UNAUTHORIZED', async () => {
-		const verifyOtp = vi.fn().mockResolvedValue({
-			data: { session: null, user: null },
-			error: { code: 'otp_expired', message: 'Token has expired or is invalid' }
-		});
-		const adapter = createAuthAdapter({
-			publicClient: {
-				auth: {
-					signInAnonymously: vi.fn(),
-					signInWithOtp: vi.fn(),
-					signInWithPassword: vi.fn(),
-					exchangeCodeForSession: vi.fn(),
-					verifyOtp
-				}
-			}
-		});
-
-		const result = await adapter.completeAuthCallback({
-			code: null,
-			tokenHash: 't1',
-			otpType: 'magiclink'
-		});
-
-		expect(result.ok).toBe(false);
-		if (!result.ok) {
-			expect(result.error.code).toBe(SeamErrorCodes.UNAUTHORIZED);
-			expect(result.error.details).toMatchObject({ upstreamCode: 'otp_expired' });
-		}
-	});
-
-	it('falls back to otp verification during callback completion', async () => {
-		const exchangeCodeForSession = vi.fn().mockResolvedValue({
-			data: { session: null, user: null },
-			error: { status: 400, code: 'bad_code', message: 'invalid code' }
-		});
-		const verifyOtp = vi.fn().mockResolvedValue({
-			data: {
-				session: {
-					access_token: 'access',
-					refresh_token: 'refresh',
-					user: { id: 'user-1', email: 'user@example.com', user_metadata: { name: 'User' } }
-				},
-				user: { id: 'user-1', email: 'user@example.com', user_metadata: { name: 'User' } }
-			},
-			error: null
-		});
-		const adapter = createAuthAdapter({
-			publicClient: {
-				auth: {
-					signInAnonymously: vi.fn(),
-					signInWithOtp: vi.fn(),
-					signInWithPassword: vi.fn(),
-					exchangeCodeForSession,
-					verifyOtp
-				}
-			}
-		});
-
-		const result = await adapter.completeAuthCallback({
-			code: 'abc123',
-			tokenHash: 't1',
-			otpType: 'magiclink'
-		});
-		expect(exchangeCodeForSession).toHaveBeenCalledWith('abc123');
-		expect(verifyOtp).toHaveBeenCalledWith({ token_hash: 't1', type: 'magiclink' });
+		const result = await adapter.signOut(signIn.value.accessToken);
 		expect(result.ok).toBe(true);
 		if (result.ok) {
-			expect(result.value.userId).toBe('user-1');
+			expect(result.value.success).toBe(true);
 		}
+	});
+
+	it('rejects bare uuid signOut token', async () => {
+		const adapter = createAuthAdapter({ env: makeEnv() });
+		const result = await adapter.signOut('fca1e4e8-9a8e-4d67-bd87-cf8405917ca7');
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe(SeamErrorCodes.UNAUTHORIZED);
+		}
+	});
+
+	it('revoke member session for valid clerk token', async () => {
+		verifyTokenMock.mockResolvedValue({ sid: 'sess_123' });
+		revokeSessionMock.mockResolvedValue({ id: 'sess_123' });
+		const adapter = createAuthAdapter({ env: makeEnv() });
+
+		const result = await adapter.signOut('member.jwt.token');
+		expect(result.ok).toBe(true);
+		expect(revokeSessionMock).toHaveBeenCalledWith('sess_123');
 	});
 });

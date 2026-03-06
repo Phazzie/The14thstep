@@ -8,10 +8,44 @@
 	} = $props();
 
 	const styleMap = {
-		info: 'border-sky-600 bg-sky-900/30 text-sky-200',
-		error: 'border-rose-600 bg-rose-900/30 text-rose-200',
-		success: 'border-emerald-600 bg-emerald-900/30 text-emerald-200'
+		info: 'info',
+		error: 'error',
+		success: 'success'
 	} as const;
 </script>
 
-<p class={`rounded-lg border px-3 py-2 text-sm ${styleMap[kind]}`}>{message}</p>
+<p
+	class={`system-message ${styleMap[kind]}`}
+	role={kind === 'error' ? 'alert' : 'status'}
+	aria-live={kind === 'error' ? 'assertive' : 'polite'}
+>
+	{message}
+</p>
+
+<style>
+	.system-message {
+		margin: 0;
+		padding: 0.58rem 0.68rem;
+		border-radius: 0.65rem;
+		font-size: 0.85rem;
+		border: 1px solid;
+	}
+
+	.system-message.info {
+		border-color: rgba(125, 211, 252, 0.45);
+		background: rgba(12, 46, 71, 0.3);
+		color: #d0edff;
+	}
+
+	.system-message.error {
+		border-color: rgba(252, 165, 165, 0.48);
+		background: rgba(123, 18, 36, 0.24);
+		color: #fecdd3;
+	}
+
+	.system-message.success {
+		border-color: rgba(110, 231, 183, 0.45);
+		background: rgba(19, 78, 56, 0.26);
+		color: #d1fae5;
+	}
+</style>

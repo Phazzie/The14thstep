@@ -452,49 +452,40 @@
 	}
 </script>
 
-<main class="mx-auto grid max-w-6xl gap-4 p-4 lg:grid-cols-[2fr_1fr]">
-	<section class="sticky top-4 space-y-4 rounded-xl border border-gray-700 bg-gray-900 p-4">
-		<header class="space-y-2">
-			<h1 class="text-2xl font-bold text-amber-200">Meeting Room</h1>
-			<p class="text-sm text-gray-300">Meeting ID: <code>{data.meetingId}</code></p>
-			<p class="text-xs text-gray-400">Ritual phase: {ritualPhaseState?.currentPhase ?? 'unknown'}</p>
-			<p class="text-sm text-gray-300">
-				{userName} · {data.initialCleanTime ?? 'clean time not set'}
-			</p>
+<main class="room-shell">
+	<section class="room-panel room-meta">
+		<header class="room-head">
+			<p class="kicker">Room Live</p>
+			<h1>Meeting Room</h1>
+			<p class="meeting-id">Meeting ID: <code>{data.meetingId}</code></p>
+			<p class="phase-pill">Phase: {ritualPhaseState?.currentPhase ?? 'unknown'}</p>
+			<p class="member-line">{userName} · {data.initialCleanTime ?? 'clean time not set'}</p>
 		</header>
 
 		<MeetingCircle characters={data.characters} {activeCharacterId} {crisisMode} />
 
-		<section class="grid gap-2 sm:grid-cols-3">
-			<label class="text-sm text-gray-200">
-				Topic
-				<input
-					class="mt-1 w-full rounded-md border border-gray-700 bg-gray-800 p-2"
-					bind:value={topic}
-				/>
+		<section class="edit-grid" aria-label="Meeting metadata">
+			<label>
+				<span>Topic</span>
+				<input bind:value={topic} />
 			</label>
-			<label class="text-sm text-gray-200">
-				Your Name
-				<input
-					class="mt-1 w-full rounded-md border border-gray-700 bg-gray-800 p-2"
-					bind:value={userName}
-				/>
+			<label>
+				<span>Your Name</span>
+				<input bind:value={userName} />
 			</label>
-			<label class="text-sm text-gray-200">
-				Mood
-				<input
-					class="mt-1 w-full rounded-md border border-gray-700 bg-gray-800 p-2"
-					bind:value={userMood}
-				/>
+			<label>
+				<span>Mood</span>
+				<input bind:value={userMood} />
 			</label>
 		</section>
+	</section>
 
-		<div class="flex flex-wrap gap-2">
+	<section class="room-panel room-transcript">
+		<div class="toolbar">
 			<button
 				type="button"
 				onclick={requestCharacterShare}
 				disabled={sharing || postingShare || closing || crisisMode || meetingPhase !== 'sharing'}
-				class="min-h-11 rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
 			>
 				{crisisMode
 					? 'Character Shares Paused (Crisis Mode)'
@@ -506,7 +497,6 @@
 				type="button"
 				onclick={requestCloseSummary}
 				disabled={closing || sharing || meetingPhase !== 'sharing'}
-				class="min-h-11 rounded-md bg-amber-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
 			>
 				{closing ? 'Closing Meeting...' : 'Close Meeting'}
 			</button>
@@ -522,14 +512,11 @@
 			<SystemMessage message={`Streaming: ${streamingDraft}`} kind="success" />
 		{/if}
 
-		<div
-			bind:this={transcriptContainer}
-			class="max-h-[28rem] space-y-3 overflow-y-auto rounded-xl border border-gray-700 bg-gray-950 p-3"
-		>
+		<div bind:this={transcriptContainer} class="transcript-scroll" aria-live="polite">
 			{#if transcript.length === 0}
 				<SystemMessage message="No shares yet." kind="info" />
 			{:else}
-				<ol class="space-y-3">
+				<ol class="transcript-list">
 					{#each transcript as entry (entry.id)}
 						<ShareMessage
 							{entry}
@@ -543,12 +530,12 @@
 		</div>
 	</section>
 
-	<section class="space-y-4 rounded-xl border border-gray-700 bg-gray-900 p-4">
+	<section class="room-panel room-turn">
 		{#if crisisMode}
-			<section class="rounded-xl border border-rose-600 bg-rose-950/30 p-4">
-				<h2 class="text-base font-semibold text-rose-200">{crisisResources.title}</h2>
+			<section class="crisis-card" role="status" aria-live="polite">
+				<h2>{crisisResources.title}</h2>
 				{#each crisisResources.lines as line (`${line}`)}
-					<p class="text-sm text-rose-100">{line}</p>
+					<p>{line}</p>
 				{/each}
 			</section>
 		{/if}
@@ -568,3 +555,180 @@
 		{/if}
 	</section>
 </main>
+
+<style>
+	.room-shell {
+		max-width: 1300px;
+		margin: 0 auto;
+		padding: 1rem;
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 0.9rem;
+	}
+
+	.room-panel {
+		border-radius: 1rem;
+		border: 1px solid rgba(158, 178, 214, 0.24);
+		background:
+			radial-gradient(circle at 86% 8%, rgba(255, 171, 68, 0.1), transparent 36%),
+			linear-gradient(170deg, rgba(9, 14, 24, 0.94), rgba(7, 10, 17, 0.88));
+		padding: 0.92rem;
+	}
+
+	.room-head h1 {
+		margin: 0.25rem 0 0;
+		font-size: 1.52rem;
+		color: #ffe8bb;
+	}
+
+	.kicker {
+		margin: 0;
+		font-size: 0.72rem;
+		text-transform: uppercase;
+		letter-spacing: 0.12em;
+		color: #f5c87a;
+	}
+
+	.meeting-id,
+	.member-line {
+		margin: 0.35rem 0 0;
+		font-size: 0.84rem;
+		color: #d4e2fb;
+	}
+
+	.phase-pill {
+		display: inline-flex;
+		margin: 0.4rem 0 0;
+		padding: 0.22rem 0.45rem;
+		border-radius: 999px;
+		font-size: 0.72rem;
+		text-transform: uppercase;
+		letter-spacing: 0.07em;
+		background: rgba(21, 31, 51, 0.84);
+		border: 1px solid rgba(123, 156, 214, 0.34);
+		color: #d9e7ff;
+	}
+
+	.edit-grid {
+		margin-top: 0.8rem;
+		display: grid;
+		gap: 0.5rem;
+	}
+
+	.edit-grid label {
+		display: grid;
+		gap: 0.24rem;
+	}
+
+	.edit-grid span {
+		font-size: 0.72rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: #ffd7a0;
+	}
+
+	.edit-grid input {
+		width: 100%;
+		border-radius: 0.66rem;
+		border: 1px solid rgba(127, 149, 188, 0.36);
+		background: rgba(12, 19, 32, 0.84);
+		color: #e5eeff;
+		padding: 0.48rem 0.58rem;
+		font: inherit;
+		font-size: 0.88rem;
+	}
+
+	.edit-grid input:focus {
+		outline: 2px solid rgba(255, 195, 110, 0.66);
+		outline-offset: 1px;
+	}
+
+	.toolbar {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.45rem;
+		margin-bottom: 0.55rem;
+	}
+
+	.toolbar button {
+		min-height: 2.65rem;
+		padding: 0.56rem 0.75rem;
+		border-radius: 0.65rem;
+		border: 1px solid rgba(140, 168, 218, 0.4);
+		background: rgba(17, 47, 74, 0.88);
+		color: #e0f2fe;
+		font: inherit;
+		font-size: 0.82rem;
+		font-weight: 700;
+		cursor: pointer;
+	}
+
+	.toolbar button:nth-child(2) {
+		background: rgba(122, 58, 17, 0.88);
+		border-color: rgba(251, 191, 36, 0.38);
+		color: #fef3c7;
+	}
+
+	.toolbar button:disabled {
+		opacity: 0.48;
+		cursor: not-allowed;
+	}
+
+	.transcript-scroll {
+		margin-top: 0.55rem;
+		max-height: 34rem;
+		overflow-y: auto;
+		border-radius: 0.82rem;
+		border: 1px solid rgba(104, 122, 156, 0.32);
+		background: rgba(6, 10, 17, 0.8);
+		padding: 0.62rem;
+	}
+
+	.transcript-list {
+		list-style: none;
+		padding: 0;
+		margin: 0;
+		display: grid;
+		gap: 0.52rem;
+	}
+
+	.crisis-card {
+		margin-bottom: 0.62rem;
+		padding: 0.74rem;
+		border-radius: 0.78rem;
+		border: 1px solid rgba(253, 164, 175, 0.45);
+		background: rgba(127, 29, 29, 0.24);
+		color: #fecaca;
+	}
+
+	.crisis-card h2 {
+		margin: 0;
+		font-size: 0.92rem;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+	}
+
+	.crisis-card p {
+		margin: 0.4rem 0 0;
+		font-size: 0.85rem;
+		line-height: 1.4;
+	}
+
+	@media (min-width: 980px) {
+		.room-shell {
+			grid-template-columns: minmax(220px, 1fr) minmax(420px, 2fr) minmax(260px, 1fr);
+			align-items: start;
+		}
+
+		.room-meta {
+			position: sticky;
+			top: 0.8rem;
+		}
+
+		.room-turn {
+			position: sticky;
+			top: 0.8rem;
+		}
+	}
+</style>

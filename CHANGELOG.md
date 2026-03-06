@@ -2,6 +2,46 @@
 
 All notable changes to this repository are documented in this file.
 
+## [2026-03-05]
+
+### Changed
+
+- Replaced the member auth runtime path with Clerk-backed session handling in `app/src/lib/server/seams/auth/adapter.ts` and shifted landing auth UI to hosted Clerk entry in `app/src/routes/+page.svelte` and `app/src/routes/+page.server.ts`.
+- Simplified callback completion behavior for hosted auth in `app/src/routes/auth/callback/+server.ts`.
+- Refactored seam bootstrapping in `app/src/hooks.server.ts` to reuse module-level adapter singletons.
+- Redesigned landing and meeting interfaces (`app/src/routes/+page.svelte`, `app/src/routes/meeting/[id]/+page.svelte`, `app/src/lib/components/*.svelte`, `app/src/app.css`) to ship the new visual direction.
+
+### Added
+
+- Clerk dependency surface in `app/package.json` (`@clerk/backend`, `@clerk/clerk-js`).
+- Database migration `app/supabase/migrations/20260305_000002_decouple_users_from_supabase_auth.sql` to remove direct FK coupling from `public.users` to Supabase `auth.users`.
+- Clerk environment variable documentation in `app/.env.example` and runbook updates in `app/README.md`.
+
+### Fixed
+
+- Hardened guest auth against cookie forgery by signing guest access tokens server-side and validating signatures before resolving `locals.userId` in `app/src/lib/server/seams/auth/adapter.ts`.
+- Tightened sign-out token handling to reject bare UUIDs and accept only validated signed guest tokens or verified Clerk member tokens in `app/src/lib/server/seams/auth/adapter.ts`.
+- Callback success path now normalizes auth state by clearing stale guest Supabase cookies and forcing `app-session-kind=member` in `app/src/routes/auth/callback/+server.ts`.
+- Improved accessibility with live region semantics and expansion state metadata in `app/src/lib/components/SystemMessage.svelte` and `app/src/lib/components/ShareMessage.svelte`.
+- Corrected landing heading hierarchy by promoting the primary title to an `<h1>` in `app/src/routes/+page.svelte`.
+
+### Verified
+
+- `npm run check`
+- `npm run test:unit -- --run`
+- `npm run verify`
+
+## [2026-03-06]
+
+### Fixed
+
+- Removed a redundant boolean cast in `app/src/lib/server/seams/auth/adapter.ts` (`if (Boolean(guestUserId))` -> `if (guestUserId)`) to satisfy the `no-extra-boolean-cast` lint rule and unblock full verification.
+- Rebuilt `app/package-lock.json` with npm 10 compatibility so GitHub Actions `npm ci` no longer fails on missing optional websocket dependencies (`bufferutil`, `utf-8-validate`).
+
+### Verified
+
+- `npm run verify` (full lint/check/fixtures/contracts/core/composition/e2e chain passing)
+
 ## [2026-02-23]
 
 ### Changed

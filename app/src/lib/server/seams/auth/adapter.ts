@@ -1,4 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClerkClient, verifyToken } from '@clerk/backend';
+import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { SeamErrorCodes, err, ok } from '$lib/core/seam';
 import type {
 	AuthCallbackCompletionInput,
@@ -18,376 +19,115 @@ import {
 	validateSessionTokenInput
 } from '$lib/seams/auth/contract';
 
-interface SupabaseAuthErrorLike {
-	code?: string;
-	status?: number;
-	message?: string;
-	name?: string;
-}
-
-interface SupabaseAuthUserLike {
-	id?: unknown;
-	email?: unknown;
-	user_metadata?: unknown;
-}
-
-interface SupabaseSessionLike {
-	access_token?: unknown;
-	refresh_token?: unknown;
-	user?: SupabaseAuthUserLike | null;
-}
-
-interface SupabaseGetUserResponseLike {
-	data: {
-		user: SupabaseAuthUserLike | null;
-	};
-	error: SupabaseAuthErrorLike | null;
-}
-
-interface SupabaseSignOutResponseLike {
-	data: null;
-	error: SupabaseAuthErrorLike | null;
-}
-
-interface SupabaseSignInResponseLike {
-	data: {
-		session: SupabaseSessionLike | null;
-		user: SupabaseAuthUserLike | null;
-	};
-	error: SupabaseAuthErrorLike | null;
-}
-
-interface SupabaseOtpResponseLike {
-	data: unknown;
-	error: SupabaseAuthErrorLike | null;
-}
-
-interface ServiceAuthClientLike {
-	auth: {
-		getUser(jwt: string): Promise<SupabaseGetUserResponseLike>;
-		admin: {
-			signOut(jwt: string): Promise<SupabaseSignOutResponseLike>;
-		};
-	};
-}
-
-interface PublicAuthClientLike {
-	auth: {
-		signInAnonymously(): Promise<SupabaseSignInResponseLike>;
-		signInWithOtp(input: {
-			email: string;
-			options: { emailRedirectTo: string };
-		}): Promise<SupabaseOtpResponseLike>;
-		signInWithPassword(input: {
-			email: string;
-			password: string;
-		}): Promise<SupabaseSignInResponseLike>;
-		exchangeCodeForSession(code: string): Promise<SupabaseSignInResponseLike>;
-		verifyOtp(input: {
-			token_hash: string;
-			type: string;
-		}): Promise<SupabaseSignInResponseLike>;
-	};
-}
-
 interface CreateAuthAdapterOptions {
-	client?: ServiceAuthClientLike;
-	serviceClient?: ServiceAuthClientLike;
-	publicClient?: PublicAuthClientLike;
 	env?: NodeJS.ProcessEnv;
 }
 
-const PROVIDER = 'supabase-auth';
-const AUTHORIZED_STATUS_CODES = new Set([401, 403]);
-const RATE_LIMITED_STATUS_CODES = new Set([429]);
-const UNAVAILABLE_STATUS_CODES = new Set([408, 502, 503, 504]);
-const INPUT_INVALID_STATUS_CODES = new Set([400, 422]);
-const UNAUTHORIZED_UPSTREAM_CODES = new Set([
-	'bad_jwt',
-	'invalid_credentials',
-	'no_authorization',
-	'otp_expired',
-	'session_expired',
-	'session_not_found',
-	'user_not_found'
-]);
-const INPUT_INVALID_UPSTREAM_CODES = new Set(['bad_json', 'validation_failed']);
-const RATE_LIMITED_UPSTREAM_CODES = new Set(['over_request_rate_limit']);
-const UNAVAILABLE_UPSTREAM_CODES = new Set([
-	'hook_timeout',
-	'hook_timeout_after_retry',
-	'request_timeout'
-]);
-
-function resolveAnonKey(env: NodeJS.ProcessEnv): string {
-	return (
-		env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() ??
-		env.SUPABASE_ANON_KEY?.trim() ??
-		env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ??
-		''
-	);
-}
-
-function createDefaultServiceAuthClient(env: NodeJS.ProcessEnv = process.env): ServiceAuthClientLike | null {
-	const supabaseUrl = env.SUPABASE_URL?.trim();
-	const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-
-	if (!supabaseUrl || !serviceRoleKey) {
-		return null;
-	}
-
-	return createClient(supabaseUrl, serviceRoleKey, {
-		auth: { autoRefreshToken: false, persistSession: false }
-	}) as unknown as ServiceAuthClientLike;
-}
-
-function createDefaultPublicAuthClient(env: NodeJS.ProcessEnv = process.env): PublicAuthClientLike | null {
-	const supabaseUrl = env.SUPABASE_URL?.trim();
-	const anonKey = resolveAnonKey(env);
-
-	if (!supabaseUrl || !anonKey) {
-		return null;
-	}
-
-	return createClient(supabaseUrl, anonKey, {
-		auth: { autoRefreshToken: false, persistSession: false }
-	}) as unknown as PublicAuthClientLike;
-}
-
-function normalizeCookieValue(rawValue: string): string {
-	try {
-		return decodeURIComponent(rawValue);
-	} catch {
-		return rawValue;
-	}
-}
-
-function tryExtractTokenFromCookieValue(cookieValue: string): string | null {
-	const normalized = normalizeCookieValue(cookieValue);
-
-	try {
-		const parsed = JSON.parse(normalized) as unknown;
-		if (Array.isArray(parsed) && typeof parsed[0] === 'string' && validateSessionTokenInput(parsed[0])) {
-			return parsed[0];
-		}
-
-		if (
-			typeof parsed === 'object' &&
-			parsed !== null &&
-			'access_token' in parsed &&
-			typeof parsed.access_token === 'string' &&
-			validateSessionTokenInput(parsed.access_token)
-		) {
-			return parsed.access_token;
-		}
-	} catch {
-		// Fall through to raw token parsing.
-	}
-
-	if (validateSessionTokenInput(normalized) && normalized.split('.').length === 3) {
-		return normalized;
-	}
-
-	return null;
-}
+const PROVIDER = 'clerk-auth';
+const GUEST_EMAIL = 'guest@local.invalid';
 
 function parseCookies(cookieHeader: string): Map<string, string> {
 	const cookies = new Map<string, string>();
 	for (const part of cookieHeader.split(';')) {
 		const trimmed = part.trim();
 		if (!trimmed) continue;
-
 		const separatorIndex = trimmed.indexOf('=');
 		if (separatorIndex < 0) continue;
-
 		const name = trimmed.slice(0, separatorIndex).trim();
 		const value = trimmed.slice(separatorIndex + 1);
 		if (!name) continue;
-		cookies.set(name, value);
+		try {
+			cookies.set(name, decodeURIComponent(value));
+		} catch {
+			cookies.set(name, value);
+		}
 	}
 	return cookies;
 }
 
-function extractSessionToken(cookieHeader: string): string | null {
-	const cookies = parseCookies(cookieHeader);
-
-	const directAccessToken = cookies.get('sb-access-token');
-	if (typeof directAccessToken === 'string') {
-		const token = tryExtractTokenFromCookieValue(directAccessToken);
-		if (token) return token;
-	}
-
-	const chunkedAuthCookies = new Map<string, Map<number, string>>();
-
-	for (const [name, value] of cookies) {
-		const match = /^(sb-[^=;]+-auth-token)(?:\.(\d+))?$/.exec(name);
-		if (!match) continue;
-
-		const baseName = match[1];
-		const chunkIndex = match[2] === undefined ? 0 : Number.parseInt(match[2], 10);
-		if (!Number.isInteger(chunkIndex) || chunkIndex < 0) continue;
-
-		const chunks = chunkedAuthCookies.get(baseName) ?? new Map<number, string>();
-		chunks.set(chunkIndex, value);
-		chunkedAuthCookies.set(baseName, chunks);
-	}
-
-	for (const chunks of chunkedAuthCookies.values()) {
-		const ordered = [...chunks.entries()].sort((left, right) => left[0] - right[0]);
-		const joinedValue = ordered.map((chunk) => chunk[1]).join('');
-		const token = tryExtractTokenFromCookieValue(joinedValue);
-		if (token) return token;
-	}
-
-	return null;
+function isUuid(value: string): boolean {
+	return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
-function parseJwtExpiresAtIso(token: string): string | null {
-	const parts = token.split('.');
-	if (parts.length < 2) return null;
-
-	const payloadPart = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-	const paddedPayload = payloadPart.padEnd(Math.ceil(payloadPart.length / 4) * 4, '=');
-
-	try {
-		const payloadText = Buffer.from(paddedPayload, 'base64').toString('utf8');
-		const payload = JSON.parse(payloadText) as unknown;
-		if (
-			typeof payload === 'object' &&
-			payload !== null &&
-			'exp' in payload &&
-			typeof payload.exp === 'number' &&
-			Number.isFinite(payload.exp)
-		) {
-			return new Date(payload.exp * 1000).toISOString();
-		}
-	} catch {
-		return null;
-	}
-
-	return null;
-}
-
-function toUpstreamErrorDetails(error: SupabaseAuthErrorLike): Record<string, unknown> {
-	return {
-		provider: PROVIDER,
-		upstreamCode: error.code,
-		upstreamStatus: error.status,
-		upstreamMessage: error.message
-	};
-}
-
-function classifyUpstreamError(error: SupabaseAuthErrorLike) {
-	const status = error.status;
-	const code = typeof error.code === 'string' ? error.code : undefined;
-
-	if (code && UNAUTHORIZED_UPSTREAM_CODES.has(code)) {
-		return SeamErrorCodes.UNAUTHORIZED;
-	}
-
-	if (code && INPUT_INVALID_UPSTREAM_CODES.has(code)) {
-		return SeamErrorCodes.INPUT_INVALID;
-	}
-
-	if (
-		(code && RATE_LIMITED_UPSTREAM_CODES.has(code)) ||
-		code === 'over_email_send_rate_limit' ||
-		code === 'over_sms_send_rate_limit'
-	) {
-		return SeamErrorCodes.RATE_LIMITED;
-	}
-
-	if (code && UNAVAILABLE_UPSTREAM_CODES.has(code)) {
-		return SeamErrorCodes.UPSTREAM_UNAVAILABLE;
-	}
-
-	if (typeof status === 'number') {
-		if (AUTHORIZED_STATUS_CODES.has(status)) return SeamErrorCodes.UNAUTHORIZED;
-		if (RATE_LIMITED_STATUS_CODES.has(status)) return SeamErrorCodes.RATE_LIMITED;
-		if (UNAVAILABLE_STATUS_CODES.has(status) || status >= 500) {
-			return SeamErrorCodes.UPSTREAM_UNAVAILABLE;
-		}
-		if (INPUT_INVALID_STATUS_CODES.has(status)) return SeamErrorCodes.INPUT_INVALID;
-		return SeamErrorCodes.UPSTREAM_ERROR;
-	}
-
-	return SeamErrorCodes.UPSTREAM_UNAVAILABLE;
-}
-
-function toMessage(rawMessage: unknown, fallback: string): string {
-	if (typeof rawMessage !== 'string') return fallback;
-	const normalized = rawMessage.trim();
-	return normalized.length > 0 ? normalized : fallback;
-}
-
-function toErrorLike(value: unknown): SupabaseAuthErrorLike {
-	if (typeof value !== 'object' || value === null) {
-		return { message: undefined };
-	}
-
-	const errorRecord = value as Record<string, unknown>;
-	return {
-		code: typeof errorRecord.code === 'string' ? errorRecord.code : undefined,
-		status: typeof errorRecord.status === 'number' ? errorRecord.status : undefined,
-		message: typeof errorRecord.message === 'string' ? errorRecord.message : undefined,
-		name: typeof errorRecord.name === 'string' ? errorRecord.name : undefined
-	};
-}
-
-function mapThrownError(fallbackMessage: string, thrown: unknown) {
-	const upstream = toErrorLike(thrown);
-	return err(
-		classifyUpstreamError(upstream),
-		toMessage(upstream.message, fallbackMessage),
-		toUpstreamErrorDetails(upstream)
+function resolveGuestSessionSecret(env: NodeJS.ProcessEnv): string {
+	return (
+		env.APP_SESSION_SECRET?.trim() ??
+		env.SUPABASE_JWT_SECRET?.trim() ??
+		env.CLERK_SECRET_KEY?.trim() ??
+		''
 	);
 }
 
-function toAuthSignInPayload(
-	session: SupabaseSessionLike | null | undefined,
-	user: SupabaseAuthUserLike | null | undefined
-): AuthSignInPayload | null {
-	if (!session) return null;
-
-	const resolvedUser = user ?? session.user ?? null;
-	const payload: AuthSignInPayload = {
-		userId: typeof resolvedUser?.id === 'string' ? resolvedUser.id : '',
-		email: typeof resolvedUser?.email === 'string' ? resolvedUser.email : null,
-		accessToken: typeof session.access_token === 'string' ? session.access_token : '',
-		refreshToken: typeof session.refresh_token === 'string' ? session.refresh_token : '',
-		userMetadata:
-			typeof resolvedUser?.user_metadata === 'object' && resolvedUser.user_metadata !== null
-				? (resolvedUser.user_metadata as Record<string, unknown>)
-				: {}
-	};
-
-	return validateAuthSignInPayload(payload) ? payload : null;
+function encodeGuestAccessToken(userId: string, secret: string): string {
+	const signature = createHmac('sha256', secret).update(userId).digest('hex');
+	return `${userId}.${signature}`;
 }
 
-function configurationError() {
-	return err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, 'Supabase auth adapter is not configured', {
-		provider: PROVIDER
+function decodeGuestAccessToken(token: string, secret: string): string | null {
+	const separator = token.indexOf('.');
+	if (separator < 0) return null;
+	const userId = token.slice(0, separator).trim();
+	const providedSignature = token.slice(separator + 1).trim();
+	if (!isUuid(userId) || providedSignature.length === 0) return null;
+	const expectedSignature = createHmac('sha256', secret).update(userId).digest('hex');
+	const providedBuffer = Buffer.from(providedSignature);
+	const expectedBuffer = Buffer.from(expectedSignature);
+	if (providedBuffer.length !== expectedBuffer.length) return null;
+	if (!timingSafeEqual(providedBuffer, expectedBuffer)) return null;
+	return userId;
+}
+
+function toIsoExpiration(exp: number | undefined): string {
+	const seconds = typeof exp === 'number' && Number.isFinite(exp) ? exp : Math.floor(Date.now() / 1000) + 3600;
+	return new Date(seconds * 1000).toISOString();
+}
+
+function toStableUuid(seed: string): string {
+	const hash = createHash('sha256').update(seed).digest('hex').slice(0, 32).split('');
+	hash[12] = '4';
+	const variant = Number.parseInt(hash[16] ?? '0', 16);
+	hash[16] = ((variant & 0x3) | 0x8).toString(16);
+	const hex = hash.join('');
+	return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+}
+
+function toAuthSignInPayload(input: {
+	userId: string;
+	email: string | null;
+	accessToken: string;
+	refreshToken: string;
+	userMetadata: Record<string, unknown>;
+}): AuthSignInPayload {
+	return {
+		userId: input.userId,
+		email: input.email,
+		accessToken: input.accessToken,
+		refreshToken: input.refreshToken,
+		userMetadata: input.userMetadata
+	};
+}
+
+function unsupportedHostedFlowError(message: string) {
+	return err(SeamErrorCodes.INPUT_INVALID, message, {
+		provider: PROVIDER,
+		hint: 'Use hosted Clerk sign-in from the landing page.'
 	});
 }
 
-function toOtpType(value: string | null): string | null {
-	if (
-		value === 'signup' ||
-		value === 'invite' ||
-		value === 'magiclink' ||
-		value === 'recovery' ||
-		value === 'email_change' ||
-		value === 'email'
-	) {
-		return value;
-	}
-	return null;
+function resolveSecretKey(env: NodeJS.ProcessEnv): string {
+	return env.CLERK_SECRET_KEY?.trim() ?? '';
 }
 
 export function createAuthAdapter(options: CreateAuthAdapterOptions = {}): AuthPort {
-	const serviceAuthClient =
-		options.client ?? options.serviceClient ?? createDefaultServiceAuthClient(options.env);
-	const publicAuthClient = options.publicClient ?? createDefaultPublicAuthClient(options.env);
+	const env = options.env ?? process.env;
+	const secretKey = resolveSecretKey(env);
+	const guestSessionSecret = resolveGuestSessionSecret(env);
+	const clerkClient =
+		secretKey.length > 0
+			? createClerkClient({
+				secretKey
+			})
+			: null;
 
 	return {
 		async getSession(cookies) {
@@ -402,236 +142,120 @@ export function createAuthAdapter(options: CreateAuthAdapterOptions = {}): AuthP
 				});
 			}
 
-			if (!serviceAuthClient) {
-				return configurationError();
+			const parsedCookies = parseCookies(cookies);
+			const clerkSessionToken = parsedCookies.get('__session')?.trim() ?? '';
+			if (clerkSessionToken.length > 0) {
+				if (secretKey.length === 0) {
+					return err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, 'Clerk auth adapter is not configured', {
+						provider: PROVIDER
+					});
+				}
+
+				try {
+					const claims = await verifyToken(clerkSessionToken, {
+						secretKey,
+						clockSkewInMs: 5000
+					});
+					const clerkUserId = typeof claims.sub === 'string' ? claims.sub.trim() : '';
+					if (!clerkUserId) {
+						return err(SeamErrorCodes.UNAUTHORIZED, 'Missing Clerk subject claim', {
+							provider: PROVIDER,
+							reason: 'subject_claim_missing'
+						});
+					}
+
+					const session: AuthSession = {
+						userId: toStableUuid(`clerk:${clerkUserId}`),
+						email:
+							typeof claims.email === 'string' && claims.email.includes('@')
+								? claims.email
+								: 'member@local.invalid',
+						expiresAt: toIsoExpiration(claims.exp)
+					};
+					if (!validateAuthSession(session)) {
+						return err(SeamErrorCodes.CONTRACT_VIOLATION, 'Clerk session payload violates AuthSession', {
+							provider: PROVIDER
+						});
+					}
+					return ok(session);
+				} catch (cause) {
+					return err(SeamErrorCodes.UNAUTHORIZED, 'Invalid Clerk session token', {
+						provider: PROVIDER,
+						reason: cause instanceof Error ? cause.message : String(cause)
+					});
+				}
 			}
 
-			const sessionToken = extractSessionToken(cookies);
-			if (!sessionToken) {
-				return err(SeamErrorCodes.UNAUTHORIZED, 'Session token is missing from auth cookies', {
-					provider: PROVIDER,
-					reason: 'session_token_missing'
-				});
+			const sessionKind = parsedCookies.get('app-session-kind')?.trim() ?? '';
+			const guestToken = parsedCookies.get('sb-access-token')?.trim() ?? '';
+			const guestUserId =
+				sessionKind === 'guest' && guestSessionSecret.length > 0
+					? decodeGuestAccessToken(guestToken, guestSessionSecret)
+					: null;
+			if (sessionKind === 'guest' && guestUserId) {
+				const guestSession: AuthSession = {
+					userId: guestUserId,
+					email: GUEST_EMAIL,
+					expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+				};
+				if (!validateAuthSession(guestSession)) {
+					return err(SeamErrorCodes.CONTRACT_VIOLATION, 'Guest auth payload violates AuthSession', {
+						provider: PROVIDER
+					});
+				}
+				return ok(guestSession);
 			}
 
-			const expiresAt = parseJwtExpiresAtIso(sessionToken);
-			if (!expiresAt) {
-				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'Session token is missing a valid expiration');
-			}
-
-			let userResponse: SupabaseGetUserResponseLike;
-			try {
-				userResponse = await serviceAuthClient.auth.getUser(sessionToken);
-			} catch (error) {
-				return mapThrownError('Failed to resolve auth session', error);
-			}
-
-			if (userResponse.error) {
-				return err(
-					classifyUpstreamError(userResponse.error),
-					toMessage(userResponse.error.message, 'Failed to resolve auth session'),
-					toUpstreamErrorDetails(userResponse.error)
-				);
-			}
-
-			const rawUser = userResponse.data?.user;
-			const session: AuthSession = {
-				userId: typeof rawUser?.id === 'string' ? rawUser.id : '',
-				email: typeof rawUser?.email === 'string' ? rawUser.email : '',
-				expiresAt
-			};
-
-			if (!validateAuthSession(session)) {
-				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'Supabase auth response violates AuthSession');
-			}
-
-			return ok(session);
+			return err(SeamErrorCodes.UNAUTHORIZED, 'No active auth session', {
+				provider: PROVIDER,
+				reason: 'session_missing'
+			});
 		},
 
 		async signInGuest() {
-			if (!publicAuthClient) {
-				return configurationError();
-			}
-
-			let signInResponse: SupabaseSignInResponseLike;
-			try {
-				signInResponse = await publicAuthClient.auth.signInAnonymously();
-			} catch (error) {
-				return mapThrownError('Failed to start guest session', error);
-			}
-
-			if (signInResponse.error) {
-				return err(
-					classifyUpstreamError(signInResponse.error),
-					toMessage(signInResponse.error.message, 'Failed to start guest session'),
-					toUpstreamErrorDetails(signInResponse.error)
-				);
-			}
-
-			const payload = toAuthSignInPayload(signInResponse.data?.session, signInResponse.data?.user);
-			if (!payload) {
-				return err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, 'Guest session did not return tokens', {
-					provider: PROVIDER,
-					reason: 'missing_session'
+			if (guestSessionSecret.length === 0) {
+				return err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, 'Guest auth adapter secret is not configured', {
+					provider: PROVIDER
 				});
 			}
 
+			const guestId = randomUUID();
+			const payload = toAuthSignInPayload({
+				userId: guestId,
+				email: null,
+				accessToken: encodeGuestAccessToken(guestId, guestSessionSecret),
+				refreshToken: randomUUID(),
+				userMetadata: {
+					sessionKind: 'guest'
+				}
+			});
+			if (!validateAuthSignInPayload(payload)) {
+				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'Guest sign-in violates AuthSignInPayload', {
+					provider: PROVIDER
+				});
+			}
 			return ok(payload);
 		},
 
 		async sendMagicLink(input: MagicLinkInput) {
 			if (!validateMagicLinkInput(input)) {
-				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid magic link input');
+				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid magic-link input');
 			}
-
-			if (!publicAuthClient) {
-				return configurationError();
-			}
-
-			let sendResponse: SupabaseOtpResponseLike;
-			try {
-				sendResponse = await publicAuthClient.auth.signInWithOtp({
-					email: input.email,
-					options: {
-						emailRedirectTo: input.emailRedirectTo
-					}
-				});
-			} catch (error) {
-				return mapThrownError('Failed to send sign-in link', error);
-			}
-
-			if (sendResponse.error) {
-				return err(
-					classifyUpstreamError(sendResponse.error),
-					toMessage(sendResponse.error.message, 'Failed to send sign-in link'),
-					toUpstreamErrorDetails(sendResponse.error)
-				);
-			}
-
-			return ok({ success: true as const });
+			return unsupportedHostedFlowError('Magic links are handled by Clerk hosted sign-in.');
 		},
 
 		async signInWithPassword(input: PasswordSignInInput) {
 			if (!validatePasswordSignInInput(input)) {
-				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid sign-in input');
+				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid password sign-in input');
 			}
-
-			if (!publicAuthClient) {
-				return configurationError();
-			}
-
-			let signInResponse: SupabaseSignInResponseLike;
-			try {
-				signInResponse = await publicAuthClient.auth.signInWithPassword({
-					email: input.email,
-					password: input.password
-				});
-			} catch (error) {
-				return mapThrownError('Failed to sign in', error);
-			}
-
-			if (signInResponse.error) {
-				return err(
-					classifyUpstreamError(signInResponse.error),
-					toMessage(signInResponse.error.message, 'Failed to sign in'),
-					toUpstreamErrorDetails(signInResponse.error)
-				);
-			}
-
-			const payload = toAuthSignInPayload(signInResponse.data?.session, signInResponse.data?.user);
-			if (!payload) {
-				return err(SeamErrorCodes.UNAUTHORIZED, 'Sign in did not return a session', {
-					provider: PROVIDER,
-					reason: 'missing_session'
-				});
-			}
-
-			return ok(payload);
+			return unsupportedHostedFlowError('Password sign-in is handled by Clerk hosted sign-in.');
 		},
 
 		async completeAuthCallback(input: AuthCallbackCompletionInput) {
 			if (!validateAuthCallbackCompletionInput(input)) {
 				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid callback completion input');
 			}
-
-			if (!publicAuthClient) {
-				return configurationError();
-			}
-
-			const code = input.code;
-			const tokenHash = input.tokenHash;
-			const otpType = toOtpType(input.otpType);
-
-			let codeExchangeError: SupabaseAuthErrorLike | null = null;
-			if (code) {
-				let exchangeResponse: SupabaseSignInResponseLike;
-				try {
-					exchangeResponse = await publicAuthClient.auth.exchangeCodeForSession(code);
-				} catch (error) {
-					return mapThrownError('Failed to complete sign-in callback', error);
-				}
-
-				if (!exchangeResponse.error) {
-					const payload = toAuthSignInPayload(exchangeResponse.data?.session, exchangeResponse.data?.user);
-					if (payload) {
-						return ok(payload);
-					}
-					codeExchangeError = {
-						message: 'Code exchange succeeded but did not return a session'
-					};
-				} else {
-					codeExchangeError = exchangeResponse.error;
-				}
-			}
-
-			if (tokenHash) {
-				if (!otpType) {
-					return err(SeamErrorCodes.INPUT_INVALID, 'Invalid callback otp type', {
-						provider: PROVIDER,
-						type: input.otpType
-					});
-				}
-
-				let verifyResponse: SupabaseSignInResponseLike;
-				try {
-					verifyResponse = await publicAuthClient.auth.verifyOtp({
-						token_hash: tokenHash,
-						type: otpType
-					});
-				} catch (error) {
-					return mapThrownError('Failed to verify sign-in callback', error);
-				}
-
-				if (verifyResponse.error) {
-					return err(
-						classifyUpstreamError(verifyResponse.error),
-						toMessage(verifyResponse.error.message, 'Failed to verify sign-in callback'),
-						toUpstreamErrorDetails(verifyResponse.error)
-					);
-				}
-
-				const payload = toAuthSignInPayload(verifyResponse.data?.session, verifyResponse.data?.user);
-				if (!payload) {
-					return err(SeamErrorCodes.UPSTREAM_ERROR, 'Callback verification did not return a session', {
-						provider: PROVIDER,
-						reason: 'missing_session'
-					});
-				}
-
-				return ok(payload);
-			}
-
-			if (codeExchangeError) {
-				return err(
-					classifyUpstreamError(codeExchangeError),
-					toMessage(codeExchangeError.message, 'Failed to complete sign-in callback'),
-					toUpstreamErrorDetails(codeExchangeError)
-				);
-			}
-
-			return err(SeamErrorCodes.INPUT_INVALID, 'Missing callback completion params', {
-				provider: PROVIDER
-			});
+			return unsupportedHostedFlowError('Auth callback completion is handled by Clerk hosted sign-in.');
 		},
 
 		async signOut(sessionToken) {
@@ -639,23 +263,46 @@ export function createAuthAdapter(options: CreateAuthAdapterOptions = {}): AuthP
 				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid session token input');
 			}
 
-			if (!serviceAuthClient) {
-				return configurationError();
+			const guestUserId =
+				guestSessionSecret.length > 0 ? decodeGuestAccessToken(sessionToken, guestSessionSecret) : null;
+			if (guestUserId) {
+				return ok({ success: true as const });
 			}
 
-			let signOutResponse: SupabaseSignOutResponseLike;
+			if (secretKey.length === 0 || !clerkClient) {
+				return err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, 'Clerk auth adapter is not configured', {
+					provider: PROVIDER
+				});
+			}
+
+			let claims;
 			try {
-				signOutResponse = await serviceAuthClient.auth.admin.signOut(sessionToken);
-			} catch (error) {
-				return mapThrownError('Failed to sign out session', error);
+				claims = await verifyToken(sessionToken, {
+					secretKey,
+					clockSkewInMs: 5000
+				});
+			} catch (cause) {
+				return err(SeamErrorCodes.UNAUTHORIZED, 'Invalid Clerk session token', {
+					provider: PROVIDER,
+					reason: cause instanceof Error ? cause.message : String(cause)
+				});
 			}
 
-			if (signOutResponse.error) {
-				return err(
-					classifyUpstreamError(signOutResponse.error),
-					toMessage(signOutResponse.error.message, 'Failed to sign out session'),
-					toUpstreamErrorDetails(signOutResponse.error)
-				);
+			const sessionId = typeof claims.sid === 'string' ? claims.sid.trim() : '';
+			if (!sessionId) {
+				return err(SeamErrorCodes.UNAUTHORIZED, 'Missing Clerk session id', {
+					provider: PROVIDER,
+					reason: 'sid_claim_missing'
+				});
+			}
+
+			try {
+				await clerkClient.sessions.revokeSession(sessionId);
+			} catch (cause) {
+				return err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, 'Failed to revoke Clerk session', {
+					provider: PROVIDER,
+					reason: cause instanceof Error ? cause.message : String(cause)
+				});
 			}
 
 			return ok({ success: true as const });

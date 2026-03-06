@@ -56,6 +56,9 @@ function createUnavailableDatabaseAdapter(message: string): DatabasePort {
 	};
 }
 
+const authAdapter = createAuthAdapter();
+const grokAiAdapter = createGrokAiAdapter();
+
 function buildSeamBundle(): {
 	auth: ReturnType<typeof createAuthAdapter>;
 	database: DatabasePort;
@@ -71,9 +74,9 @@ function buildSeamBundle(): {
 	}
 
 	return {
-		auth: createAuthAdapter(),
+		auth: authAdapter,
 		database,
-		grokAi: createGrokAiAdapter()
+		grokAi: grokAiAdapter
 	};
 }
 

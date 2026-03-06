@@ -2,7 +2,6 @@ import { createMeeting } from '$lib/core/meeting';
 import { SeamErrorCodes } from '$lib/core/seam';
 import {
 	clearAllAuthCookies,
-	normalizeEmailToDisplayName,
 	readSessionKindCookie,
 	setSessionKindCookie,
 	setSupabaseSessionCookies
@@ -23,70 +22,10 @@ function statusFromSeamCode(code: string): number {
 	return 500;
 }
 
-function isValidEmail(value: string): boolean {
-	return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-}
-
-function resolveDisplayNameFromAuthPayload(
-	payload: { email: string | null; userMetadata: Record<string, unknown> },
-	fallbackEmail?: string | null
-): string {
-	const metadata = payload.userMetadata;
-	const fullName = typeof metadata.full_name === 'string' ? metadata.full_name.trim() : '';
-	if (fullName) return fullName;
-	const name = typeof metadata.name === 'string' ? metadata.name.trim() : '';
-	if (name) return name;
-	return normalizeEmailToDisplayName(payload.email ?? fallbackEmail ?? null);
-}
-
-function maskEmail(email: string): string {
-	const [local, domain] = email.split('@');
-	if (!domain) return '[invalid-email]';
-	if (local.length <= 2) return `**@${domain}`;
-	return `${local.slice(0, 2)}***@${domain}`;
-}
-
-function authFailureMessage(rawMessage: string | undefined): string {
-	const normalized = rawMessage?.toLowerCase() ?? '';
-	if (
-		normalized.includes('already registered') ||
-		normalized.includes('already exists') ||
-		normalized.includes('user_already_exists')
-	) {
-		return 'That email already has an account. Try signing in or request a magic link.';
-	}
-	if (
-		normalized.includes('identity is already linked') ||
-		normalized.includes('provider') && normalized.includes('different')
-	) {
-		return 'That email is linked to a different sign-in method. Try another sign-in option.';
-	}
-	if (normalized.includes('invalid login credentials')) {
-		return 'Sign in failed. Double-check your email and password, or request a magic link.';
-	}
-	if (normalized.includes('email not confirmed')) {
-		return 'Sign in failed. Confirm your email first, then try again.';
-	}
-	if (normalized.includes('expired')) {
-		return 'Sign in failed. Your sign-in link expired. Request a new one.';
-	}
-	return 'Sign in failed. Check your credentials and try again.';
-}
-
-function shouldReturnMagicLinkSoftSuccess(rawMessage: string | undefined): boolean {
-	const normalized = rawMessage?.toLowerCase() ?? '';
-	return (
-		normalized.includes('already registered') ||
-		normalized.includes('already exists') ||
-		normalized.includes('user_already_exists') ||
-		normalized.includes('identity is already linked')
-	);
-}
-
 function meetingStartFailureMessage(status: number): string {
 	if (status === 400) return 'Name, clean time, mood, and mind are required.';
-	if (status === 401) return 'Your session is no longer valid. Sign in again or provide a user ID.';
-	if (status === 404) return 'We could not find that account. Sign in again or provide a valid user ID.';
+	if (status === 401) return 'Your session is no longer valid. Sign in again or continue as guest.';
+	if (status === 404) return 'We could not find that account. Sign in again or continue as guest.';
 	if (status === 429) return 'Too many requests right now. Please try again in a minute.';
 	if (status === 503) return 'Meeting services are temporarily unavailable. Please retry shortly.';
 	return 'Unable to start the meeting right now.';
@@ -94,63 +33,20 @@ function meetingStartFailureMessage(status: number): string {
 
 function noticeFromQuery(url: URL): { authNotice: string | null; authNoticeKind: 'success' | 'error' | null } {
 	const code = url.searchParams.get('auth');
-	if (code === 'magic-link-sent') {
-		return {
-			authNotice: 'If that email is registered, we sent a sign-in link.',
-			authNoticeKind: 'success'
-		};
-	}
 	if (code === 'signed-in') {
 		return { authNotice: 'You are signed in.', authNoticeKind: 'success' };
 	}
-	if (code === 'auth-failed') {
-		return { authNotice: "We couldn't complete sign-in. Try the link again.", authNoticeKind: 'error' };
+	if (code === 'signed-out') {
+		return { authNotice: 'You are signed out.', authNoticeKind: 'success' };
 	}
-	if (code === 'magic-link-cancelled') {
-		return { authNotice: 'Sign-in was canceled or expired. Request a new link.', authNoticeKind: 'error' };
+	if (code === 'auth-failed') {
+		return { authNotice: "We couldn't complete sign-in. Try again.", authNoticeKind: 'error' };
 	}
 	return { authNotice: null, authNoticeKind: null };
 }
 
-function upstreamMessageFromSeamError(error: { message: string; details?: Record<string, unknown> }): string {
-	const upstream = error.details?.upstreamMessage;
-	if (typeof upstream === 'string' && upstream.trim().length > 0) {
-		return upstream;
-	}
-	return error.message;
-}
-
 function isProductionRuntime(env: NodeJS.ProcessEnv = process.env): boolean {
 	return (env.NODE_ENV ?? '').trim() === 'production' || (env.VERCEL_ENV ?? '').trim() === 'production';
-}
-
-function resolveCanonicalOrigin(url: URL, env: NodeJS.ProcessEnv = process.env): string | null {
-	const configured =
-		env.CANONICAL_ORIGIN?.trim() ??
-		env.PUBLIC_APP_ORIGIN?.trim() ??
-		env.PUBLIC_SITE_URL?.trim() ??
-		'';
-	if (configured) {
-		try {
-			return new URL(configured).origin;
-		} catch {
-			console.warn('invalid canonical origin config', { configured });
-			return null;
-		}
-	}
-
-	if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
-		return url.origin;
-	}
-
-	if (!isProductionRuntime(env)) {
-		return url.origin;
-	}
-
-	console.warn('missing canonical origin in production for magic link redirect', {
-		origin: url.origin
-	});
-	return null;
 }
 
 async function ensureProfileBootstrap(
@@ -174,11 +70,20 @@ async function ensureProfileBootstrap(
 
 export const load: PageServerLoad = async ({ locals, cookies, url }) => {
 	const { authNotice, authNoticeKind } = noticeFromQuery(url);
+	const sessionKindCookie = readSessionKindCookie(cookies);
+	const sessionKind = locals.userId
+		? sessionKindCookie === 'guest'
+			? 'guest'
+			: 'member'
+		: sessionKindCookie;
+
 	return {
 		userId: locals.userId,
-		sessionKind: readSessionKindCookie(cookies),
+		sessionKind,
 		authNotice,
-		authNoticeKind
+		authNoticeKind,
+		clerkPublishableKey: process.env.PUBLIC_CLERK_PUBLISHABLE_KEY?.trim() ?? '',
+		clerkPublishableKeyConfigured: Boolean(process.env.PUBLIC_CLERK_PUBLISHABLE_KEY?.trim())
 	};
 };
 
@@ -212,104 +117,16 @@ export const actions: Actions = {
 		throw redirect(303, '/');
 	},
 
-	sendMagicLink: async ({ request, url, locals }) => {
-		const formData = await request.formData();
-		const email = asTrimmedString(formData.get('magicEmail'));
-
-		if (!email || !isValidEmail(email)) {
-			return fail(400, { authMessage: 'Enter a valid email address.', authEmail: email });
-		}
-
-		const redirectOrigin = resolveCanonicalOrigin(url);
-		if (!redirectOrigin) {
-			return fail(500, {
-				authMessage: "Couldn't send a sign-in link right now. Try again.",
-				authEmail: email
-			});
-		}
-
-		const sendResult = await locals.seams.auth.sendMagicLink({
-			email,
-			emailRedirectTo: `${redirectOrigin}/auth/callback`
-		});
-
-		if (!sendResult.ok) {
-			const status = statusFromSeamCode(sendResult.error.code);
-			const upstreamMessage = upstreamMessageFromSeamError(sendResult.error);
-			if (status === 429) {
-				return fail(429, {
-					authMessage: 'Please wait a minute before requesting another sign-in link.',
-					authEmail: email
-				});
-			}
-			if (shouldReturnMagicLinkSoftSuccess(upstreamMessage)) {
-				return {
-					authSuccess: 'If that email is registered, we sent a sign-in link.',
-					authEmail: email
-				};
-			}
-			return fail(503, {
-				authMessage: "Couldn't send a sign-in link right now. Try again.",
-				authEmail: email
-			});
-		}
-
-		return {
-			authSuccess: 'If that email is registered, we sent a sign-in link.',
-			authEmail: email
-		};
-	},
-
-	signIn: async ({ request, cookies, locals }) => {
-		const formData = await request.formData();
-		const email = asTrimmedString(formData.get('email'));
-		const password = asTrimmedString(formData.get('password'));
-
-		if (!email || !password) {
-			return fail(400, { authMessage: 'Email and password are required.' });
-		}
-
-		const signInResult = await locals.seams.auth.signInWithPassword({
-			email,
-			password
-		});
-		if (!signInResult.ok) {
-			const status = statusFromSeamCode(signInResult.error.code);
-			const upstreamMessage = upstreamMessageFromSeamError(signInResult.error);
-			console.warn(
-				`[auth.signIn] failed email=${maskEmail(email)} code=${signInResult.error.code} status=${status} message=${upstreamMessage}`
-			);
-			return fail(status, { authMessage: authFailureMessage(upstreamMessage) });
-		}
-
-		setSupabaseSessionCookies(cookies, {
-			access_token: signInResult.value.accessToken,
-			refresh_token: signInResult.value.refreshToken
-		});
-		setSessionKindCookie(cookies, 'member');
-
-		const bootstrap = await ensureProfileBootstrap(locals, {
-			id: signInResult.value.userId,
-			displayName: resolveDisplayNameFromAuthPayload(signInResult.value, email),
-			cleanTime: null,
-			isAnonymous: false
-		});
-		if (!bootstrap.ok) {
-			clearAllAuthCookies(cookies);
-			return fail(bootstrap.status, { authMessage: bootstrap.authMessage });
-		}
-
-		throw redirect(303, '/');
-	},
-
 	signOut: async ({ cookies, locals }) => {
-		const accessToken = cookies.get('sb-access-token');
-		if (accessToken) {
-			await locals.seams.auth.signOut(accessToken);
+		const memberToken = cookies.get('__session')?.trim() ?? '';
+		const guestToken = cookies.get('sb-access-token')?.trim() ?? '';
+		const sessionToken = memberToken || guestToken;
+		if (sessionToken) {
+			await locals.seams.auth.signOut(sessionToken);
 		}
 
 		clearAllAuthCookies(cookies);
-		throw redirect(303, '/');
+		throw redirect(303, '/?auth=signed-out');
 	},
 
 	join: async ({ request, locals, cookies }) => {
