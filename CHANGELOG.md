@@ -36,6 +36,7 @@ All notable changes to this repository are documented in this file.
 ### Fixed
 
 - Removed a redundant boolean cast in `app/src/lib/server/seams/auth/adapter.ts` (`if (Boolean(guestUserId))` -> `if (guestUserId)`) to satisfy the `no-extra-boolean-cast` lint rule and unblock full verification.
+- Rebuilt `app/package-lock.json` with npm 10 compatibility so GitHub Actions `npm ci` no longer fails on missing optional websocket dependencies (`bufferutil`, `utf-8-validate`).
 
 ### Verified
 
