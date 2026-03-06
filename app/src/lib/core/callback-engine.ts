@@ -1,4 +1,5 @@
 import type { CallbackRecord } from './types';
+import { bestEffortRandom } from './random-utils';
 
 export interface CallbackEngineInput {
 	callback: CallbackRecord;
@@ -142,7 +143,7 @@ export function resolveCallbackProbability(input: CallbackEngineInput): {
 
 export function shouldIncludeCallback(
 	input: CallbackEngineInput,
-	randomValue: number = Math.random()
+	randomValue: number = bestEffortRandom()
 ): CallbackDecision {
 	const resolved = resolveCallbackProbability(input);
 	const roll = Number.isFinite(randomValue) ? randomValue : 1;

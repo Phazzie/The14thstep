@@ -37,10 +37,20 @@ All notable changes to this repository are documented in this file.
 
 - Removed a redundant boolean cast in `app/src/lib/server/seams/auth/adapter.ts` (`if (Boolean(guestUserId))` -> `if (guestUserId)`) to satisfy the `no-extra-boolean-cast` lint rule and unblock full verification.
 - Rebuilt `app/package-lock.json` with npm 10 compatibility so GitHub Actions `npm ci` no longer fails on missing optional websocket dependencies (`bufferutil`, `utf-8-validate`).
+- Replaced runtime `Math.random()` defaults with hardened shared random utilities in `app/src/lib/core/random-utils.ts`, `app/src/lib/core/callback-engine.ts`, `app/src/lib/core/character-selector.ts`, and `app/src/lib/content/startup-sayings.ts`.
+- Added UUID guardrails in `resolveDbCharacterId` to reject non-UUID mapped character IDs before DB writes in `app/src/lib/server/seams/database/adapter.ts`.
+- Added regression coverage for startup saying selection and non-UUID character mapping in `app/src/lib/content/startup-sayings.spec.ts` and `app/src/lib/server/seams/database/adapter.spec.ts`.
+- Expanded composition seam failure coverage for SSE append-share failures and phase update retries in `app/tests/composition/seam-failure.spec.ts`.
 
 ### Verified
 
 - `npm run verify` (full lint/check/fixtures/contracts/core/composition/e2e chain passing)
+- `npx vitest --run src/lib/content/startup-sayings.spec.ts src/lib/server/seams/database/adapter.spec.ts tests/composition/seam-failure.spec.ts`
+- `npm run verify:core`
+- `npm run verify:contracts`
+- `npm run verify:composition`
+- `npm run lint:verify`
+- `npm run check`
 
 ## [2026-02-23]
 

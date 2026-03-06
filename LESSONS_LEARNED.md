@@ -20,11 +20,15 @@ This file captures practical lessons we want future work to reuse.
 ### Process
 
 - A single lint error can quietly block the entire release lane; running `npm run verify` after each auth change keeps deployment confidence high.
+- Branch triage quality improves dramatically when we trial-apply unique commits (`git cherry` + `cherry-pick --no-commit`) instead of relying on ahead/behind counts alone.
+- Cleanup should be staged as `salvage -> verify -> archive`; deleting stale branches before extracting high-value hunks creates avoidable recovery work.
 
 ### Technical
 
 - Environment sandbox restrictions can mimic app failures for Playwright (`listen EPERM`) by blocking local preview port binding. Treat this as an execution-environment constraint and rerun e2e in an unsandboxed context before diagnosing application behavior.
 - Lockfiles generated with a newer npm can still break CI `npm ci` on older runners; always validate with the runner-major npm version (here, npm 10) before declaring dependency changes done.
+- Security hardening commits should be extracted hunk-by-hunk when they include mixed formatting churn, so we preserve behavior while reducing merge risk.
+- Character ID maps must enforce UUID shape before persistence writes; accepting slug values at seam boundaries turns data-shape drift into harder downstream failures.
 
 ## 2026-02-21
 
