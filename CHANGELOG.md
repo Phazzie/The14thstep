@@ -45,6 +45,7 @@ All notable changes to this repository are documented in this file.
 - Refreshed `app/package-lock.json` to install `cookie@0.7.2` under SvelteKit and clear low-severity dependency alert debt.
 - Hardened callback success criteria in `app/src/routes/auth/callback/+server.ts` so `/?auth=signed-in` is only emitted when `seams.auth.getSession(cookieHeader)` resolves a valid session; invalid/missing callback sessions now redirect to `/?auth=auth-failed`.
 - Added callback regression coverage in `app/src/lib/server/routes/auth-callback.spec.ts` for invalid-session callback redirects.
+- Removed top-level `optionalDependencies` (`bufferutil`, `utf-8-validate`) from `app/package.json` and regenerated `app/package-lock.json` to fix GitHub Actions `npm ci` sync failures under npm 11.
 
 ### Verified
 
@@ -57,6 +58,7 @@ All notable changes to this repository are documented in this file.
 - `npm run check`
 - `npm ls cookie` (`@sveltejs/kit@2.53.4 -> cookie@0.7.2`)
 - `npx vitest --run src/lib/server/routes/auth-callback.spec.ts`
+- `npm ci` (local clean install check)
 
 ## [2026-02-23]
 

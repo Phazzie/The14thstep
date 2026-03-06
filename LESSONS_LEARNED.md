@@ -31,6 +31,7 @@ This file captures practical lessons we want future work to reuse.
 - Character ID maps must enforce UUID shape before persistence writes; accepting slug values at seam boundaries turns data-shape drift into harder downstream failures.
 - Dependabot advisory closure can require an explicit transitive override even after parent package upgrades; verify actual installed tree (`npm ls <pkg>`) instead of assuming advisory resolution from top-level version bumps.
 - Callback endpoints must verify actual session resolution before emitting success notices; trusting callback entry alone can produce false \"signed-in\" UX even for invalid callback hits.
+- npm 11 `ci` can fail hard if `package.json` optional top-level deps are not represented concretely in lockfile packages; if reproducibility is inconsistent, remove brittle optional declarations instead of forcing lock drift.
 
 ## 2026-02-21
 
