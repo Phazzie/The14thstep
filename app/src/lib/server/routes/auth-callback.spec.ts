@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { SeamErrorCodes, err, ok } from '$lib/core/seam';
 
 import { GET } from '../../../routes/auth/callback/+server';
 
@@ -47,12 +48,23 @@ describe('auth callback route', () => {
 		const { cookies } = createCookieJar();
 		cookies.set('app-session-kind', 'guest');
 		cookies.set('sb-access-token', 'legacy-token');
+		const auth = {
+			getSession: async () =>
+				ok({
+					userId: '9fce0f33-9200-4e7b-b5f3-9b01f674264f',
+					email: 'member@local.invalid',
+					expiresAt: new Date(Date.now() + 60_000).toISOString()
+				})
+		};
 
 		await expect(
 			GET({
 				url: new URL('http://localhost/auth/callback?state=s1'),
 				cookies,
-				locals: { seams: { auth: {}, database: {} } }
+				request: new Request('http://localhost/auth/callback?state=s1', {
+					headers: { cookie: 'app-session-kind=guest; sb-access-token=legacy-token' }
+				}),
+				locals: { seams: { auth, database: {} } }
 			} as never)
 		).rejects.toSatisfy((error: unknown) => {
 			expectRedirectLike(error, 303, '/?auth=signed-in');
@@ -60,5 +72,24 @@ describe('auth callback route', () => {
 		});
 		expect(cookies.get('app-session-kind')).toBe('member');
 		expect(cookies.get('sb-access-token')).toBeUndefined();
+	});
+
+	it('redirects to auth-failed when callback has no valid session', async () => {
+		const { cookies } = createCookieJar();
+		const auth = {
+			getSession: async () => err(SeamErrorCodes.UNAUTHORIZED, 'No active auth session')
+		};
+
+		await expect(
+			GET({
+				url: new URL('http://localhost/auth/callback?state=s1'),
+				cookies,
+				request: new Request('http://localhost/auth/callback?state=s1'),
+				locals: { seams: { auth, database: {} } }
+			} as never)
+		).rejects.toSatisfy((error: unknown) => {
+			expectRedirectLike(error, 303, '/?auth=auth-failed');
+			return true;
+		});
 	});
 });

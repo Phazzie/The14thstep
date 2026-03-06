@@ -43,6 +43,8 @@ All notable changes to this repository are documented in this file.
 - Expanded composition seam failure coverage for SSE append-share failures and phase update retries in `app/tests/composition/seam-failure.spec.ts`.
 - Upgraded `@sveltejs/kit` to `2.53.4` in `app/package.json` and pinned `cookie` to `^0.7.0` via npm overrides to resolve the open Dependabot advisory on `cookie@<0.7.0`.
 - Refreshed `app/package-lock.json` to install `cookie@0.7.2` under SvelteKit and clear low-severity dependency alert debt.
+- Hardened callback success criteria in `app/src/routes/auth/callback/+server.ts` so `/?auth=signed-in` is only emitted when `seams.auth.getSession(cookieHeader)` resolves a valid session; invalid/missing callback sessions now redirect to `/?auth=auth-failed`.
+- Added callback regression coverage in `app/src/lib/server/routes/auth-callback.spec.ts` for invalid-session callback redirects.
 
 ### Verified
 
@@ -54,6 +56,7 @@ All notable changes to this repository are documented in this file.
 - `npm run lint:verify`
 - `npm run check`
 - `npm ls cookie` (`@sveltejs/kit@2.53.4 -> cookie@0.7.2`)
+- `npx vitest --run src/lib/server/routes/auth-callback.spec.ts`
 
 ## [2026-02-23]
 
