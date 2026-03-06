@@ -30,6 +30,7 @@ This file captures practical lessons we want future work to reuse.
 - Security hardening commits should be extracted hunk-by-hunk when they include mixed formatting churn, so we preserve behavior while reducing merge risk.
 - Character ID maps must enforce UUID shape before persistence writes; accepting slug values at seam boundaries turns data-shape drift into harder downstream failures.
 - Dependabot advisory closure can require an explicit transitive override even after parent package upgrades; verify actual installed tree (`npm ls <pkg>`) instead of assuming advisory resolution from top-level version bumps.
+- Callback endpoints must verify actual session resolution before emitting success notices; trusting callback entry alone can produce false \"signed-in\" UX even for invalid callback hits.
 
 ## 2026-02-21
 
