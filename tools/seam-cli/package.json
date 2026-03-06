@@ -1,0 +1,17 @@
+{
+  "name": "seam-cli",
+  "version": "1.0.0",
+  "description": "Continuous Seam-Driven Development CLI",
+  "main": "index.js",
+  "bin": {
+    "seam": "./index.js"
+  },
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "commander": "^11.0.0",
+    "chalk": "^5.3.0"
+  }
+}

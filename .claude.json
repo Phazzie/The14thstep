@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "seam-mcp-server": {
+      "command": "node",
+      "args": ["tools/seam-mcp-server/index.js"]
+    }
+  },
+  "customInstructions": "You are operating in a workspace that enforces Continuous Seam-Driven Development (CSDD). Use the `seam-mcp-server` tools (`get_seam_registry`, `check_seam_freshness`, `record_seam_probe`, `automock_seam`) to interact with I/O boundaries. The `src/lib/core` directory is strictly pure and enforced via ESLint."
+}

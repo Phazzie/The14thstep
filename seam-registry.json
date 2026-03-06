@@ -33,6 +33,7 @@
       "freshnessFixtures": [
         "app/src/lib/seams/auth/fixtures/probe.sample.json"
       ],
+      "probe": "app/probes/authProbe.mjs",
       "purpose": "Authenticate users and resolve the active session identity.",
       "contract": "app/src/lib/seams/auth/contract.ts"
     },
