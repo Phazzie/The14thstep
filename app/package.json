@@ -37,7 +37,7 @@
 		"@eslint/js": "^9.39.2",
 		"@playwright/test": "^1.58.1",
 		"@sveltejs/adapter-auto": "^7.0.0",
-		"@sveltejs/kit": "^2.53.1",
+		"@sveltejs/kit": "^2.53.4",
 		"@sveltejs/vite-plugin-svelte": "^6.2.4",
 		"@types/node": "^24",
 		"@vitest/browser-playwright": "^4.0.18",
@@ -63,5 +63,8 @@
 	"optionalDependencies": {
 		"bufferutil": "4.1.0",
 		"utf-8-validate": "6.0.6"
+	},
+	"overrides": {
+		"cookie": "^0.7.0"
 	}
 }

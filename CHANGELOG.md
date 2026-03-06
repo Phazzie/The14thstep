@@ -41,6 +41,8 @@ All notable changes to this repository are documented in this file.
 - Added UUID guardrails in `resolveDbCharacterId` to reject non-UUID mapped character IDs before DB writes in `app/src/lib/server/seams/database/adapter.ts`.
 - Added regression coverage for startup saying selection and non-UUID character mapping in `app/src/lib/content/startup-sayings.spec.ts` and `app/src/lib/server/seams/database/adapter.spec.ts`.
 - Expanded composition seam failure coverage for SSE append-share failures and phase update retries in `app/tests/composition/seam-failure.spec.ts`.
+- Upgraded `@sveltejs/kit` to `2.53.4` in `app/package.json` and pinned `cookie` to `^0.7.0` via npm overrides to resolve the open Dependabot advisory on `cookie@<0.7.0`.
+- Refreshed `app/package-lock.json` to install `cookie@0.7.2` under SvelteKit and clear low-severity dependency alert debt.
 
 ### Verified
 
@@ -51,6 +53,7 @@ All notable changes to this repository are documented in this file.
 - `npm run verify:composition`
 - `npm run lint:verify`
 - `npm run check`
+- `npm ls cookie` (`@sveltejs/kit@2.53.4 -> cookie@0.7.2`)
 
 ## [2026-02-23]
 
