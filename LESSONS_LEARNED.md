@@ -29,6 +29,7 @@ This file captures practical lessons we want future work to reuse.
 - Lockfiles generated with a newer npm can still break CI `npm ci` on older runners; always validate with the runner-major npm version (here, npm 10) before declaring dependency changes done.
 - Security hardening commits should be extracted hunk-by-hunk when they include mixed formatting churn, so we preserve behavior while reducing merge risk.
 - Character ID maps must enforce UUID shape before persistence writes; accepting slug values at seam boundaries turns data-shape drift into harder downstream failures.
+- Dependabot advisory closure can require an explicit transitive override even after parent package upgrades; verify actual installed tree (`npm ls <pkg>`) instead of assuming advisory resolution from top-level version bumps.
 
 ## 2026-02-21
 
