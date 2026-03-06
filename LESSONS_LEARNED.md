@@ -33,6 +33,7 @@ This file captures practical lessons we want future work to reuse.
 - Callback endpoints must verify actual session resolution before emitting success notices; trusting callback entry alone can produce false \"signed-in\" UX even for invalid callback hits.
 - npm 11 `ci` can fail hard if `package.json` optional top-level deps are not represented concretely in lockfile packages; if reproducibility is inconsistent, remove brittle optional declarations instead of forcing lock drift.
 - When GitHub-hosted runners show install drift that cannot be reproduced locally, pin npm explicitly in workflow jobs and print the toolchain (`node -v`, `npm -v`) so install behavior is deterministic and diagnosable.
+- If auth UI depends on client-only SDK bootstrap, initial SSR should communicate "loading" rather than rendering disabled primary actions with no explanation; otherwise healthy auth can look broken on first paint.
 
 ## 2026-02-21
 

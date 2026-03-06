@@ -47,6 +47,8 @@ All notable changes to this repository are documented in this file.
 - Added callback regression coverage in `app/src/lib/server/routes/auth-callback.spec.ts` for invalid-session callback redirects.
 - Removed top-level `optionalDependencies` (`bufferutil`, `utf-8-validate`) from `app/package.json` and regenerated `app/package-lock.json` to fix GitHub Actions `npm ci` sync failures under npm 11.
 - Pinned GitHub Actions verify jobs to `npm@11.6.2` in `.github/workflows/verify.yml` and added toolchain echo steps to stabilize and diagnose CI install behavior on Node 24 runners.
+- Clarified landing-page auth readiness in `app/src/routes/+page.svelte` so Clerk bootstrap shows an explicit loading state instead of inert-looking member auth buttons during first paint.
+- Added browser coverage in `app/src/routes/page.svelte.spec.ts` for the member sign-in loading state.
 
 ### Verified
 

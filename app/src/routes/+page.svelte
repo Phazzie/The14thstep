@@ -18,6 +18,7 @@
 	let openingSignIn = $state(false);
 	let openingSignUp = $state(false);
 	let clerk: ClerkInstance | null = null;
+	const clerkLoading = $derived(Boolean(clerkPublishableKey) && !clerkReady && !clerkLoadError);
 
 	onMount(async () => {
 		const key = clerkPublishableKey;
@@ -99,22 +100,42 @@
 				{#if clerkLoadError}
 					<p class="auth-alert" role="alert">{clerkLoadError}</p>
 				{/if}
+				{#if clerkLoading}
+					<p class="auth-loading" role="status" aria-live="polite">
+						<span class="auth-loading-dot" aria-hidden="true"></span>
+						Loading member sign-in...
+					</p>
+				{/if}
 				<div class="auth-actions">
 					<button
 						type="button"
 						class="primary-btn full"
 						onclick={openSignIn}
+						aria-busy={clerkLoading || openingSignIn}
 						disabled={!clerkReady || openingSignIn || openingSignUp}
 					>
-						{openingSignIn ? 'Opening sign in...' : 'Sign In'}
+						{#if openingSignIn}
+							Opening sign in...
+						{:else if clerkLoading}
+							Loading sign in...
+						{:else}
+							Sign In
+						{/if}
 					</button>
 					<button
 						type="button"
 						class="secondary-btn full"
 						onclick={openSignUp}
+						aria-busy={clerkLoading || openingSignUp}
 						disabled={!clerkReady || openingSignIn || openingSignUp}
 					>
-						{openingSignUp ? 'Opening sign up...' : 'Create Account'}
+						{#if openingSignUp}
+							Opening sign up...
+						{:else if clerkLoading}
+							Loading sign up...
+						{:else}
+							Create Account
+						{/if}
 					</button>
 				</div>
 				<form method="POST" action="?/continueGuest" class="auth-form">
@@ -288,7 +309,8 @@
 	}
 
 	.auth-alert,
-	.auth-success {
+	.auth-success,
+	.auth-loading {
 		margin: 0 0 0.55rem;
 		padding: 0.7rem 0.78rem;
 		border-radius: 0.72rem;
@@ -305,6 +327,24 @@
 		border: 1px solid rgba(110, 231, 183, 0.42);
 		background: rgba(18, 70, 50, 0.26);
 		color: #d1fae5;
+	}
+
+	.auth-loading {
+		display: flex;
+		align-items: center;
+		gap: 0.55rem;
+		border: 1px solid rgba(143, 172, 221, 0.28);
+		background: rgba(20, 31, 53, 0.44);
+		color: #dce9ff;
+	}
+
+	.auth-loading-dot {
+		width: 0.58rem;
+		height: 0.58rem;
+		border-radius: 999px;
+		background: #ffd88d;
+		box-shadow: 0 0 0 0 rgba(255, 216, 141, 0.4);
+		animation: auth-pulse 1.3s ease-out infinite;
 	}
 
 	.legal-links {
@@ -333,6 +373,23 @@
 	@media (max-width: 960px) {
 		.landing-shell {
 			grid-template-columns: 1fr;
+		}
+	}
+
+	@keyframes auth-pulse {
+		0% {
+			transform: scale(0.92);
+			box-shadow: 0 0 0 0 rgba(255, 216, 141, 0.38);
+		}
+
+		70% {
+			transform: scale(1);
+			box-shadow: 0 0 0 10px rgba(255, 216, 141, 0);
+		}
+
+		100% {
+			transform: scale(0.92);
+			box-shadow: 0 0 0 0 rgba(255, 216, 141, 0);
 		}
 	}
 </style>
