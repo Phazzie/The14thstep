@@ -31,6 +31,16 @@ All notable changes to this repository are documented in this file.
 - `npm run test:unit -- --run`
 - `npm run verify`
 
+## [2026-03-06]
+
+### Fixed
+
+- Removed a redundant boolean cast in `app/src/lib/server/seams/auth/adapter.ts` (`if (Boolean(guestUserId))` -> `if (guestUserId)`) to satisfy the `no-extra-boolean-cast` lint rule and unblock full verification.
+
+### Verified
+
+- `npm run verify` (full lint/check/fixtures/contracts/core/composition/e2e chain passing)
+
 ## [2026-02-23]
 
 ### Changed

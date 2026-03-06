@@ -265,7 +265,7 @@ export function createAuthAdapter(options: CreateAuthAdapterOptions = {}): AuthP
 
 			const guestUserId =
 				guestSessionSecret.length > 0 ? decodeGuestAccessToken(sessionToken, guestSessionSecret) : null;
-			if (Boolean(guestUserId)) {
+			if (guestUserId) {
 				return ok({ success: true as const });
 			}
 

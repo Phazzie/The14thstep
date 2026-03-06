@@ -15,6 +15,16 @@ This file captures practical lessons we want future work to reuse.
 - Hosted third-party auth can coexist with seam-driven architecture if route actions stop owning provider-specific flows and move to provider-neutral outcomes (`signed-in`, `signed-out`, `auth-failed` notices).
 - Accessibility regressions can hide in redesign work; basic ARIA state (`aria-expanded`, `aria-controls`) and live region semantics (`role="status"/"alert"`) should be treated as part of done criteria, not post-polish work.
 
+## 2026-03-06
+
+### Process
+
+- A single lint error can quietly block the entire release lane; running `npm run verify` after each auth change keeps deployment confidence high.
+
+### Technical
+
+- Environment sandbox restrictions can mimic app failures for Playwright (`listen EPERM`) by blocking local preview port binding. Treat this as an execution-environment constraint and rerun e2e in an unsandboxed context before diagnosing application behavior.
+
 ## 2026-02-21
 
 ### Process
