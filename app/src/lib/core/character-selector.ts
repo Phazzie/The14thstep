@@ -8,6 +8,7 @@ import {
 	VISITOR_WOUNDS
 } from './characters';
 import type { CharacterProfile } from './types';
+import { bestEffortRandom } from './random-utils';
 
 export type CharacterRole = 'chair' | 'active_sharer' | 'quiet_presence';
 
@@ -83,7 +84,7 @@ function toSelectedCharacter(character: CharacterProfile): SelectedCharacter {
 }
 
 export function selectCharacters(input: SelectCharactersInput = {}): SelectedCharacter[] {
-	const random = input.random ?? Math.random;
+	const random = input.random ?? bestEffortRandom;
 	const nowIso = input.nowIso ?? new Date().toISOString();
 	const targetSize = clampTargetSize(input.targetSize);
 	const recent = new Set(input.recentMeetingCharacterIds ?? []);

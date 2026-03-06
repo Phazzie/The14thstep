@@ -1,3 +1,5 @@
+import { bestEffortRandomInt } from '$lib/core/random-utils';
+
 export const STARTUP_SAYINGS: readonly string[] = [
 	'A fake meeting with fake people is better than a real meeting with fake people.',
 	'At least we admit the other people are fake.',
@@ -49,10 +51,9 @@ export const STARTUP_SAYINGS: readonly string[] = [
 
 export function pickStartupSaying(seed?: number): string {
 	if (STARTUP_SAYINGS.length === 0) return 'Room is live.';
-	const raw =
+	const index =
 		typeof seed === 'number' && Number.isFinite(seed)
-			? seed
-			: (globalThis.crypto?.getRandomValues?.(new Uint32Array(1))[0] ?? Math.floor(Math.random() * 1_000_000));
-	const index = Math.abs(raw) % STARTUP_SAYINGS.length;
+			? Math.abs(seed) % STARTUP_SAYINGS.length
+			: bestEffortRandomInt(STARTUP_SAYINGS.length);
 	return STARTUP_SAYINGS[index] ?? STARTUP_SAYINGS[0];
 }
