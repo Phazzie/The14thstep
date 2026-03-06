@@ -32,6 +32,12 @@ jobs:
           cache: npm
           cache-dependency-path: app/package-lock.json
 
+      - name: Pin npm
+        run: npm install -g npm@11.6.2
+
+      - name: Print Toolchain
+        run: node -v && npm -v
+
       - name: Install
         run: npm ci
 
@@ -58,6 +64,12 @@ jobs:
           cache: npm
           cache-dependency-path: app/package-lock.json
 
+      - name: Pin npm
+        run: npm install -g npm@11.6.2
+
+      - name: Print Toolchain
+        run: node -v && npm -v
+
       - name: Install
         run: npm ci
 
@@ -80,6 +92,12 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: app/package-lock.json
+
+      - name: Pin npm
+        run: npm install -g npm@11.6.2
+
+      - name: Print Toolchain
+        run: node -v && npm -v
 
       - name: Install
         run: npm ci
@@ -104,6 +122,12 @@ jobs:
           cache: npm
           cache-dependency-path: app/package-lock.json
 
+      - name: Pin npm
+        run: npm install -g npm@11.6.2
+
+      - name: Print Toolchain
+        run: node -v && npm -v
+
       - name: Install
         run: npm ci
 
@@ -127,6 +151,12 @@ jobs:
           cache: npm
           cache-dependency-path: app/package-lock.json
 
+      - name: Pin npm
+        run: npm install -g npm@11.6.2
+
+      - name: Print Toolchain
+        run: node -v && npm -v
+
       - name: Install
         run: npm ci
 
@@ -149,6 +179,12 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: app/package-lock.json
+
+      - name: Pin npm
+        run: npm install -g npm@11.6.2
+
+      - name: Print Toolchain
+        run: node -v && npm -v
 
       - name: Install
         run: npm ci
