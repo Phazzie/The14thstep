@@ -75,7 +75,13 @@
 	const shouldTriggerInitialCrisisSupport = $derived(
 		data.shouldTriggerInitialCrisisSupport === true
 	);
-	const ROOM_LED_PHASES = new Set(['setup', 'opening', 'empty_chair', 'introductions', 'topic_selection']);
+	const ROOM_LED_PHASES = new Set([
+		'setup',
+		'opening',
+		'empty_chair',
+		'introductions',
+		'topic_selection'
+	]);
 	const SHARING_ROUND_PHASES = new Set(['sharing_round_1', 'sharing_round_2', 'sharing_round_3']);
 	let topic = $state('');
 	let userName = $state('');
@@ -115,7 +121,8 @@
 	});
 
 	$effect(() => {
-		const serverPhaseState = (data.phaseState as unknown as RitualPhaseStateSnapshot | undefined) ?? null;
+		const serverPhaseState =
+			(data.phaseState as unknown as RitualPhaseStateSnapshot | undefined) ?? null;
 		if (!ritualPhaseState && serverPhaseState) {
 			ritualPhaseState = serverPhaseState;
 		}
@@ -143,6 +150,10 @@
 
 	function isSharingRoundPhase(phase: string | null | undefined): boolean {
 		return typeof phase === 'string' && SHARING_ROUND_PHASES.has(phase);
+	}
+
+	function shouldAutoRetryRoomLedShare(phase: string | null | undefined): boolean {
+		return typeof phase === 'string' && ROOM_LED_PHASES.has(phase);
 	}
 
 	function shouldDisableUserInput(): boolean {
@@ -364,9 +375,7 @@
 				share?: ShareRecord;
 				phaseState?: RitualPhaseStateSnapshot;
 				generation?: { attempts?: number; fallbackUsed?: boolean };
-			}>(
-				JSON.parse((event as MessageEvent<string>).data)
-			);
+			}>(JSON.parse((event as MessageEvent<string>).data));
 			if (parsed?.ok) {
 				if (parsed.value.phaseState) ritualPhaseState = parsed.value.phaseState;
 			}
@@ -387,10 +396,14 @@
 				parsed = null;
 			}
 			const parsedMessage = parsed && !parsed.ok ? parsed.error.message : 'Share stream failed.';
+			const shouldRetryRoomLedShare = shouldAutoRetryRoomLedShare(ritualPhaseState?.currentPhase);
 			if (parsedMessage.toLowerCase().includes('crisis mode')) {
 				crisisMode = true;
 				errorMessage = '';
 				statusLine = 'Crisis mode is active. Character shares are paused.';
+			} else if (shouldRetryRoomLedShare) {
+				errorMessage = '';
+				statusLine = 'Character share failed. Retrying the room.';
 			} else {
 				errorMessage = parsedMessage;
 			}

@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { ok, type SeamResult } from '$lib/core/seam';
 import type { MeetingPhaseState } from '$lib/core/types';
-import type { CallbackRecord, DatabasePort, MeetingRecord, ShareRecord, UserProfile } from '$lib/seams/database/contract';
+import type {
+	CallbackRecord,
+	DatabasePort,
+	MeetingRecord,
+	ShareRecord,
+	UserProfile
+} from '$lib/seams/database/contract';
 import { load as loadMeetingPage } from '../../../routes/meeting/[id]/+page.server';
 import { GET as getCharacterShare } from '../../../routes/meeting/[id]/share/+server';
 import { POST as postUserShare } from '../../../routes/meeting/[id]/user-share/+server';
@@ -172,7 +178,16 @@ function createInMemoryDatabase(
 		}
 	};
 
-	return Object.assign(database, { state: { get phaseState() { return state.phaseState; }, set phaseState(v) { state.phaseState = v; } } });
+	return Object.assign(database, {
+		state: {
+			get phaseState() {
+				return state.phaseState;
+			},
+			set phaseState(v) {
+				state.phaseState = v;
+			}
+		}
+	});
 }
 
 function createGrokStub() {
@@ -301,6 +316,15 @@ function readPersistedPhase(events: Array<{ event: string; data: unknown }>): st
 	return typeof currentPhase === 'string' ? currentPhase : undefined;
 }
 
+function readMetaCharacterId(events: Array<{ event: string; data: unknown }>): string | undefined {
+	const meta = events.find((event) => event.event === 'meta');
+	if (!meta || !isObject(meta.data)) return undefined;
+	const value = meta.data.value;
+	if (!isObject(value) || !isObject(value.character)) return undefined;
+	const characterId = value.character.id;
+	return typeof characterId === 'string' ? characterId : undefined;
+}
+
 async function requestCharacterShare(input: {
 	meetingId: string;
 	database: DatabasePort;
@@ -358,6 +382,23 @@ async function requestUserShare(input: {
 }
 
 describe('meeting ritual phase route integration (server routes + in-memory seam)', () => {
+	it('ignores client-provided speaker overrides during room-led phases', async () => {
+		const meetingId = 'meeting-int-room-led-override';
+		const database = createInMemoryDatabase(meetingId);
+		const grokAi = createGrokStub();
+
+		const events = await requestCharacterShare({
+			meetingId,
+			database,
+			grokAi,
+			sequenceOrder: 0,
+			characterId: 'heather'
+		});
+
+		expect(readMetaCharacterId(events)).toBe('marcus');
+		expect(readPersistedPhase(events)).toBe('empty_chair');
+	});
+
 	it('persists and restores ritual phase progression through shares, user turns, and close', async () => {
 		const meetingId = 'meeting-int-1';
 		const database = createInMemoryDatabase(meetingId);
@@ -378,20 +419,18 @@ describe('meeting ritual phase route integration (server routes + in-memory seam
 			meetingId,
 			database,
 			grokAi,
-			sequenceOrder: 0,
-			characterId: 'marcus'
+			sequenceOrder: 0
 		});
-			expect(readPersistedPhase(events)).toBe('empty_chair');
+		expect(readPersistedPhase(events)).toBe('empty_chair');
 
 		// EMPTY_CHAIR -> INTRODUCTIONS
 		events = await requestCharacterShare({
 			meetingId,
 			database,
 			grokAi,
-			sequenceOrder: 1,
-			characterId: 'heather'
+			sequenceOrder: 1
 		});
-			expect(readPersistedPhase(events)).toBe('introductions');
+		expect(readPersistedPhase(events)).toBe('introductions');
 
 		// Introductions needs two speakers in current simplified route logic: user + character
 		let userPayload = await requestUserShare({
@@ -410,7 +449,7 @@ describe('meeting ritual phase route integration (server routes + in-memory seam
 			grokAi,
 			sequenceOrder: 3
 		});
-			expect(readPersistedPhase(events)).toBe('topic_selection');
+		expect(readPersistedPhase(events)).toBe('topic_selection');
 
 		// Topic selection -> sharing_round_1 on room-led topic introduction
 		events = await requestCharacterShare({
@@ -423,21 +462,39 @@ describe('meeting ritual phase route integration (server routes + in-memory seam
 
 		// Advance through sharing rounds with char+user pairs
 		events = await requestCharacterShare({ meetingId, database, grokAi, sequenceOrder: 5 });
-			expect(readPersistedPhase(events)).toBe('sharing_round_1');
+		expect(readPersistedPhase(events)).toBe('sharing_round_1');
 
-		userPayload = await requestUserShare({ meetingId, database, grokAi, sequenceOrder: 6, content: 'still here' });
+		userPayload = await requestUserShare({
+			meetingId,
+			database,
+			grokAi,
+			sequenceOrder: 6,
+			content: 'still here'
+		});
 		expect(userPayload.value.phaseState.currentPhase).toBe('sharing_round_2');
 
-		events = await requestCharacterShare({ meetingId, database, grokAi, sequenceOrder: 7, characterId: 'heather' });
-			expect(readPersistedPhase(events)).toBe('sharing_round_2');
+		events = await requestCharacterShare({ meetingId, database, grokAi, sequenceOrder: 7 });
+		expect(readPersistedPhase(events)).toBe('sharing_round_2');
 
-		userPayload = await requestUserShare({ meetingId, database, grokAi, sequenceOrder: 8, content: 'still staying' });
+		userPayload = await requestUserShare({
+			meetingId,
+			database,
+			grokAi,
+			sequenceOrder: 8,
+			content: 'still staying'
+		});
 		expect(userPayload.value.phaseState.currentPhase).toBe('sharing_round_3');
 
-		events = await requestCharacterShare({ meetingId, database, grokAi, sequenceOrder: 9, characterId: 'gemini' });
-			expect(readPersistedPhase(events)).toBe('sharing_round_3');
+		events = await requestCharacterShare({ meetingId, database, grokAi, sequenceOrder: 9 });
+		expect(readPersistedPhase(events)).toBe('sharing_round_3');
 
-		userPayload = await requestUserShare({ meetingId, database, grokAi, sequenceOrder: 10, content: 'closing out' });
+		userPayload = await requestUserShare({
+			meetingId,
+			database,
+			grokAi,
+			sequenceOrder: 10,
+			content: 'closing out'
+		});
 		expect(userPayload.value.phaseState.currentPhase).toBe('closing');
 
 		// Close route should persist post_meeting and page load should restore it

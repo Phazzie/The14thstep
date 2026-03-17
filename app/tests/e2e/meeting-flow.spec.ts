@@ -75,6 +75,21 @@ function sseResponseBody(meetingId: string) {
 	].join('\n');
 }
 
+function sseErrorResponseBody(message: string) {
+	return [
+		'event: error',
+		`data: ${JSON.stringify({
+			ok: false,
+			error: {
+				code: 'UNEXPECTED',
+				message
+			}
+		})}`,
+		'',
+		''
+	].join('\n');
+}
+
 test('meeting browser flow: share generation, user share, and close reflection', async ({
 	page
 }) => {
@@ -143,6 +158,34 @@ test('meeting browser flow: share generation, user share, and close reflection',
 	await expect(
 		page.getByText('You stayed grounded and connected with the room tonight.')
 	).toBeVisible();
+});
+
+test('meeting browser flow: room-led phases retry after a transient share stream error', async ({
+	page
+}) => {
+	const meetingId = 'e2e-room-led-retry';
+	let shareAttempts = 0;
+
+	await page.route(`**/meeting/${meetingId}/share*`, async (route) => {
+		shareAttempts += 1;
+		await route.fulfill({
+			status: 200,
+			headers: { 'content-type': 'text/event-stream; charset=utf-8' },
+			body:
+				shareAttempts === 1
+					? sseErrorResponseBody('temporary room glitch')
+					: sseResponseBody(meetingId)
+		});
+	});
+
+	await page.goto(
+		`/meeting/${meetingId}?name=Tester&cleanTime=7%20days&mood=steady&mind=Staying%20close`
+	);
+
+	await expect(page.getByText('Character share failed. Retrying the room.')).toBeVisible();
+	await expect(page.getByText('Marcus from SSE stream.')).toBeVisible();
+	await expect(page.getByLabel('Your Share')).toBeEnabled();
+	expect(shareAttempts).toBeGreaterThanOrEqual(2);
 });
 
 test('meeting browser flow: crisis mode switches UI and renders sticky resources', async ({
