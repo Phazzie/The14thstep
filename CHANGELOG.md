@@ -2,6 +2,17 @@
 
 All notable changes to this repository are documented in this file.
 
+## [2026-03-16]
+
+### Added
+
+- Added nested agent guides for source-level app work in `app/src/AGENTS.md` and GitHub automation work in `.github/AGENTS.md`.
+
+### Changed
+
+- Tightened repository and app agent guidance in `AGENTS.md`, `app/AGENTS.md`, and `plans/AGENTS.md` to favor decision-gated slice promotion, honest blocker reporting, and living-plan maintenance.
+- Recorded promotion-process lessons in `LESSONS_LEARNED.md` so future cleanup and sync work reuses the same playbook.
+
 ## [2026-03-05]
 
 ### Changed

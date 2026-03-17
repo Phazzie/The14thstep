@@ -74,3 +74,9 @@
 - Hardened quality-gate editorial enforcement by adding explicit anti-pattern flags (`moralizingEnding`, `overexplainsImage`, `genericAcrossCharacters`, `emotionLabelingWithoutScene`) and using shared threshold logic for expansion flow parity; merged through PR #53.
 - Updated narrative-context generation and fallback wording to use the same room-specific style/taste constraints as runtime share prompts; merged through PR #54.
 - Adopted an explicit crisis-triage parse policy: normalize common boolean/confidence token drift, but treat malformed/ambiguous parse results as fail-conservative (`crisis=true`) and cover confidence-token edge cases with tests.
+
+## 2026-03-16
+
+- Adopted decision-gated slice promotion as the preferred way to move valuable local work onto `main`, rather than reconciling large dirty branches wholesale.
+- Added nested agent guidance for `app/src/` and `.github/` so source-level implementation rules and automation/workflow rules can evolve without bloating the root guide.
+- Recorded line-ending churn and clean-main-worktree separation as explicit process lessons so future sync work does not mistake formatting noise for product progress.

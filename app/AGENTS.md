@@ -2,6 +2,8 @@
 
 Scope: apply these rules for work under `app/`.
 
+For source-level implementation details, also read `app/src/AGENTS.md`.
+
 ## Architecture rules
 
 - Follow Seam-Driven Development order for I/O seams: contract, probe, fixtures, mock, contract test, adapter, composition wiring.
@@ -51,6 +53,7 @@ For each I/O seam, execute these steps in order:
 - ExecPlan progress and logs are updated for meaningful milestones.
 - `CHANGELOG.md` and `LESSONS_LEARNED.md` are updated with concise entries.
 - No secrets are committed; env changes are reflected in `app/.env.example` only.
+- If the change is being promoted as a clean slice, the diff must stay narrowly scoped to one user-visible step forward.
 
 ## Runbook commands
 
@@ -70,3 +73,4 @@ Run from `app/`:
 - Keep secrets in `app/.env.local` (ignored by git).
 - Keep non-secret variable templates in `app/.env.example`.
 - If a new required env var is introduced, document where it is used in `app/README.md`.
+- If missing env or auth blocks a validation step, record the exact blocker in the active ExecPlan instead of claiming broader verification than actually ran.
