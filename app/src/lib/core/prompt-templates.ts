@@ -62,12 +62,12 @@ export function buildCharacterSharePrompt(
 		.join('\n\n');
 }
 
-export function buildCharacterIntroductionPrompt(character: CharacterProfile, userName: string): string {
+export function buildCharacterIntroductionPrompt(character: CharacterProfile): string {
 	return [
 		`Generate a 1-2 sentence introduction for ${character.name}.`,
 		`Voice: ${character.voice}`,
 		`Clean time: ${character.cleanTime}`,
-		`Address newcomer: ${userName}`,
+		'Introduce to the room, not to any individual. No names. No direct address.',
 		'No cliches, no therapy language.'
 	].join('\n\n');
 }
@@ -270,14 +270,13 @@ export function buildVoiceCandidatePrompt(
  * Build prompt for meeting ritual opening.
  * Marcus or Heather opens the meeting.
  */
-export function buildRitualOpeningPrompt(userName: string, character: CharacterProfile): string {
+export function buildRitualOpeningPrompt(character: CharacterProfile): string {
 	return [
-		`You are ${character.name}. You are opening this meeting for ${userName}.`,
+		`You are ${character.name}. You are opening this meeting.`,
 		`Your voice: ${character.voice}`,
-		'Acknowledge the empty chair with respect. Welcome everyone present.',
-		'Target 2-4 spoken sentences. If a shorter landing is stronger, keep it shorter.',
+		'Acknowledge the empty chair with respect. Welcome everyone present. 2-3 sentences max.',
 		`STYLE CONSTITUTION:\n${STYLE_CONSTITUTION}`,
-		'Grounded, direct, no clichés or slogans.'
+		'Grounded, direct, no clichés or slogans. No names. The meeting opens for the room, not for any one person.'
 	]
 		.filter((section): section is string => Boolean(section))
 		.join('\n\n');
@@ -323,23 +322,36 @@ export function buildRitualReadingPrompt(character: CharacterProfile): string {
 }
 
 /**
- * Build prompt for meeting ritual closing.
- * Marcus or Heather closes, thanks the user, reminds about confidentiality.
+ * Build prompt for a room-led topic introduction.
+ * A character names the topic without handing control to the user.
  */
-export function buildRitualClosingPrompt(
-	character: CharacterProfile,
-	userName: string,
-	meetingSummary: string
-): string {
+export function buildTopicIntroductionPrompt(character: CharacterProfile, topic: string): string {
+	return [
+		`You are ${character.name}. You are introducing the topic for tonight's meeting.`,
+		`Your voice: ${character.voice}`,
+		`Tonight's topic: ${topic}`,
+		'Introduce this topic the way you would at a real meeting - briefly, plainly, without ceremony.',
+		'1-2 sentences. Do not explain the topic or turn it into a lesson. Just name it and maybe say one plain thing about why it matters.',
+		`STYLE CONSTITUTION:\n${STYLE_CONSTITUTION}`,
+		'No therapy-speak. No inspirational framing. No questions directed at the room. Just set the topic and let the room take it.'
+	]
+		.filter((section): section is string => Boolean(section))
+		.join('\n\n');
+}
+
+/**
+ * Build prompt for meeting ritual closing.
+ * Marcus or Heather closes the meeting as a ritual — same every time, regardless of who attended.
+ */
+export function buildRitualClosingPrompt(character: CharacterProfile): string {
 	return [
 		`You are ${character.name}. You are closing this meeting.`,
 		`Your voice: ${character.voice}`,
-		`Thank ${userName} for being present and honest tonight.`,
-		`Meeting summary themes: ${meetingSummary}`,
-		'Include a plain-language reminder about confidentiality: what is said here stays here.',
-		'Target 2-4 spoken sentences. Direct and grounded.',
+		'Close this meeting the way it always closes. The ritual is the same regardless of who was here tonight.',
+		'Remind the room: what is said here stays here.',
+		'2-3 sentences. Grounded and direct.',
 		`STYLE CONSTITUTION:\n${STYLE_CONSTITUTION}`,
-		'No therapy-speak, no slogans, and no tidy moralizing wrap-up.'
+		'No names. No personalization. No therapy-speak. The meeting closes as itself.'
 	]
 		.filter((section): section is string => Boolean(section))
 		.join('\n\n');

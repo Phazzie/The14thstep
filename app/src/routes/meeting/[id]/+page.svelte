@@ -75,10 +75,17 @@
 	const shouldTriggerInitialCrisisSupport = $derived(
 		data.shouldTriggerInitialCrisisSupport === true
 	);
+	const ROOM_LED_PHASES = new Set([
+		'setup',
+		'opening',
+		'empty_chair',
+		'introductions',
+		'topic_selection'
+	]);
+	const SHARING_ROUND_PHASES = new Set(['sharing_round_1', 'sharing_round_2', 'sharing_round_3']);
 	let topic = $state('');
 	let userName = $state('');
 	let userMood = $state('present');
-	let selectedCharacterId = $state('');
 	let userShareText = $state('');
 	let transcript = $state<TranscriptEntry[]>([]);
 	let expandedShares = $state<Record<string, string>>({});
@@ -109,13 +116,13 @@
 
 	$effect(() => {
 		if (!topic) topic = defaultTopic;
-		if (!selectedCharacterId) selectedCharacterId = data.characters[0]?.id ?? 'marcus';
 		if (!userName) userName = initialUserName;
 		if (userMood === 'present') userMood = initialMood;
 	});
 
 	$effect(() => {
-		const serverPhaseState = (data.phaseState as unknown as RitualPhaseStateSnapshot | undefined) ?? null;
+		const serverPhaseState =
+			(data.phaseState as unknown as RitualPhaseStateSnapshot | undefined) ?? null;
 		if (!ritualPhaseState && serverPhaseState) {
 			ritualPhaseState = serverPhaseState;
 		}
@@ -135,6 +142,55 @@
 			transcriptContainer.scrollTop = transcriptContainer.scrollHeight;
 		}
 		void transcriptCount;
+	});
+
+	function isRoomLedPhase(phase: string | null | undefined): boolean {
+		return typeof phase === 'string' && ROOM_LED_PHASES.has(phase);
+	}
+
+	function isSharingRoundPhase(phase: string | null | undefined): boolean {
+		return typeof phase === 'string' && SHARING_ROUND_PHASES.has(phase);
+	}
+
+	function shouldAutoRetryRoomLedShare(phase: string | null | undefined): boolean {
+		return typeof phase === 'string' && ROOM_LED_PHASES.has(phase);
+	}
+
+	function shouldDisableUserInput(): boolean {
+		return (
+			postingShare ||
+			sharing ||
+			crisisResponding ||
+			meetingPhase !== 'sharing' ||
+			isRoomLedPhase(ritualPhaseState?.currentPhase)
+		);
+	}
+
+	$effect(() => {
+		const currentRitualPhase = ritualPhaseState?.currentPhase;
+		const userIsTyping = userShareText.trim().length > 0;
+		const shouldAutoRunOpening = isRoomLedPhase(currentRitualPhase);
+		const shouldAutoRunSharingRound = isSharingRoundPhase(currentRitualPhase) && !userIsTyping;
+
+		if (
+			meetingPhase !== 'sharing' ||
+			sharing ||
+			postingShare ||
+			closing ||
+			crisisMode ||
+			crisisResponding ||
+			errorMessage ||
+			(!shouldAutoRunOpening && !shouldAutoRunSharingRound)
+		) {
+			return;
+		}
+
+		const delay = shouldAutoRunOpening ? (transcript.length === 0 ? 350 : 1200) : 9000;
+		const timer = setTimeout(() => {
+			requestCharacterShare();
+		}, delay);
+
+		return () => clearTimeout(timer);
 	});
 
 	function isRecord(value: unknown): value is Record<string, unknown> {
@@ -294,7 +350,6 @@
 
 		const search = new URLSearchParams({
 			topic,
-			characterId: selectedCharacterId,
 			sequenceOrder: String(transcript.length),
 			crisisMode: crisisMode ? '1' : '0',
 			interactionType: 'respond_to',
@@ -320,9 +375,7 @@
 				share?: ShareRecord;
 				phaseState?: RitualPhaseStateSnapshot;
 				generation?: { attempts?: number; fallbackUsed?: boolean };
-			}>(
-				JSON.parse((event as MessageEvent<string>).data)
-			);
+			}>(JSON.parse((event as MessageEvent<string>).data));
 			if (parsed?.ok) {
 				if (parsed.value.phaseState) ritualPhaseState = parsed.value.phaseState;
 			}
@@ -343,10 +396,14 @@
 				parsed = null;
 			}
 			const parsedMessage = parsed && !parsed.ok ? parsed.error.message : 'Share stream failed.';
+			const shouldRetryRoomLedShare = shouldAutoRetryRoomLedShare(ritualPhaseState?.currentPhase);
 			if (parsedMessage.toLowerCase().includes('crisis mode')) {
 				crisisMode = true;
 				errorMessage = '';
 				statusLine = 'Crisis mode is active. Character shares are paused.';
+			} else if (shouldRetryRoomLedShare) {
+				errorMessage = '';
+				statusLine = 'Character share failed. Retrying the room.';
 			} else {
 				errorMessage = parsedMessage;
 			}
@@ -482,17 +539,9 @@
 
 	<section class="room-panel room-transcript">
 		<div class="toolbar">
-			<button
-				type="button"
-				onclick={requestCharacterShare}
-				disabled={sharing || postingShare || closing || crisisMode || meetingPhase !== 'sharing'}
-			>
-				{crisisMode
-					? 'Character Shares Paused (Crisis Mode)'
-					: sharing
-						? 'Generating Character Share...'
-						: 'Generate Character Share'}
-			</button>
+			{#if sharing}
+				<p class="toolbar-status">The room keeps moving on its own.</p>
+			{/if}
 			<button
 				type="button"
 				onclick={requestCloseSummary}
@@ -548,7 +597,7 @@
 				onValueChange={(next) => (userShareText = next)}
 				onSubmit={() => submitUserShare()}
 				onPass={submitPass}
-				disabled={postingShare || sharing || crisisResponding || meetingPhase !== 'sharing'}
+				disabled={shouldDisableUserInput()}
 				{crisisMode}
 				listeningOnly={data.listeningOnly}
 			/>
@@ -649,25 +698,26 @@
 		flex-wrap: wrap;
 		gap: 0.45rem;
 		margin-bottom: 0.55rem;
+		align-items: center;
+	}
+
+	.toolbar-status {
+		margin: 0;
+		font-size: 0.78rem;
+		color: #cbdcf8;
 	}
 
 	.toolbar button {
 		min-height: 2.65rem;
 		padding: 0.56rem 0.75rem;
 		border-radius: 0.65rem;
-		border: 1px solid rgba(140, 168, 218, 0.4);
-		background: rgba(17, 47, 74, 0.88);
-		color: #e0f2fe;
+		border: 1px solid rgba(251, 191, 36, 0.38);
+		background: rgba(122, 58, 17, 0.88);
+		color: #fef3c7;
 		font: inherit;
 		font-size: 0.82rem;
 		font-weight: 700;
 		cursor: pointer;
-	}
-
-	.toolbar button:nth-child(2) {
-		background: rgba(122, 58, 17, 0.88);
-		border-color: rgba(251, 191, 36, 0.38);
-		color: #fef3c7;
 	}
 
 	.toolbar button:disabled {

@@ -14,6 +14,7 @@ import {
 	buildRitualIntroPrompt,
 	buildRitualReadingPrompt,
 	buildRitualClosingPrompt,
+	buildTopicIntroductionPrompt,
 	buildEmptyChairPrompt
 } from './prompt-templates';
 
@@ -114,10 +115,11 @@ describe('prompt templates', () => {
 	});
 
 	it('builds ritual opening prompt with character voice and meeting context', () => {
-		const prompt = buildRitualOpeningPrompt('trap', marcus);
+		const prompt = buildRitualOpeningPrompt(marcus);
 
 		expect(prompt).toContain('You are Marcus');
-		expect(prompt).toContain('opening this meeting for trap');
+		expect(prompt).toContain('opening this meeting');
+		expect(prompt).not.toContain('for trap');
 		expect(prompt).toContain('empty chair');
 		expect(prompt).toContain(STYLE_CONSTITUTION);
 		// Constraint: avoid clichéd therapy opening phrases
@@ -150,13 +152,23 @@ describe('prompt templates', () => {
 		expect(prompt).not.toContain('transformation');
 	});
 
+	it('builds topic introduction prompt without handing control to the user', () => {
+		const prompt = buildTopicIntroductionPrompt(marcus, 'staying present');
+
+		expect(prompt).toContain('introducing the topic');
+		expect(prompt).toContain("Tonight's topic: staying present");
+		expect(prompt).toContain('without ceremony');
+		expect(prompt).toContain('No questions directed at the room');
+		expect(prompt).toContain(STYLE_CONSTITUTION);
+	});
+
 	it('builds ritual closing prompt with confidentiality reminder', () => {
-		const prompt = buildRitualClosingPrompt(marcus, 'trap', 'honesty, accountability, staying present');
+		const prompt = buildRitualClosingPrompt(marcus);
 
 		expect(prompt).toContain('You are Marcus');
 		expect(prompt).toContain('closing this meeting');
-		expect(prompt).toContain('Thank trap');
-		expect(prompt).toContain('confidentiality');
+		expect(prompt).not.toContain('Thank');
+		expect(prompt).not.toContain('trap');
 		expect(prompt).toContain('what is said here stays here');
 		expect(prompt).toContain(STYLE_CONSTITUTION);
 	});

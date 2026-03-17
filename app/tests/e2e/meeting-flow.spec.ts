@@ -1,5 +1,15 @@
 import { expect, test } from '@playwright/test';
 
+function sharingRoundPhaseState() {
+	return {
+		currentPhase: 'sharing_round_1',
+		phaseStartedAt: '2026-02-19T00:00:01.000Z',
+		roundNumber: 1,
+		charactersSpokenThisRound: ['marcus'],
+		userHasSharedInRound: false
+	};
+}
+
 function sseResponseBody(meetingId: string) {
 	return [
 		'event: meta',
@@ -41,6 +51,7 @@ function sseResponseBody(meetingId: string) {
 					createdAt: '2026-02-19T00:00:00.000Z'
 				},
 				callbacksUsed: [],
+				phaseState: sharingRoundPhaseState(),
 				character: {
 					id: 'marcus',
 					name: 'Marcus',
@@ -55,7 +66,23 @@ function sseResponseBody(meetingId: string) {
 			ok: true,
 			value: {
 				meetingId,
-				characterId: 'marcus'
+				characterId: 'marcus',
+				phaseState: sharingRoundPhaseState()
+			}
+		})}`,
+		'',
+		''
+	].join('\n');
+}
+
+function sseErrorResponseBody(message: string) {
+	return [
+		'event: error',
+		`data: ${JSON.stringify({
+			ok: false,
+			error: {
+				code: 'UNEXPECTED',
+				message
 			}
 		})}`,
 		'',
@@ -119,8 +146,8 @@ test('meeting browser flow: share generation, user share, and close reflection',
 	);
 	await expect(page.getByRole('heading', { name: 'Meeting Room' })).toBeVisible();
 
-	await page.getByRole('button', { name: 'Generate Character Share' }).click();
 	await expect(page.getByText('Marcus from SSE stream.')).toBeVisible();
+	await expect(page.getByLabel('Your Share')).toBeEnabled();
 
 	await page.getByLabel('Your Share').fill('I am staying for today.');
 	await page.getByRole('button', { name: 'Submit Share' }).click();
@@ -133,10 +160,46 @@ test('meeting browser flow: share generation, user share, and close reflection',
 	).toBeVisible();
 });
 
+test('meeting browser flow: room-led phases retry after a transient share stream error', async ({
+	page
+}) => {
+	const meetingId = 'e2e-room-led-retry';
+	let shareAttempts = 0;
+
+	await page.route(`**/meeting/${meetingId}/share*`, async (route) => {
+		shareAttempts += 1;
+		await route.fulfill({
+			status: 200,
+			headers: { 'content-type': 'text/event-stream; charset=utf-8' },
+			body:
+				shareAttempts === 1
+					? sseErrorResponseBody('temporary room glitch')
+					: sseResponseBody(meetingId)
+		});
+	});
+
+	await page.goto(
+		`/meeting/${meetingId}?name=Tester&cleanTime=7%20days&mood=steady&mind=Staying%20close`
+	);
+
+	await expect(page.getByText('Character share failed. Retrying the room.')).toBeVisible();
+	await expect(page.getByText('Marcus from SSE stream.')).toBeVisible();
+	await expect(page.getByLabel('Your Share')).toBeEnabled();
+	expect(shareAttempts).toBeGreaterThanOrEqual(2);
+});
+
 test('meeting browser flow: crisis mode switches UI and renders sticky resources', async ({
 	page
 }) => {
 	const meetingId = 'e2e-crisis';
+
+	await page.route(`**/meeting/${meetingId}/share*`, async (route) => {
+		await route.fulfill({
+			status: 200,
+			headers: { 'content-type': 'text/event-stream; charset=utf-8' },
+			body: sseResponseBody(meetingId)
+		});
+	});
 
 	await page.route(`**/meeting/${meetingId}/user-share`, async (route) => {
 		await route.fulfill({
@@ -208,12 +271,11 @@ test('meeting browser flow: crisis mode switches UI and renders sticky resources
 	await page.goto(
 		`/meeting/${meetingId}?name=Tester&cleanTime=7%20days&mood=anxious&mind=Trying%20to%20hang%20on`
 	);
+	await expect(page.getByText('Marcus from SSE stream.')).toBeVisible();
+	await expect(page.getByLabel('Your Share')).toBeEnabled();
 	await page.getByLabel('Your Share').fill('I want to die tonight.');
 	await page.getByRole('button', { name: 'Submit Share' }).click();
 
-	await expect(
-		page.getByRole('button', { name: 'Character Shares Paused (Crisis Mode)' })
-	).toBeVisible();
 	await expect(page.getByText("If you're in crisis")).toBeVisible();
 	await expect(page.getByText('988 - Suicide & Crisis Lifeline')).toBeVisible();
 	await expect(page.getByText("I'm right here with you.")).toBeVisible();
