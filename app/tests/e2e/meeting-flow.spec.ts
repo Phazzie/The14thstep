@@ -1,5 +1,15 @@
 import { expect, test } from '@playwright/test';
 
+function sharingRoundPhaseState() {
+	return {
+		currentPhase: 'sharing_round_1',
+		phaseStartedAt: '2026-02-19T00:00:01.000Z',
+		roundNumber: 1,
+		charactersSpokenThisRound: ['marcus'],
+		userHasSharedInRound: false
+	};
+}
+
 function sseResponseBody(meetingId: string) {
 	return [
 		'event: meta',
@@ -41,6 +51,7 @@ function sseResponseBody(meetingId: string) {
 					createdAt: '2026-02-19T00:00:00.000Z'
 				},
 				callbacksUsed: [],
+				phaseState: sharingRoundPhaseState(),
 				character: {
 					id: 'marcus',
 					name: 'Marcus',
@@ -55,7 +66,8 @@ function sseResponseBody(meetingId: string) {
 			ok: true,
 			value: {
 				meetingId,
-				characterId: 'marcus'
+				characterId: 'marcus',
+				phaseState: sharingRoundPhaseState()
 			}
 		})}`,
 		'',
@@ -120,6 +132,7 @@ test('meeting browser flow: share generation, user share, and close reflection',
 	await expect(page.getByRole('heading', { name: 'Meeting Room' })).toBeVisible();
 
 	await expect(page.getByText('Marcus from SSE stream.')).toBeVisible();
+	await expect(page.getByLabel('Your Share')).toBeEnabled();
 
 	await page.getByLabel('Your Share').fill('I am staying for today.');
 	await page.getByRole('button', { name: 'Submit Share' }).click();
@@ -136,6 +149,14 @@ test('meeting browser flow: crisis mode switches UI and renders sticky resources
 	page
 }) => {
 	const meetingId = 'e2e-crisis';
+
+	await page.route(`**/meeting/${meetingId}/share*`, async (route) => {
+		await route.fulfill({
+			status: 200,
+			headers: { 'content-type': 'text/event-stream; charset=utf-8' },
+			body: sseResponseBody(meetingId)
+		});
+	});
 
 	await page.route(`**/meeting/${meetingId}/user-share`, async (route) => {
 		await route.fulfill({
@@ -207,6 +228,8 @@ test('meeting browser flow: crisis mode switches UI and renders sticky resources
 	await page.goto(
 		`/meeting/${meetingId}?name=Tester&cleanTime=7%20days&mood=anxious&mind=Trying%20to%20hang%20on`
 	);
+	await expect(page.getByText('Marcus from SSE stream.')).toBeVisible();
+	await expect(page.getByLabel('Your Share')).toBeEnabled();
 	await page.getByLabel('Your Share').fill('I want to die tonight.');
 	await page.getByRole('button', { name: 'Submit Share' }).click();
 
