@@ -8,6 +8,8 @@ This file captures practical lessons we want future work to reuse.
 
 - **Diagnosis should challenge the "easy fix" first**: In this case, prompt cleanup alone would have looked productive while leaving the user in control of the meeting. The useful critique step was asking whether each proposed fix changed the actual center of gravity or just the wording.
 - **Collaboration docs are worth updating during implementation, not after**: The shared Codex/Claude exchange stayed valuable because it captured diagnosis, implementation choices, verification, and remaining open questions in one place instead of splitting them across chat turns.
+- **Huge dirty diffs can be mostly line-ending mirages**: Before treating an old worktree as a mine of unpromoted value, compare the diff again with `--ignore-cr-at-eol`. In this repo, that cut the apparent local delta from 177 files to 15 substantive files and prevented a fake “next slice” hunt.
+- **Keep one clean `main` worktree separate from the lab**: Once the lab branch drifted badly, the safest way to sync merged remote truth was not to switch the dirty root but to fast-forward an already-clean `main` worktree. That kept promotion work and experimental residue from contaminating each other.
 
 ### Technical
 

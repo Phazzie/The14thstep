@@ -12,6 +12,7 @@ This root file defines global rules. For detailed instructions, also read the ne
 - If work is intentionally deferred, incomplete, or left as a known follow-up, create a GitHub issue before finishing the task/PR and link it in your summary.
 - Follow Seam-Driven Development for app implementation. Summary order: contract, probe, fixtures, mock, contract test, adapter, composition wiring. See `app/AGENTS.md` for the full workflow and gate checks.
 - Proceed milestone by milestone unless blocked by missing credentials, missing infrastructure access, or conflicting product direction.
+- When promoting local work to remote, use decision-gated slices from current `origin/main`; do not push a dirty lab branch wholesale.
 - Do not commit secrets. Keep credentials in local env files only.
 - Prefer Linux shell commands and Bash-oriented workflows for reproducibility.
 
@@ -65,6 +66,9 @@ This section adds concrete examples for rules that can be interpreted multiple w
 - Proceed milestone by milestone unless blocked by missing credentials, missing infrastructure access, or conflicting product direction.
   - Do: Finish the current milestone acceptance criteria before opening unrelated future-milestone implementation work.
   - Don't: Jump from Milestone 5 into Milestone 9 polish while Milestone 5 core acceptance checks are still failing.
+- When promoting local work to remote, use decision-gated slices from current `origin/main`; do not push a dirty lab branch wholesale.
+  - Do: Extract one coherent user-visible change onto a clean branch, critique it, validate it, then open a focused PR.
+  - Don't: Push a huge mixed branch just because it contains some good work somewhere inside it.
 
 ### Architecture examples
 
@@ -126,6 +130,8 @@ This section adds concrete examples for rules that can be interpreted multiple w
 
 - App implementation rules: `app/AGENTS.md`
 - ExecPlan authoring and maintenance rules: `plans/AGENTS.md`
+- Source-level implementation rules: `app/src/AGENTS.md`
+- CI/workflow automation rules: `.github/AGENTS.md`
 
 ## Subagent usage (Codex)
 
