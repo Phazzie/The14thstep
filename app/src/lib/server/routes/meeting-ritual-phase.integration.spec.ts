@@ -408,24 +408,21 @@ describe('meeting ritual phase route integration (server routes + in-memory seam
 			meetingId,
 			database,
 			grokAi,
-			sequenceOrder: 3,
-			characterId: 'marcus'
+			sequenceOrder: 3
 		});
 			expect(readPersistedPhase(events)).toBe('topic_selection');
 
-		// Topic selection -> sharing_round_1 on user input
-		userPayload = await requestUserShare({
+		// Topic selection -> sharing_round_1 on room-led topic introduction
+		events = await requestCharacterShare({
 			meetingId,
 			database,
 			grokAi,
-			sequenceOrder: 4,
-			content: 'My topic is staying when I want to run.'
+			sequenceOrder: 4
 		});
-		expect(userPayload.ok).toBe(true);
-		expect(userPayload.value.phaseState.currentPhase).toBe('sharing_round_1');
+		expect(readPersistedPhase(events)).toBe('sharing_round_1');
 
 		// Advance through sharing rounds with char+user pairs
-		events = await requestCharacterShare({ meetingId, database, grokAi, sequenceOrder: 5, characterId: 'marcus' });
+		events = await requestCharacterShare({ meetingId, database, grokAi, sequenceOrder: 5 });
 			expect(readPersistedPhase(events)).toBe('sharing_round_1');
 
 		userPayload = await requestUserShare({ meetingId, database, grokAi, sequenceOrder: 6, content: 'still here' });

@@ -119,7 +119,6 @@ test('meeting browser flow: share generation, user share, and close reflection',
 	);
 	await expect(page.getByRole('heading', { name: 'Meeting Room' })).toBeVisible();
 
-	await page.getByRole('button', { name: 'Generate Character Share' }).click();
 	await expect(page.getByText('Marcus from SSE stream.')).toBeVisible();
 
 	await page.getByLabel('Your Share').fill('I am staying for today.');
@@ -211,9 +210,6 @@ test('meeting browser flow: crisis mode switches UI and renders sticky resources
 	await page.getByLabel('Your Share').fill('I want to die tonight.');
 	await page.getByRole('button', { name: 'Submit Share' }).click();
 
-	await expect(
-		page.getByRole('button', { name: 'Character Shares Paused (Crisis Mode)' })
-	).toBeVisible();
 	await expect(page.getByText("If you're in crisis")).toBeVisible();
 	await expect(page.getByText('988 - Suicide & Crisis Lifeline')).toBeVisible();
 	await expect(page.getByText("I'm right here with you.")).toBeVisible();

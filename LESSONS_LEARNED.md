@@ -2,6 +2,19 @@
 
 This file captures practical lessons we want future work to reuse.
 
+## 2026-03-14
+
+### Process
+
+- **Diagnosis should challenge the "easy fix" first**: In this case, prompt cleanup alone would have looked productive while leaving the user in control of the meeting. The useful critique step was asking whether each proposed fix changed the actual center of gravity or just the wording.
+- **Collaboration docs are worth updating during implementation, not after**: The shared Codex/Claude exchange stayed valuable because it captured diagnosis, implementation choices, verification, and remaining open questions in one place instead of splitting them across chat turns.
+
+### Technical
+
+- **Room autonomy has to live on the server, not just in prompts**: Removing a user gate is not enough if the page still nominates speakers or manually summons every character turn. Phase-owned speaker selection in the share route was necessary to make the room feel like it had its own momentum.
+- **`TOPIC_SELECTION` needed its own prompt type, not a recycled one**: Mapping that phase to `reading` hid the deeper problem. Giving it a dedicated `topic_intro` prompt exposed the missing behavioral seam and made the flow easier to reason about.
+- **Auto-flow changes should be verified in narrow lanes first**: `svelte-check` plus targeted Vitest on phase logic, prompt contracts, and route integration produced clear signal quickly, while broader browser verification was noisier and easier to misread.
+
 ## 2026-03-05
 
 ### Process

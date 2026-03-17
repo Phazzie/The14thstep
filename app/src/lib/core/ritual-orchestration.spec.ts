@@ -131,7 +131,7 @@ describe('ritual-orchestration', () => {
 			expect(state.currentPhase).toBe(MeetingPhase.TOPIC_SELECTION);
 
 			// TOPIC_SELECTION -> SHARING_ROUND_1
-			result = transitionToNextPhase(state, 'user_input');
+			result = transitionToNextPhase(state, 'share_complete');
 			expect(result.ok).toBe(true);
 			state = unwrap(result);
 			expect(state.currentPhase).toBe(MeetingPhase.SHARING_ROUND_1);
@@ -232,7 +232,7 @@ describe('ritual-orchestration', () => {
 			state = unwrap(transitionToNextPhase(state, 'share_complete'));
 			state = unwrap(transitionToNextPhase(state, 'share_complete'));
 			state = unwrap(transitionToNextPhase(state, 'round_complete'));
-			state = unwrap(transitionToNextPhase(state, 'user_input'));
+			state = unwrap(transitionToNextPhase(state, 'share_complete'));
 
 			// At SHARING_ROUND_1, add a speaker
 			const stateWithSpeaker = unwrap(recordCharacterSpoke(state, 'marcus'));
@@ -270,8 +270,8 @@ describe('ritual-orchestration', () => {
 			expect(selectPromptForPhase(MeetingPhase.INTRODUCTIONS, mockCharacter)).toBe('intro');
 		});
 
-		it('returns reading for TOPIC_SELECTION phase', () => {
-			expect(selectPromptForPhase(MeetingPhase.TOPIC_SELECTION, mockCharacter)).toBe('reading');
+		it('returns topic_intro for TOPIC_SELECTION phase', () => {
+			expect(selectPromptForPhase(MeetingPhase.TOPIC_SELECTION, mockCharacter)).toBe('topic_intro');
 		});
 
 		it('returns share for all SHARING_ROUND phases', () => {
@@ -290,8 +290,8 @@ describe('ritual-orchestration', () => {
 	});
 
 	describe('requiresUserInput', () => {
-		it('returns true for TOPIC_SELECTION', () => {
-			expect(requiresUserInput(MeetingPhase.TOPIC_SELECTION)).toBe(true);
+		it('returns false for TOPIC_SELECTION', () => {
+			expect(requiresUserInput(MeetingPhase.TOPIC_SELECTION)).toBe(false);
 		});
 
 		it('returns true for all SHARING_ROUND phases', () => {
@@ -488,9 +488,13 @@ describe('ritual-orchestration', () => {
 			state = unwrap(transitionToNextPhase(state, 'share_complete')); // EMPTY_CHAIR
 			state = unwrap(transitionToNextPhase(state, 'share_complete')); // INTRODUCTIONS
 			state = unwrap(transitionToNextPhase(state, 'round_complete')); // TOPIC_SELECTION
-			state = unwrap(transitionToNextPhase(state, 'user_input')); // SHARING_ROUND_1
+			state = unwrap(transitionToNextPhase(state, 'share_complete')); // SHARING_ROUND_1
 			state = unwrap(recordCharacterSpoke(state, 'marcus'));
-			const interrupted = { ...state, currentPhase: MeetingPhase.CRISIS_MODE };
+			const interrupted = {
+				...state,
+				currentPhase: MeetingPhase.CRISIS_MODE,
+				preCrisisPhase: MeetingPhase.SHARING_ROUND_1
+			};
 
 			expect(interrupted.charactersSpokenThisRound).toEqual(['marcus']);
 			expect(interrupted.userHasSharedInRound).toBe(false);

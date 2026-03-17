@@ -110,7 +110,7 @@ export function transitionToNextPhase(
 			break;
 
 		case MeetingPhaseEnum.TOPIC_SELECTION:
-			if (transitionTrigger === 'user_input') {
+			if (transitionTrigger === 'share_complete') {
 				nextPhase = MeetingPhaseEnum.SHARING_ROUND_1;
 			}
 			break;
@@ -221,7 +221,7 @@ function getRoundNumber(phase: MeetingPhase): number | undefined {
 export function selectPromptForPhase(
 	phase: MeetingPhase,
 	character: CharacterProfile
-): 'opening' | 'intro' | 'share' | 'closing' | 'reading' {
+): 'opening' | 'intro' | 'share' | 'closing' | 'reading' | 'topic_intro' {
 	void character;
 	switch (phase) {
 		case MeetingPhaseEnum.OPENING:
@@ -231,7 +231,7 @@ export function selectPromptForPhase(
 		case MeetingPhaseEnum.INTRODUCTIONS:
 			return 'intro';
 		case MeetingPhaseEnum.TOPIC_SELECTION:
-			return 'reading';
+			return 'topic_intro';
 		case MeetingPhaseEnum.SHARING_ROUND_1:
 		case MeetingPhaseEnum.SHARING_ROUND_2:
 		case MeetingPhaseEnum.SHARING_ROUND_3:
@@ -252,7 +252,6 @@ export function selectPromptForPhase(
  */
 export function requiresUserInput(phase: MeetingPhase): boolean {
 	return (
-		phase === MeetingPhaseEnum.TOPIC_SELECTION ||
 		phase === MeetingPhaseEnum.SHARING_ROUND_1 ||
 		phase === MeetingPhaseEnum.SHARING_ROUND_2 ||
 		phase === MeetingPhaseEnum.SHARING_ROUND_3
