@@ -27,4 +27,4 @@ Scope: apply these rules for work under `.github/`.
 ## Verification
 
 - Validate workflow syntax before merge.
-- For CI changes, confirm required checks names remain stable for branch protection.
+- For CI changes, confirm required checks names remain stable for branch protection and still line up with the `Verify` workflow jobs.

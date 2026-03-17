@@ -51,6 +51,10 @@ The 14th Step is a recovery meeting simulator. Users are real people - often in 
 Cut the last sentence. If the share hits harder, it was filler.
 A share fails if it ends with a lesson, names an emotion, or could have been said by any character in any meeting.
 
+## PROMOTION VOCABULARY
+
+- Decision-gated slice promotion: move one coherent, user-visible change onto a clean branch from current `origin/main`, critique the slice, validate only the touched behavior honestly, then open a focused PR.
+
 ## Non-Obvious Rules: Do and Don't Examples
 
 This section adds concrete examples for rules that can be interpreted multiple ways in practice.

@@ -25,7 +25,7 @@ Scope: apply these rules for work under `app/src/`.
 
 ## Verification baseline
 
-- Run targeted unit tests for touched server routes/adapters.
+- Run targeted unit tests for touched server routes/adapters with `npm run test:unit -- --run ...`.
 - Run `npm run check` after TypeScript or Svelte structure changes.
-- Run Playwright smoke/e2e after significant UI or auth flow updates.
+- Run Playwright smoke/e2e after significant UI or auth flow updates, typically through `npm run test:e2e`.
 - When a change is part of a decision-gated slice, keep validation evidence scoped to the actual files and behaviors touched, then record any blocked checks honestly in the active ExecPlan.
