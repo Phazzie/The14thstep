@@ -1,6 +1,7 @@
 import { createClerkClient, verifyToken } from '@clerk/backend';
 import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { SeamErrorCodes, err, ok } from '$lib/core/seam';
+import { readClerkSessionTokens } from '$lib/server/auth/clerk-session-cookie';
 import type {
 	AuthCallbackCompletionInput,
 	AuthPort,
@@ -25,7 +26,6 @@ interface CreateAuthAdapterOptions {
 
 const PROVIDER = 'clerk-auth';
 const GUEST_EMAIL = 'guest@local.invalid';
-const CLERK_SESSION_COOKIE_NAME = '__session';
 
 function parseCookies(cookieHeader: string): Map<string, string> {
 	const cookies = new Map<string, string>();
@@ -44,23 +44,6 @@ function parseCookies(cookieHeader: string): Map<string, string> {
 		}
 	}
 	return cookies;
-}
-
-function isClerkSessionCookieName(name: string): boolean {
-	return name === CLERK_SESSION_COOKIE_NAME || name.startsWith(`${CLERK_SESSION_COOKIE_NAME}_`);
-}
-
-function readClerkSessionToken(parsedCookies: Map<string, string>): string {
-	const exactMatch = parsedCookies.get(CLERK_SESSION_COOKIE_NAME)?.trim() ?? '';
-	if (exactMatch.length > 0) return exactMatch;
-
-	for (const [name, value] of parsedCookies) {
-		if (!isClerkSessionCookieName(name)) continue;
-		const trimmedValue = value.trim();
-		if (trimmedValue.length > 0) return trimmedValue;
-	}
-
-	return '';
 }
 
 function isUuid(value: string): boolean {
@@ -161,47 +144,50 @@ export function createAuthAdapter(options: CreateAuthAdapterOptions = {}): AuthP
 			}
 
 			const parsedCookies = parseCookies(cookies);
-			const clerkSessionToken = readClerkSessionToken(parsedCookies);
-			if (clerkSessionToken.length > 0) {
+			const clerkSessionTokens = readClerkSessionTokens(parsedCookies);
+			if (clerkSessionTokens.length > 0) {
 				if (secretKey.length === 0) {
 					return err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, 'Clerk auth adapter is not configured', {
 						provider: PROVIDER
 					});
 				}
 
-				try {
-					const claims = await verifyToken(clerkSessionToken, {
-						secretKey,
-						clockSkewInMs: 5000
-					});
-					const clerkUserId = typeof claims.sub === 'string' ? claims.sub.trim() : '';
-					if (!clerkUserId) {
-						return err(SeamErrorCodes.UNAUTHORIZED, 'Missing Clerk subject claim', {
-							provider: PROVIDER,
-							reason: 'subject_claim_missing'
+				let lastFailureReason = 'session_verification_failed';
+				for (const clerkSessionToken of clerkSessionTokens) {
+					try {
+						const claims = await verifyToken(clerkSessionToken, {
+							secretKey,
+							clockSkewInMs: 5000
 						});
-					}
+						const clerkUserId = typeof claims.sub === 'string' ? claims.sub.trim() : '';
+						if (!clerkUserId) {
+							lastFailureReason = 'subject_claim_missing';
+							continue;
+						}
 
-					const session: AuthSession = {
-						userId: toStableUuid(`clerk:${clerkUserId}`),
-						email:
-							typeof claims.email === 'string' && claims.email.includes('@')
-								? claims.email
-								: 'member@local.invalid',
-						expiresAt: toIsoExpiration(claims.exp)
-					};
-					if (!validateAuthSession(session)) {
-						return err(SeamErrorCodes.CONTRACT_VIOLATION, 'Clerk session payload violates AuthSession', {
-							provider: PROVIDER
-						});
+						const session: AuthSession = {
+							userId: toStableUuid(`clerk:${clerkUserId}`),
+							email:
+								typeof claims.email === 'string' && claims.email.includes('@')
+									? claims.email
+									: 'member@local.invalid',
+							expiresAt: toIsoExpiration(claims.exp)
+						};
+						if (!validateAuthSession(session)) {
+							return err(SeamErrorCodes.CONTRACT_VIOLATION, 'Clerk session payload violates AuthSession', {
+								provider: PROVIDER
+							});
+						}
+						return ok(session);
+					} catch (cause) {
+						lastFailureReason = cause instanceof Error ? cause.message : String(cause);
 					}
-					return ok(session);
-				} catch (cause) {
-					return err(SeamErrorCodes.UNAUTHORIZED, 'Invalid Clerk session token', {
-						provider: PROVIDER,
-						reason: cause instanceof Error ? cause.message : String(cause)
-					});
 				}
+
+				return err(SeamErrorCodes.UNAUTHORIZED, 'Invalid Clerk session token', {
+					provider: PROVIDER,
+					reason: lastFailureReason
+				});
 			}
 
 			const sessionKind = parsedCookies.get('app-session-kind')?.trim() ?? '';

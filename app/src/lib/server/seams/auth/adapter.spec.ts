@@ -96,6 +96,30 @@ describe('auth server adapter', () => {
 		expect(result.ok).toBe(true);
 	});
 
+	it('tries later matching clerk cookies when an earlier token is invalid', async () => {
+		verifyTokenMock
+			.mockRejectedValueOnce(new Error('invalid token'))
+			.mockResolvedValueOnce({
+				sub: 'user_2abcxyz',
+				email: 'member@example.com',
+				exp: 1893456000
+			});
+		const adapter = createAuthAdapter({ env: makeEnv() });
+
+		const result = await adapter.getSession('__session_app=stale-token; __session_member=valid-token');
+		expect(verifyTokenMock).toHaveBeenNthCalledWith(
+			1,
+			'stale-token',
+			expect.objectContaining({ secretKey: 'sk_test_123' })
+		);
+		expect(verifyTokenMock).toHaveBeenNthCalledWith(
+			2,
+			'valid-token',
+			expect.objectContaining({ secretKey: 'sk_test_123' })
+		);
+		expect(result.ok).toBe(true);
+	});
+
 	it('returns unauthorized when clerk token is invalid', async () => {
 		verifyTokenMock.mockRejectedValue(new Error('invalid token'));
 		const adapter = createAuthAdapter({ env: makeEnv() });
