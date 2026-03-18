@@ -21,6 +21,9 @@ function createCookieJar() {
 			get(name: string) {
 				return store.get(name);
 			},
+			getAll() {
+				return Array.from(store.entries()).map(([name, value]) => ({ name, value }));
+			},
 			set(name: string, value: string, options?: Record<string, unknown>) {
 				store.set(name, value);
 				calls.set.push({ name, value, options });
@@ -145,6 +148,25 @@ describe('landing auth route actions', () => {
 		expect(auth.signOut).toHaveBeenCalledWith('member-token');
 		expect(calls.delete.map((call) => call.name)).toEqual(
 			expect.arrayContaining(['sb-access-token', 'sb-refresh-token', '__session', 'app-session-kind'])
+		);
+	});
+
+	it('signOut uses suffixed clerk session cookies when bare session cookie is absent', async () => {
+		const { cookies, calls, store } = createCookieJar();
+		store.set('__session_app', 'member-token');
+		const auth = createAuthSeamStub();
+		auth.signOut.mockResolvedValue(ok({ success: true }));
+
+		await expect(
+			actions.signOut?.({ cookies, locals: { seams: { auth } } } as never)
+		).rejects.toSatisfy((error: unknown) => {
+			expectRedirectLike(error, 303, '/?auth=signed-out');
+			return true;
+		});
+
+		expect(auth.signOut).toHaveBeenCalledWith('member-token');
+		expect(calls.delete.map((call) => call.name)).toEqual(
+			expect.arrayContaining(['sb-access-token', 'sb-refresh-token', '__session', '__session_app', 'app-session-kind'])
 		);
 	});
 

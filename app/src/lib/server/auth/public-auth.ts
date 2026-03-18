@@ -4,6 +4,7 @@ import type { Cookies } from '@sveltejs/kit';
 export type SessionKind = 'guest' | 'member';
 
 const SESSION_KIND_COOKIE = 'app-session-kind';
+const CLERK_SESSION_COOKIE_NAME = '__session';
 
 function secureCookieFlag(env: NodeJS.ProcessEnv): boolean {
 	return (env.NODE_ENV ?? '').trim() === 'production';
@@ -63,8 +64,34 @@ export function clearSupabaseSessionCookies(cookies: Cookies): void {
 	cookies.delete('sb-refresh-token', { path: '/' });
 }
 
+function isClerkSessionCookieName(name: string): boolean {
+	return name === CLERK_SESSION_COOKIE_NAME || name.startsWith(`${CLERK_SESSION_COOKIE_NAME}_`);
+}
+
+export function readClerkSessionCookie(cookies: Cookies): string {
+	const exactMatch = cookies.get(CLERK_SESSION_COOKIE_NAME)?.trim() ?? '';
+	if (exactMatch.length > 0) return exactMatch;
+
+	for (const { name, value } of cookies.getAll()) {
+		if (!isClerkSessionCookieName(name)) continue;
+		const trimmedValue = value.trim();
+		if (trimmedValue.length > 0) return trimmedValue;
+	}
+
+	return '';
+}
+
 export function clearClerkSessionCookie(cookies: Cookies): void {
-	cookies.delete('__session', { path: '/' });
+	const cookieNames = new Set([CLERK_SESSION_COOKIE_NAME]);
+	for (const { name } of cookies.getAll()) {
+		if (isClerkSessionCookieName(name)) {
+			cookieNames.add(name);
+		}
+	}
+
+	for (const name of cookieNames) {
+		cookies.delete(name, { path: '/' });
+	}
 }
 
 export function clearAllAuthCookies(cookies: Cookies): void {

@@ -25,6 +25,7 @@ interface CreateAuthAdapterOptions {
 
 const PROVIDER = 'clerk-auth';
 const GUEST_EMAIL = 'guest@local.invalid';
+const CLERK_SESSION_COOKIE_NAME = '__session';
 
 function parseCookies(cookieHeader: string): Map<string, string> {
 	const cookies = new Map<string, string>();
@@ -43,6 +44,23 @@ function parseCookies(cookieHeader: string): Map<string, string> {
 		}
 	}
 	return cookies;
+}
+
+function isClerkSessionCookieName(name: string): boolean {
+	return name === CLERK_SESSION_COOKIE_NAME || name.startsWith(`${CLERK_SESSION_COOKIE_NAME}_`);
+}
+
+function readClerkSessionToken(parsedCookies: Map<string, string>): string {
+	const exactMatch = parsedCookies.get(CLERK_SESSION_COOKIE_NAME)?.trim() ?? '';
+	if (exactMatch.length > 0) return exactMatch;
+
+	for (const [name, value] of parsedCookies) {
+		if (!isClerkSessionCookieName(name)) continue;
+		const trimmedValue = value.trim();
+		if (trimmedValue.length > 0) return trimmedValue;
+	}
+
+	return '';
 }
 
 function isUuid(value: string): boolean {
@@ -143,7 +161,7 @@ export function createAuthAdapter(options: CreateAuthAdapterOptions = {}): AuthP
 			}
 
 			const parsedCookies = parseCookies(cookies);
-			const clerkSessionToken = parsedCookies.get('__session')?.trim() ?? '';
+			const clerkSessionToken = readClerkSessionToken(parsedCookies);
 			if (clerkSessionToken.length > 0) {
 				if (secretKey.length === 0) {
 					return err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, 'Clerk auth adapter is not configured', {
