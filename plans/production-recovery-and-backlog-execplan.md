@@ -24,10 +24,14 @@ This plan also assumes a high-agency implementation style. The executing agent s
 - [x] (2026-03-18 09:50Z) Opened PR `#69` (`fix(auth): harden Clerk session cookie selection`) to address the review follow-up where multiple Clerk session cookies should be tried in order instead of failing on the first stale token.
 - [x] (2026-03-18 20:10Z) Confirmed that all three production Postgres URLs (`POSTGRES_URL`, `POSTGRES_PRISMA_URL`, `POSTGRES_URL_NON_POOLING`) fail with `Tenant or user not found`, so the direct pooler path is not a viable unattended recovery target.
 - [x] (2026-03-18 20:12Z) Confirmed Supabase CLI is not installed on this machine and there is no saved Supabase auth/config, so a fresh Supabase reprovision cannot be completed autonomously from the current environment.
+- [x] (2026-03-18 20:45Z) Landed the bounded issue `#10` hardening slice on branch `codex/narrative-context-hardening-2026-03-18` and opened draft PR `#70` (`fix(core): harden narrative context fallback handling`).
+- [x] (2026-03-18 20:50Z) Commented a concrete prompt-surface inventory onto issue `#17`, including grouped runtime surfaces and the smallest safe follow-up slices.
+- [x] (2026-03-18 20:53Z) Opened issue `#71` to track production database backend reprovisioning as the current external blocker.
 - [ ] Provision or recover a real production database target, apply the existing schema, and update the live Vercel project to use it.
 - [ ] Land the minimum production recovery change or env update, redeploy, and verify both guest and member meeting start on the real public site.
 - [ ] Merge or close PR `#69` after the production recovery decision is made so auth work does not linger as half-finished local state.
-- [ ] After production is stable, mine the next two bounded backlog slices in parallel: issue `#10` as implementation work and issue `#17` as analysis/inventory work.
+- [ ] Review and ship or revise draft PR `#70` after a trustworthy narrow test/build pass is available.
+- [ ] After production is stable, turn the issue `#17` inventory into the next 2-3 prompt-writing slices instead of one giant rewrite.
 
 ## Surprises & Discoveries
 
@@ -76,6 +80,10 @@ This plan also assumes a high-agency implementation style. The executing agent s
 
 - Decision: Treat production recovery as externally blocked pending a newly provisioned database target, and use the blocked time to mine bounded backlog work that does not overlap the database outage.
   Rationale: The remaining work that can be done autonomously with high confidence is code hardening and diagnosis on slices that do not depend on the dead backend.
+  Date/Author: 2026-03-18 / Codex
+
+- Decision: Convert backlog work into durable artifacts while production is blocked: a real PR for issue `#10`, an issue comment inventory for issue `#17`, and a first-class outage issue for the missing backend.
+  Rationale: This keeps momentum without pretending the live outage is fixed, and it prevents the blocked time from collapsing into undocumented local analysis.
   Date/Author: 2026-03-18 / Codex
 
 - Decision: Keep backlog mining strictly secondary to production recovery.
