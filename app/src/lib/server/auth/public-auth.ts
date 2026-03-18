@@ -1,10 +1,14 @@
 import type { Session } from '@supabase/supabase-js';
 import type { Cookies } from '@sveltejs/kit';
+import {
+	CLERK_SESSION_COOKIE_NAME,
+	isSuffixedClerkSessionCookieName,
+	readClerkSessionTokens
+} from '$lib/server/auth/clerk-session-cookie';
 
 export type SessionKind = 'guest' | 'member';
 
 const SESSION_KIND_COOKIE = 'app-session-kind';
-const CLERK_SESSION_COOKIE_NAME = '__session';
 
 function secureCookieFlag(env: NodeJS.ProcessEnv): boolean {
 	return (env.NODE_ENV ?? '').trim() === 'production';
@@ -64,33 +68,19 @@ export function clearSupabaseSessionCookies(cookies: Cookies): void {
 	cookies.delete('sb-refresh-token', { path: '/' });
 }
 
-function isClerkSessionCookieName(name: string): boolean {
-	return name === CLERK_SESSION_COOKIE_NAME || name.startsWith(`${CLERK_SESSION_COOKIE_NAME}_`);
-}
-
 export function readClerkSessionCookie(cookies: Cookies): string {
-	const exactMatch = cookies.get(CLERK_SESSION_COOKIE_NAME)?.trim() ?? '';
-	if (exactMatch.length > 0) return exactMatch;
-
-	for (const { name, value } of cookies.getAll()) {
-		if (!isClerkSessionCookieName(name)) continue;
-		const trimmedValue = value.trim();
-		if (trimmedValue.length > 0) return trimmedValue;
-	}
-
-	return '';
+	return (
+		readClerkSessionTokens(cookies.getAll().map(({ name, value }) => [name, value] as const))[0] ?? ''
+	);
 }
 
 export function clearClerkSessionCookie(cookies: Cookies): void {
-	const cookieNames = new Set([CLERK_SESSION_COOKIE_NAME]);
-	for (const { name } of cookies.getAll()) {
-		if (isClerkSessionCookieName(name)) {
-			cookieNames.add(name);
-		}
-	}
+	cookies.delete(CLERK_SESSION_COOKIE_NAME, { path: '/' });
 
-	for (const name of cookieNames) {
-		cookies.delete(name, { path: '/' });
+	for (const { name } of cookies.getAll()) {
+		if (isSuffixedClerkSessionCookieName(name)) {
+			cookies.delete(name, { path: '/' });
+		}
 	}
 }
 
