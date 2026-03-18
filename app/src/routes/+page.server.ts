@@ -2,6 +2,7 @@ import { createMeeting } from '$lib/core/meeting';
 import { SeamErrorCodes } from '$lib/core/seam';
 import {
 	clearAllAuthCookies,
+	readClerkSessionCookie,
 	readSessionKindCookie,
 	setSessionKindCookie,
 	setSupabaseSessionCookies
@@ -118,7 +119,7 @@ export const actions: Actions = {
 	},
 
 	signOut: async ({ cookies, locals }) => {
-		const memberToken = cookies.get('__session')?.trim() ?? '';
+		const memberToken = readClerkSessionCookie(cookies);
 		const guestToken = cookies.get('sb-access-token')?.trim() ?? '';
 		const sessionToken = memberToken || guestToken;
 		if (sessionToken) {
