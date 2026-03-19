@@ -31,8 +31,12 @@ interface MockResponses {
 	meetingCountSelect?: QueryResponse;
 	shareSingle?: QueryResponse;
 	heavyMemorySelect?: QueryResponse;
+	meetingParticipantsMaybeSingle?: QueryResponse;
+	meetingParticipantsSelect?: QueryResponse;
+	meetingParticipantsInsert?: QueryResponse;
+	meetingParticipantsUpdateMaybeSingle?: QueryResponse;
 	// Optional specific rows to return from the characters mock instead of default generated ones
-	characterRows?: Array<{ id: string; name: string }>;
+	characterRows?: Array<{ id: string; name: string; intro_style?: string }>;
 	charactersSelect?: QueryResponse;
 	characterInsertSelect?: QueryResponse;
 }
@@ -68,10 +72,11 @@ function createCallbacksSelectChain(response: QueryResponse) {
 	};
 }
 
-function defaultCharacterRows(): Array<{ id: string; name: string }> {
+function defaultCharacterRows(): Array<{ id: string; name: string; intro_style: string }> {
 	return CORE_CHARACTERS.map((character, index) => ({
 		id: `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
-		name: character.name
+		name: character.name,
+		intro_style: character.id
 	}));
 }
 
@@ -105,6 +110,26 @@ function createHarness(responses: MockResponses = {}) {
 	};
 	const shareSingle = responses.shareSingle ?? { data: null, error: null, status: 200 };
 	const heavyMemorySelect = responses.heavyMemorySelect ?? { data: [], error: null, status: 200 };
+	const meetingParticipantsMaybeSingle = responses.meetingParticipantsMaybeSingle ?? {
+		data: null,
+		error: null,
+		status: 200
+	};
+	const meetingParticipantsSelect = responses.meetingParticipantsSelect ?? {
+		data: [],
+		error: null,
+		status: 200
+	};
+	const meetingParticipantsInsert = responses.meetingParticipantsInsert ?? {
+		data: [],
+		error: null,
+		status: 201
+	};
+	const meetingParticipantsUpdateMaybeSingle = responses.meetingParticipantsUpdateMaybeSingle ?? {
+		data: { meeting_id: 'meeting-1' },
+		error: null,
+		status: 200
+	};
 	const charactersSelect = responses.charactersSelect;
 	const characterInsertSelect = responses.characterInsertSelect;
 	const characterRows = [...(responses.characterRows ?? defaultCharacterRows())];
@@ -191,6 +216,40 @@ function createHarness(responses: MockResponses = {}) {
 				};
 			}
 
+			if (table === 'meeting_participants') {
+				return {
+					select: () => ({
+						eq: (_meetingColumn: string, meetingValue: string) => ({
+							eq: (_characterColumn: string, characterValue: string) => ({
+								maybeSingle: async () =>
+									responses.meetingParticipantsMaybeSingle ??
+									{
+										data:
+											(meetingParticipantsSelect.data as Array<Record<string, unknown>> | undefined)?.find(
+												(row) =>
+													row.meeting_id === meetingValue &&
+													row.character_id === characterValue
+											) ?? null,
+										error: null,
+										status: 200
+									}
+							}),
+							order: async () => meetingParticipantsSelect
+						})
+					}),
+					insert: () => meetingParticipantsInsert,
+					update: () => ({
+						eq: () => ({
+							eq: () => ({
+								select: () => ({
+									maybeSingle: async () => meetingParticipantsUpdateMaybeSingle
+								})
+							})
+						})
+					})
+				};
+			}
+
 			if (table === 'callbacks') {
 				return {
 					select: () => ({
@@ -230,7 +289,19 @@ function createHarness(responses: MockResponses = {}) {
 								error: null,
 								status: 200
 							};
-						}
+						},
+						eq: (_column: string, value: string) => ({
+							maybeSingle: async () => {
+								const match = characterRows.find(
+									(row) => row.intro_style === value || row.name === value
+								);
+								return {
+									data: match ?? null,
+									error: null,
+									status: 200
+								};
+							}
+						})
 					}),
 					insert: (payload: unknown) => {
 						const inserted =
@@ -242,11 +313,16 @@ function createHarness(responses: MockResponses = {}) {
 											const name = typeof record.name === 'string' ? record.name : null;
 											if (!name) return null;
 											const id = `10000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`;
-											const created = { id, name };
+											const introStyle =
+												typeof record.intro_style === 'string' ? record.intro_style : undefined;
+											const created = { id, name, intro_style: introStyle };
 											characterRows.push(created);
 											return created;
 										})
-										.filter((row): row is { id: string; name: string } => row !== null)
+										.filter(
+											(row): row is { id: string; name: string; intro_style: string | undefined } =>
+												row !== null
+										)
 								: [];
 
 						return {
@@ -369,6 +445,7 @@ describe('database supabase adapter', () => {
 			characterId: 'marcus',
 			isUserShare: false,
 			content: 'Now I can stay in the room.',
+			interactionType: 'respond_to',
 			significanceScore: 7,
 			sequenceOrder: 4
 		});
@@ -389,6 +466,7 @@ describe('database supabase adapter', () => {
 						character_id: 'heather',
 						is_user_share: false,
 						content: 'I called someone before I blew up my life.',
+						interaction_type: 'respond_to',
 						significance_score: 99,
 						sequence_order: 5,
 						created_at: '2026-02-15T04:04:45.000Z'
@@ -800,6 +878,7 @@ describe('database supabase adapter', () => {
 					character_id: marcusDbId,
 					is_user_share: false,
 					content: 'Now I can stay in the room.',
+					interaction_type: 'respond_to',
 					significance_score: 7,
 					sequence_order: 3,
 					created_at: '2026-02-15T04:00:00.000Z'
@@ -814,6 +893,7 @@ describe('database supabase adapter', () => {
 			characterId: 'marcus',
 			isUserShare: false,
 			content: 'Now I can stay in the room.',
+			interactionType: 'respond_to',
 			significanceScore: 7,
 			sequenceOrder: 3
 		});
@@ -848,6 +928,7 @@ describe('database supabase adapter', () => {
 			characterId: 'marcus',
 			isUserShare: false,
 			content: 'test',
+			interactionType: 'standard',
 			significanceScore: 5,
 			sequenceOrder: 1
 		});

@@ -4,13 +4,14 @@
 		kind = 'info'
 	}: {
 		message: string;
-		kind?: 'info' | 'error' | 'success';
+		kind?: 'info' | 'error' | 'success' | 'ritual';
 	} = $props();
 
 	const styleMap = {
 		info: 'info',
 		error: 'error',
-		success: 'success'
+		success: 'success',
+		ritual: 'ritual'
 	} as const;
 </script>
 
@@ -47,5 +48,14 @@
 		border-color: rgba(110, 231, 183, 0.45);
 		background: rgba(19, 78, 56, 0.26);
 		color: #d1fae5;
+	}
+
+	.system-message.ritual {
+		border-color: rgba(245, 158, 11, 0.58);
+		background: rgba(120, 53, 15, 0.28);
+		color: #fde68a;
+		font-weight: 700;
+		text-align: center;
+		letter-spacing: 0.05em;
 	}
 </style>

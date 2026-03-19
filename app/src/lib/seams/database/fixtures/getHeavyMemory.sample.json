@@ -5,6 +5,7 @@
     "characterId": "heather",
     "isUserShare": false,
     "content": "Listen, I wanted to disappear this week, but I called somebody before I made it worse.",
+    "interactionType": "respond_to",
     "significanceScore": 8,
     "sequenceOrder": 5,
     "createdAt": "2026-02-15T04:04:45.000Z"
@@ -15,6 +16,7 @@
     "characterId": null,
     "isUserShare": true,
     "content": "I told my mom the truth for the first time and she still answered the phone.",
+    "interactionType": "standard",
     "significanceScore": 9,
     "sequenceOrder": 8,
     "createdAt": "2026-02-08T03:14:12.000Z"

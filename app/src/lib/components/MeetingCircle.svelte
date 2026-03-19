@@ -19,7 +19,6 @@
 </script>
 
 <section class="circle-panel" aria-label="Meeting circle">
-	<h2>The Circle</h2>
 	<ul>
 		{#each characters as character (character.id)}
 			<li class:active={activeCharacterId === character.id}>
@@ -37,18 +36,10 @@
 </section>
 
 <style>
-	.circle-panel h2 {
-		margin: 0;
-		font-size: 0.95rem;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-		color: #ffdca2;
-	}
-
 	.circle-panel ul {
 		list-style: none;
 		padding: 0;
-		margin: 0.72rem 0 0;
+		margin: 0;
 		display: grid;
 		gap: 0.45rem;
 	}

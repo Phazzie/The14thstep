@@ -2,15 +2,9 @@ import { SeamErrorCodes, err, ok, type SeamResult } from './seam';
 import type { DatabasePort, MeetingRecord, ShareRecord } from '$lib/seams/database/contract';
 import type { GrokAiPort } from '$lib/seams/grok-ai/contract';
 import { detectCrisisContent as detectCrisisContentFromEngine } from './crisis-engine';
+import type { ShareInteractionType } from './types';
 
-export type ShareInteractionType =
-	| 'standard'
-	| 'respond_to'
-	| 'disagree'
-	| 'parallel_story'
-	| 'expand'
-	| 'crosstalk'
-	| 'callback';
+export type { ShareInteractionType } from './types';
 
 export interface CreateMeetingInput {
 	userId: string;
@@ -142,7 +136,8 @@ export async function addShare(
 		isUserShare: input.isUserShare,
 		content: input.content,
 		significanceScore,
-		sequenceOrder: input.sequenceOrder
+		sequenceOrder: input.sequenceOrder,
+		interactionType: input.interactionType
 	});
 }
 

@@ -4,13 +4,16 @@ import {
 	VISITOR_CLEAN_TIMES,
 	VISITOR_COLORS,
 	VISITOR_CONTRADICTIONS,
+	VISITOR_DISCOMFORT_REGISTERS,
+	VISITOR_LIES,
+	VISITOR_LOST_THINGS,
 	VISITOR_NAME_POOL,
+	VISITOR_PROGRAM_RELATIONSHIPS,
+	VISITOR_VOICE_EXAMPLE_SETS,
 	VISITOR_WOUNDS
 } from './characters';
-import type { CharacterProfile } from './types';
+import type { CharacterProfile, CharacterRole } from './types';
 import { bestEffortRandom } from './random-utils';
-
-export type CharacterRole = 'chair' | 'active_sharer' | 'quiet_presence';
 
 export interface SelectedCharacter extends CharacterProfile {
 	role: CharacterRole;
@@ -50,9 +53,45 @@ function visitorId(nowIso: string, index: number): string {
 	return `visitor-${nowIso.replace(/[^0-9]/g, '').slice(0, 14)}-${index}`;
 }
 
+function deriveVisitorCleanTimeStart(cleanTime: string, nowIso: string): Date {
+	const now = new Date(nowIso);
+	if (Number.isNaN(now.getTime())) {
+		return new Date();
+	}
+
+	if (cleanTime.startsWith('6 days')) {
+		now.setDate(now.getDate() - 6);
+		return now;
+	}
+
+	if (cleanTime.startsWith('19 days')) {
+		now.setDate(now.getDate() - 19);
+		return now;
+	}
+
+	if (cleanTime.startsWith('2 months')) {
+		now.setMonth(now.getMonth() - 2);
+		return now;
+	}
+
+	if (cleanTime.startsWith('9 months')) {
+		now.setMonth(now.getMonth() - 9);
+		return now;
+	}
+
+	if (cleanTime.includes('11 days')) {
+		now.setDate(now.getDate() - 11);
+		return now;
+	}
+
+	now.setDate(now.getDate() - 14);
+	return now;
+}
+
 function generateVisitors(random: () => number, nowIso: string): SelectedCharacter[] {
 	return [0, 1].map((index) => {
 		const name = pickOne(VISITOR_NAME_POOL, random);
+		const cleanTime = pickOne(VISITOR_CLEAN_TIMES, random);
 		return {
 			id: visitorId(nowIso, index),
 			name,
@@ -62,10 +101,16 @@ function generateVisitors(random: () => number, nowIso: string): SelectedCharact
 			wound: pickOne(VISITOR_WOUNDS, random),
 			contradiction: pickOne(VISITOR_CONTRADICTIONS, random),
 			voice: 'Concrete, specific, emotionally raw.',
+			voiceExamples: [...pickOne(VISITOR_VOICE_EXAMPLE_SETS, random)] as [string, string, string],
+			lie: pickOne(VISITOR_LIES, random),
+			discomfortRegister: pickOne(VISITOR_DISCOMFORT_REGISTERS, random),
+			programRelationship: pickOne(VISITOR_PROGRAM_RELATIONSHIPS, random),
+			lostThing: pickOne(VISITOR_LOST_THINGS, random),
 			quirk: 'Looks down before saying hard truths.',
 			color: pickOne(VISITOR_COLORS, random),
 			avatar: name.slice(0, 2),
-			cleanTime: pickOne(VISITOR_CLEAN_TIMES, random),
+			cleanTime,
+			cleanTimeStart: deriveVisitorCleanTimeStart(cleanTime, nowIso),
 			meetingCount: 0,
 			lastSeenAt: null,
 			role: 'quiet_presence' as const,
