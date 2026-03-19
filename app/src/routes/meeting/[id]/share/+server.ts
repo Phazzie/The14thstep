@@ -10,23 +10,27 @@ import {
 	passesQualityValidationThresholds
 } from '$lib/core/narrative-context';
 import {
+	areIntroductionsComplete,
 	selectPromptForPhase,
 	INTRO_ORDER,
 	initializeMeetingPhase,
-	isRoundComplete,
 	recordCharacterSpoke,
 	transitionToNextPhase
 } from '$lib/core/ritual-orchestration';
 import {
 	buildCharacterSharePrompt,
+	buildCrosstalkReactionPrompt,
+	buildGoodbyePrompt,
+	buildHardQuestionPrompt,
 	buildQualityValidationPrompt,
 	buildRitualOpeningPrompt,
 	buildRitualIntroPrompt,
 	buildRitualReadingPrompt,
 	buildRitualClosingPrompt,
+	buildTopicAcknowledgmentPrompt,
 	buildTopicIntroductionPrompt
 } from '$lib/core/prompt-templates';
-import type { MeetingPhaseState } from '$lib/core/types';
+import type { CharacterProfile, MeetingPhaseState } from '$lib/core/types';
 import { MeetingPhase } from '$lib/core/types';
 import { SeamErrorCodes, err, ok, type SeamErrorCode, type SeamResult } from '$lib/core/seam';
 import type { CallbackScope, CallbackStatus, CallbackType } from '$lib/seams/database/contract';
@@ -42,7 +46,9 @@ const SHARE_INTERACTION_TYPES: readonly ShareInteractionType[] = [
 	'parallel_story',
 	'expand',
 	'crosstalk',
-	'callback'
+	'callback',
+	'hard_question',
+	'farewell'
 ];
 
 interface ShareStreamRequest {
@@ -288,66 +294,82 @@ function parseQueryRequest(url: URL): SeamResult<ShareStreamRequest> {
 	});
 }
 
-function findCharacterById(characterId: string | undefined) {
+function findCharacterById(characterId: string | undefined, characters: CharacterProfile[]) {
 	if (!characterId) return null;
-	return CORE_CHARACTERS.find((character) => character.id === characterId) ?? null;
+	return characters.find((character) => character.id === characterId) ?? null;
 }
 
-const ROUND_SPEAKER_ORDER: Record<number, string[]> = {
-	1: ['heather', 'meechie'],
-	2: ['gemini', 'gypsy'],
-	3: ['chrystal', 'marcus']
-};
-
 function pickCharacterForPhase(
-	_characterId: string | undefined,
+	characterId: string | undefined,
 	phaseState: MeetingPhaseState,
-	sequenceOrder: number
+	sequenceOrder: number,
+	interactionType: ShareInteractionType,
+	characters: CharacterProfile[]
 ) {
-	// Speaker ownership lives on the server now; ignore stale client hints.
+	const explicitCharacter = findCharacterById(characterId, characters);
+	const allowsExplicitCharacter =
+		phaseState.currentPhase === MeetingPhase.POST_MEETING ||
+		phaseState.currentPhase === MeetingPhase.SHARING_ROUND_1 ||
+		phaseState.currentPhase === MeetingPhase.SHARING_ROUND_2 ||
+		phaseState.currentPhase === MeetingPhase.SHARING_ROUND_3 ||
+		interactionType === 'crosstalk' ||
+		interactionType === 'hard_question' ||
+		interactionType === 'farewell';
+	if (explicitCharacter && allowsExplicitCharacter) {
+		return explicitCharacter;
+	}
+
 	switch (phaseState.currentPhase) {
 		case MeetingPhase.SETUP:
 		case MeetingPhase.OPENING:
-		case MeetingPhase.EMPTY_CHAIR:
-		case MeetingPhase.TOPIC_SELECTION:
 		case MeetingPhase.CLOSING:
 		case MeetingPhase.CRISIS_MODE:
-			return findCharacterById('marcus') ?? CORE_CHARACTERS[0];
+			return findCharacterById('marcus', characters) ?? characters[0];
+
+		case MeetingPhase.EMPTY_CHAIR:
+			return (
+				findCharacterById('chrystal', characters) ??
+				findCharacterById('marcus', characters) ??
+				characters[0]
+			);
+
+		case MeetingPhase.TOPIC_SELECTION:
+			return findCharacterById('marcus', characters) ?? characters[0];
 
 		case MeetingPhase.INTRODUCTIONS: {
-			const introCharacterId =
-				INTRO_ORDER[phaseState.charactersSpokenThisRound.length] ?? INTRO_ORDER[0];
-			return findCharacterById(introCharacterId) ?? CORE_CHARACTERS[0];
+			const introCharacterId = INTRO_ORDER[phaseState.charactersSpokenThisRound.length];
+			if (introCharacterId) {
+				return findCharacterById(introCharacterId, characters) ?? characters[0];
+			}
+			return (
+				characters.find(
+					(character) =>
+						character.id !== 'marcus' &&
+						!phaseState.charactersSpokenThisRound.includes(character.id)
+				) ?? characters[0]
+			);
 		}
 
 		case MeetingPhase.SHARING_ROUND_1:
 		case MeetingPhase.SHARING_ROUND_2:
 		case MeetingPhase.SHARING_ROUND_3: {
-			const roundOrder =
-				ROUND_SPEAKER_ORDER[phaseState.roundNumber ?? 1] ??
-				CORE_CHARACTERS.map((character) => character.id);
-			const nextRoundSpeaker = roundOrder.find(
-				(candidateId) => !phaseState.charactersSpokenThisRound.includes(candidateId)
+			const fallbackCharacter = characters.find(
+				(character) =>
+					character.id !== 'marcus' &&
+					!phaseState.charactersSpokenThisRound.includes(character.id)
 			);
-			if (nextRoundSpeaker) {
-				return findCharacterById(nextRoundSpeaker) ?? CORE_CHARACTERS[0];
-			}
-
-			const fallbackCharacter = CORE_CHARACTERS.find(
-				(character) => !phaseState.charactersSpokenThisRound.includes(character.id)
-			);
-			return fallbackCharacter ?? CORE_CHARACTERS[sequenceOrder % CORE_CHARACTERS.length];
+			return fallbackCharacter ?? characters[sequenceOrder % characters.length];
 		}
 
 		case MeetingPhase.POST_MEETING:
 		default:
-			return CORE_CHARACTERS[sequenceOrder % CORE_CHARACTERS.length];
+			return characters[sequenceOrder % characters.length];
 	}
 }
 
 export async function _generateValidatedShare(input: {
 	meetingId: string;
-	character: (typeof CORE_CHARACTERS)[number];
+	character: CharacterProfile;
 	prompt: string;
 	contextMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
 	topic: string;
@@ -478,12 +500,14 @@ function mapRecentSharesFromMeeting(
 		isUserShare: boolean;
 		content: string;
 	}>,
-	userName: string
+	userName: string,
+	characters: CharacterProfile[]
 ): Array<{ speaker: string; content: string; isUserShare: boolean }> {
 	return shares.slice(-8).map((share) => {
 		const speaker = share.isUserShare
 			? userName
-			: (CORE_CHARACTERS.find((character) => character.id === share.characterId)?.name ??
+			: (characters.find((character) => character.id === share.characterId)?.name ??
+				CORE_CHARACTERS.find((character) => character.id === share.characterId)?.name ??
 				'Character');
 		return {
 			speaker,
@@ -493,17 +517,43 @@ function mapRecentSharesFromMeeting(
 	});
 }
 
-function buildPhaseAwarePrompt(
-	character: (typeof CORE_CHARACTERS)[number],
+export function buildInteractionAwarePrompt(
+	character: CharacterProfile,
 	currentPhase: MeetingPhase,
+	interactionType: ShareInteractionType,
 	userName: string,
 	userMood: string,
 	topic: string,
 	recentShares: Array<{ speaker: string; content: string }>,
+	recentTranscript: Array<{ speaker: string; content: string; isUserShare: boolean }>,
 	heavyMemoryLines?: string[],
 	callbackLines?: string[],
 	continuityLines?: string[]
 ): string {
+	if (interactionType === 'crosstalk') {
+		return buildCrosstalkReactionPrompt(
+			character,
+			recentShares.at(-1)?.content ?? 'The room just went quiet.',
+			topic
+		);
+	}
+
+	if (interactionType === 'hard_question') {
+		const userShareHistory = recentTranscript
+			.filter((share) => share.isUserShare)
+			.map((share) => share.content)
+			.slice(-3);
+		return buildHardQuestionPrompt(userName, userShareHistory);
+	}
+
+	if (interactionType === 'farewell') {
+		return buildGoodbyePrompt(character, userName);
+	}
+
+	if (currentPhase === MeetingPhase.TOPIC_SELECTION && interactionType === 'respond_to') {
+		return buildTopicAcknowledgmentPrompt(topic);
+	}
+
 	// Select prompt type based on phase
 	const promptType = selectPromptForPhase(currentPhase, character);
 
@@ -542,6 +592,7 @@ function buildPhaseAwarePrompt(
 function createShareStream(
 	meetingId: string,
 	input: ShareStreamRequest,
+	characters: CharacterProfile[],
 	recentShares: Array<{ speaker: string; content: string; isUserShare: boolean }>,
 	locals: App.Locals
 ): Response {
@@ -586,10 +637,17 @@ function createShareStream(
 				}
 
 				const currentPhase = currentPhaseState.currentPhase;
+				const participantsResult = await locals.seams.database.getMeetingParticipants(meetingId);
+				const meetingCharacters =
+					participantsResult.ok && participantsResult.value.length > 0
+						? participantsResult.value
+						: CORE_CHARACTERS;
 				const selectedCharacter = pickCharacterForPhase(
 					input.characterId,
 					currentPhaseState,
-					input.sequenceOrder
+					input.sequenceOrder,
+					interactionType,
+					meetingCharacters
 				);
 
 				const memoryUserId = locals.userId ?? process.env.PROBE_USER_ID?.trim() ?? null;
@@ -690,13 +748,15 @@ function createShareStream(
 						);
 					}
 				}
-				const prompt = buildPhaseAwarePrompt(
+				const prompt = buildInteractionAwarePrompt(
 					selectedCharacter,
 					currentPhase,
+					interactionType,
 					userName,
 					userMood,
 					input.topic,
 					recentPromptShares,
+					recentShares,
 					heavyMemoryLines,
 					selectedCallbacks.map(formatCallbackLine),
 					mergedContinuityLines
@@ -789,18 +849,17 @@ function createShareStream(
 				}
 
 				let phaseStateAfterShare = currentPhaseState;
-				const recordCharacterResult = recordCharacterSpoke(currentPhaseState, selectedCharacter.id);
-				if (recordCharacterResult.ok) {
-					phaseStateAfterShare = recordCharacterResult.value;
-				} else {
-					console.warn(
-						`[share] recordCharacterSpoke failed for meeting=${meetingId}: ${recordCharacterResult.error.message}`
-					);
+				if (!(currentPhase === MeetingPhase.TOPIC_SELECTION && interactionType === 'standard')) {
+					const recordCharacterResult = recordCharacterSpoke(currentPhaseState, selectedCharacter.id);
+					if (recordCharacterResult.ok) {
+						phaseStateAfterShare = recordCharacterResult.value;
+					} else {
+						console.warn(
+							`[share] recordCharacterSpoke failed for meeting=${meetingId}: ${recordCharacterResult.error.message}`
+						);
+					}
 				}
 
-				const speakerCount =
-					phaseStateAfterShare.charactersSpokenThisRound.length +
-					(phaseStateAfterShare.userHasSharedInRound ? 1 : 0);
 				let transitionTrigger:
 					| 'share_complete'
 					| 'round_complete'
@@ -811,18 +870,18 @@ function createShareStream(
 				if (
 					currentPhase === MeetingPhase.OPENING ||
 					currentPhase === MeetingPhase.EMPTY_CHAIR ||
-					currentPhase === MeetingPhase.TOPIC_SELECTION ||
 					currentPhase === MeetingPhase.CLOSING ||
 					currentPhase === MeetingPhase.CRISIS_MODE
 				) {
 					transitionTrigger = 'share_complete';
-				} else if (currentPhase === MeetingPhase.INTRODUCTIONS && speakerCount >= 2) {
-					transitionTrigger = 'round_complete';
+				} else if (currentPhase === MeetingPhase.TOPIC_SELECTION) {
+					transitionTrigger = interactionType === 'respond_to' ? 'share_complete' : null;
 				} else if (
-					(currentPhase === MeetingPhase.SHARING_ROUND_1 ||
-						currentPhase === MeetingPhase.SHARING_ROUND_2 ||
-						currentPhase === MeetingPhase.SHARING_ROUND_3) &&
-					isRoundComplete(phaseStateAfterShare)
+					currentPhase === MeetingPhase.INTRODUCTIONS &&
+					areIntroductionsComplete(
+						phaseStateAfterShare,
+						Math.max(0, meetingCharacters.length - INTRO_ORDER.length)
+					)
 				) {
 					transitionTrigger = 'round_complete';
 				}
@@ -1026,13 +1085,20 @@ async function handleShareRequest(
 		}
 	}
 
+	const participantsResult = await locals.seams.database.getMeetingParticipants(meetingId);
+	const meetingCharacters =
+		participantsResult.ok && participantsResult.value.length > 0
+			? participantsResult.value
+			: CORE_CHARACTERS;
 	const recentShares = mapRecentSharesFromMeeting(
 		meetingSharesResult.value,
-		input.userName ?? 'User'
+		input.userName ?? 'User',
+		meetingCharacters
 	);
 	return createShareStream(
 		meetingId,
 		{ ...input, crisisMode: persistedCrisisMode || input.crisisMode },
+		meetingCharacters,
 		recentShares,
 		locals
 	);

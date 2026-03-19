@@ -6,6 +6,7 @@ import type {
 	DatabasePort,
 	EnsureUserProfileInput,
 	GetMeetingCountAfterDateInput,
+	MeetingParticipantSeed,
 	MeetingRecord,
 	ShareRecord,
 	UpdateCallbackInput,
@@ -17,6 +18,8 @@ import {
 	validateCreateCallbackInput,
 	validateEnsureUserProfileInput,
 	validateGetMeetingCountAfterDateInput,
+	validateMeetingParticipant,
+	validateMeetingParticipantSeed,
 	validateAppendShareInput,
 	validateCreateMeetingInput,
 	validateMeetingRecord,
@@ -24,12 +27,14 @@ import {
 	validateUpdateCallbackInput,
 	validateUserProfile
 } from './contract';
+import type { MeetingParticipant } from '$lib/core/types';
 import appendShareSample from './fixtures/appendShare.sample.json';
 import createCallbackSample from './fixtures/createCallback.sample.json';
 import createMeetingSample from './fixtures/createMeeting.sample.json';
 import faultFixture from './fixtures/fault.json';
 import getActiveCallbacksSample from './fixtures/getActiveCallbacks.sample.json';
 import getHeavyMemorySample from './fixtures/getHeavyMemory.sample.json';
+import getMeetingParticipantsSample from './fixtures/getMeetingParticipants.sample.json';
 import getShareByIdSample from './fixtures/getShareById.sample.json';
 import getUserByIdSample from './fixtures/getUserById.sample.json';
 
@@ -39,6 +44,8 @@ type DatabaseMethod =
 	| 'getUserById'
 	| 'createMeeting'
 	| 'appendShare'
+	| 'saveMeetingParticipants'
+	| 'getMeetingParticipants'
 	| 'getHeavyMemory'
 	| 'getShareById'
 	| 'getMeetingShares'
@@ -55,6 +62,7 @@ interface DatabaseMockOptions {
 		getUserById?: UserProfile;
 		createMeeting?: MeetingRecord;
 		appendShare?: ShareRecord;
+		meetingParticipants?: MeetingParticipant[];
 		getHeavyMemory?: ShareRecord[];
 		getShareById?: ShareRecord;
 		getMeetingShares?: ShareRecord[];
@@ -95,6 +103,8 @@ export function createDatabaseMock(options: DatabaseMockOptions = {}): DatabaseP
 		getUserById: (options.fixtures?.getUserById ?? getUserByIdSample) as UserProfile,
 		createMeeting: (options.fixtures?.createMeeting ?? createMeetingSample) as MeetingRecord,
 		appendShare: (options.fixtures?.appendShare ?? appendShareSample) as ShareRecord,
+		meetingParticipants: (options.fixtures?.meetingParticipants ??
+			getMeetingParticipantsSample) as MeetingParticipant[],
 		getHeavyMemory: (options.fixtures?.getHeavyMemory ?? getHeavyMemorySample) as ShareRecord[],
 		getShareById: (options.fixtures?.getShareById ?? getShareByIdSample) as ShareRecord,
 		getMeetingShares: (options.fixtures?.getMeetingShares ?? getHeavyMemorySample) as ShareRecord[],
@@ -159,6 +169,37 @@ export function createDatabaseMock(options: DatabaseMockOptions = {}): DatabaseP
 				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'Fixture violates ShareRecord');
 			}
 			return ok(fixtures.appendShare);
+		},
+
+		async saveMeetingParticipants(input: { meetingId: string; participants: MeetingParticipantSeed[] }) {
+			if (
+				typeof input.meetingId !== 'string' ||
+				input.meetingId.trim().length === 0 ||
+				!Array.isArray(input.participants) ||
+				!input.participants.every((participant) => validateMeetingParticipantSeed(participant))
+			) {
+				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid saveMeetingParticipants input');
+			}
+			if (scenarios.saveMeetingParticipants === 'fault') {
+				return err(fault.code, fault.message, fault.details);
+			}
+			if (!fixtures.meetingParticipants.every((participant) => validateMeetingParticipant(participant))) {
+				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'Fixture violates MeetingParticipant[]');
+			}
+			return ok(fixtures.meetingParticipants);
+		},
+
+		async getMeetingParticipants(meetingId) {
+			if (typeof meetingId !== 'string' || meetingId.trim().length === 0) {
+				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid meetingId');
+			}
+			if (scenarios.getMeetingParticipants === 'fault') {
+				return err(fault.code, fault.message, fault.details);
+			}
+			if (!fixtures.meetingParticipants.every((participant) => validateMeetingParticipant(participant))) {
+				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'Fixture violates MeetingParticipant[]');
+			}
+			return ok(fixtures.meetingParticipants);
 		},
 
 		async getHeavyMemory(userId) {

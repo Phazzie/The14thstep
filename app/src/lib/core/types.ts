@@ -1,5 +1,6 @@
 export type CharacterTier = 'core' | 'regular' | 'pool' | 'visitor' | 'archived';
 export type CharacterStatus = 'active' | 'relapsed' | 'archived';
+export type CharacterRole = 'chair' | 'active_sharer' | 'quiet_presence';
 
 export type ShareInteractionType =
 	| 'standard'
@@ -8,7 +9,9 @@ export type ShareInteractionType =
 	| 'parallel_story'
 	| 'expand'
 	| 'crosstalk'
-	| 'callback';
+	| 'callback'
+	| 'hard_question'
+	| 'farewell';
 
 export type CallbackType =
 	| 'self_deprecation'
@@ -50,6 +53,13 @@ interface CharacterProfileBase {
 export interface CharacterProfile extends CharacterProfileBase, Partial<CharacterNarrativeProfile> {}
 
 export type CoreCharacterProfile = CharacterProfile & CharacterNarrativeProfile & { tier: 'core' };
+
+export interface MeetingParticipant extends CharacterProfile {
+	role: CharacterRole;
+	isVisitor: boolean;
+	seatOrder: number;
+	sharesCount: number;
+}
 
 export interface MemoryShare {
 	id: string;

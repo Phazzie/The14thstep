@@ -8,6 +8,8 @@ import {
 	validateGetMeetingCountAfterDateInput,
 	validateAppendShareInput,
 	validateEnsureUserProfileInput,
+	validateMeetingParticipant,
+	validateMeetingParticipantSeed,
 	validateMeetingRecord,
 	validateShareRecord,
 	validateUpdateCallbackInput,
@@ -20,6 +22,7 @@ import createMeetingSample from './fixtures/createMeeting.sample.json';
 import faultFixture from './fixtures/fault.json';
 import getActiveCallbacksSample from './fixtures/getActiveCallbacks.sample.json';
 import getHeavyMemorySample from './fixtures/getHeavyMemory.sample.json';
+import getMeetingParticipantsSample from './fixtures/getMeetingParticipants.sample.json';
 import getShareByIdSample from './fixtures/getShareById.sample.json';
 import getUserByIdSample from './fixtures/getUserById.sample.json';
 
@@ -72,6 +75,15 @@ describe('database seam contract', () => {
 		expect(
 			(getActiveCallbacksSample as unknown[]).every((record) => validateCallbackRecord(record))
 		).toBe(true);
+		expect(
+			(getMeetingParticipantsSample as unknown[]).every((record) => validateMeetingParticipant(record))
+		).toBe(true);
+		expect(
+			(getMeetingParticipantsSample as unknown[]).every((record) => {
+				const { sharesCount: _sharesCount, ...seed } = record as Record<string, unknown>;
+				return validateMeetingParticipantSeed(seed);
+			})
+		).toBe(true);
 	});
 
 	it('mock returns fixture values exactly', async () => {
@@ -110,6 +122,7 @@ describe('database seam contract', () => {
 			characterId: 'marcus',
 			isUserShare: false,
 			content: 'Now I have learned to sit in a hard minute.',
+			interactionType: 'respond_to',
 			significanceScore: 7,
 			sequenceOrder: 4
 		});
@@ -128,6 +141,21 @@ describe('database seam contract', () => {
 		expect(shareById.ok).toBe(true);
 		if (shareById.ok) {
 			expect(shareById.value).toEqual(getShareByIdSample);
+		}
+
+		const participants = await mock.getMeetingParticipants('2f5dcf63-cf80-4e09-8e3e-13f93da72cf3');
+		expect(participants.ok).toBe(true);
+		if (participants.ok) {
+			expect(participants.value).toEqual(getMeetingParticipantsSample);
+		}
+
+		const savedParticipants = await mock.saveMeetingParticipants({
+			meetingId: '2f5dcf63-cf80-4e09-8e3e-13f93da72cf3',
+			participants: getMeetingParticipantsSample as unknown as import('./contract').MeetingParticipantSeed[]
+		});
+		expect(savedParticipants.ok).toBe(true);
+		if (savedParticipants.ok) {
+			expect(savedParticipants.value).toEqual(getMeetingParticipantsSample);
 		}
 
 		const callbacks = await mock.getActiveCallbacks({
@@ -170,6 +198,33 @@ describe('database seam contract', () => {
 		if (meetingCount.ok) {
 			expect(meetingCount.value).toBe(16);
 		}
+
+		const participantSeed = {
+			id: 'marcus',
+			name: 'Marcus',
+			tier: 'core' as const,
+			status: 'active' as const,
+			archetype: 'chair',
+			wound: 'grief',
+			contradiction: 'soft voice, hard edge',
+			voice: 'measured',
+			quirk: 'leans back before he speaks',
+			color: '#c58a31',
+			avatar: 'M',
+			cleanTime: '12 years',
+			meetingCount: 0,
+			lastSeenAt: null,
+			role: 'chair' as const,
+			isVisitor: false,
+			seatOrder: 0
+		};
+		expect(validateMeetingParticipantSeed(participantSeed)).toBe(true);
+		expect(
+			validateMeetingParticipant({
+				...participantSeed,
+				sharesCount: 1
+			})
+		).toBe(true);
 	});
 
 	it('mock can surface fault scenario per method', async () => {
@@ -195,6 +250,7 @@ describe('database seam contract', () => {
 				characterId: 'marcus',
 				isUserShare: false,
 				content: 'x',
+				interactionType: 'not_real',
 				significanceScore: 11,
 				sequenceOrder: 1
 			})

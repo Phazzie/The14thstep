@@ -4,6 +4,7 @@ import type { MeetingPhaseState } from '$lib/core/types';
 import type {
 	CallbackRecord,
 	DatabasePort,
+	MeetingParticipantSeed,
 	MeetingRecord,
 	ShareRecord,
 	UserProfile
@@ -19,6 +20,7 @@ function makeShareRecord(input: {
 	characterId: string | null;
 	isUserShare: boolean;
 	content: string;
+	interactionType: ShareRecord['interactionType'];
 	significanceScore: number;
 	sequenceOrder: number;
 }): ShareRecord {
@@ -34,6 +36,7 @@ function createInMemoryDatabase(
 	const state = {
 		phaseState: null as MeetingPhaseState | null,
 		shares: [] as ShareRecord[],
+		participants: [] as Array<MeetingParticipantSeed & { sharesCount: number }>,
 		callbacks: [] as CallbackRecord[],
 		meeting: {
 			id: meetingId,
@@ -78,6 +81,16 @@ function createInMemoryDatabase(
 			};
 			return ok(state.meeting);
 		},
+		async saveMeetingParticipants(input) {
+			state.participants = input.participants.map((participant) => ({
+				...participant,
+				sharesCount: 0
+			}));
+			return ok(state.participants);
+		},
+		async getMeetingParticipants() {
+			return ok(state.participants);
+		},
 		async appendShare(input) {
 			const share = makeShareRecord({
 				id: `share-${state.shares.length + 1}`,
@@ -85,6 +98,7 @@ function createInMemoryDatabase(
 				characterId: input.characterId,
 				isUserShare: input.isUserShare,
 				content: input.content,
+				interactionType: input.interactionType,
 				significanceScore: input.significanceScore,
 				sequenceOrder: input.sequenceOrder
 			});
@@ -331,13 +345,14 @@ async function requestCharacterShare(input: {
 	grokAi: ReturnType<typeof createGrokStub>;
 	sequenceOrder: number;
 	characterId?: string;
+	interactionType?: ShareRecord['interactionType'];
 }) {
 	const url = new URL(`http://localhost/meeting/${input.meetingId}/share`);
 	url.searchParams.set('topic', 'staying');
 	url.searchParams.set('sequenceOrder', String(input.sequenceOrder));
 	url.searchParams.set('userName', 'You');
 	url.searchParams.set('userMood', 'raw');
-	url.searchParams.set('interactionType', 'respond_to');
+	url.searchParams.set('interactionType', input.interactionType ?? 'respond_to');
 	url.searchParams.set('crisisMode', '0');
 	if (input.characterId) url.searchParams.set('characterId', input.characterId);
 
@@ -387,6 +402,15 @@ describe('meeting ritual phase route integration (server routes + in-memory seam
 		const database = createInMemoryDatabase(meetingId);
 		const grokAi = createGrokStub();
 
+		await loadMeetingPage({
+			params: { id: meetingId },
+			locals: {
+				userId: 'user-1',
+				seams: { database, grokAi: grokAi as never, auth: {} as never }
+			},
+			url: new URL(`http://localhost/meeting/${meetingId}?mind=staying`)
+		} as never);
+
 		const events = await requestCharacterShare({
 			meetingId,
 			database,
@@ -411,7 +435,7 @@ describe('meeting ritual phase route integration (server routes + in-memory seam
 				seams: { database, grokAi: grokAi as never, auth: {} as never }
 			},
 			url: new URL(`http://localhost/meeting/${meetingId}?mind=staying`)
-		} as never)) as { phaseState: { currentPhase: string } };
+		} as never)) as { phaseState: { currentPhase: string }; characters: Array<{ id: string }> };
 		expect(initialLoad.phaseState.currentPhase).toBe('setup');
 
 		// SETUP -> OPENING -> EMPTY_CHAIR
@@ -432,67 +456,89 @@ describe('meeting ritual phase route integration (server routes + in-memory seam
 		});
 		expect(readPersistedPhase(events)).toBe('introductions');
 
-		// Introductions needs two speakers in current simplified route logic: user + character
+		let sequenceOrder = 2;
+		for (let index = 0; index < initialLoad.characters.length; index += 1) {
+			events = await requestCharacterShare({
+				meetingId,
+				database,
+				grokAi,
+				sequenceOrder
+			});
+			sequenceOrder += 1;
+		}
+
+		expect(readPersistedPhase(events)).toBe('introductions');
+
 		let userPayload = await requestUserShare({
 			meetingId,
 			database,
 			grokAi,
-			sequenceOrder: 2,
+			sequenceOrder,
 			content: 'I am here.'
 		});
 		expect(userPayload.ok).toBe(true);
-		expect(userPayload.value.phaseState.currentPhase).toBe('introductions');
+		expect(userPayload.value.phaseState.currentPhase).toBe('topic_selection');
+		sequenceOrder += 1;
 
+		// Topic selection first asks the room what is on the table, then acknowledges the chosen topic.
 		events = await requestCharacterShare({
 			meetingId,
 			database,
 			grokAi,
-			sequenceOrder: 3
+			sequenceOrder,
+			interactionType: 'standard'
 		});
 		expect(readPersistedPhase(events)).toBe('topic_selection');
+		sequenceOrder += 1;
 
-		// Topic selection -> sharing_round_1 on room-led topic introduction
 		events = await requestCharacterShare({
 			meetingId,
 			database,
 			grokAi,
-			sequenceOrder: 4
+			sequenceOrder,
+			interactionType: 'respond_to'
 		});
 		expect(readPersistedPhase(events)).toBe('sharing_round_1');
+		sequenceOrder += 1;
 
 		// Advance through sharing rounds with char+user pairs
-		events = await requestCharacterShare({ meetingId, database, grokAi, sequenceOrder: 5 });
+		events = await requestCharacterShare({ meetingId, database, grokAi, sequenceOrder });
 		expect(readPersistedPhase(events)).toBe('sharing_round_1');
+		sequenceOrder += 1;
 
 		userPayload = await requestUserShare({
 			meetingId,
 			database,
 			grokAi,
-			sequenceOrder: 6,
+			sequenceOrder,
 			content: 'still here'
 		});
 		expect(userPayload.value.phaseState.currentPhase).toBe('sharing_round_2');
+		sequenceOrder += 1;
 
-		events = await requestCharacterShare({ meetingId, database, grokAi, sequenceOrder: 7 });
+		events = await requestCharacterShare({ meetingId, database, grokAi, sequenceOrder });
 		expect(readPersistedPhase(events)).toBe('sharing_round_2');
+		sequenceOrder += 1;
 
 		userPayload = await requestUserShare({
 			meetingId,
 			database,
 			grokAi,
-			sequenceOrder: 8,
+			sequenceOrder,
 			content: 'still staying'
 		});
 		expect(userPayload.value.phaseState.currentPhase).toBe('sharing_round_3');
+		sequenceOrder += 1;
 
-		events = await requestCharacterShare({ meetingId, database, grokAi, sequenceOrder: 9 });
+		events = await requestCharacterShare({ meetingId, database, grokAi, sequenceOrder });
 		expect(readPersistedPhase(events)).toBe('sharing_round_3');
+		sequenceOrder += 1;
 
 		userPayload = await requestUserShare({
 			meetingId,
 			database,
 			grokAi,
-			sequenceOrder: 10,
+			sequenceOrder,
 			content: 'closing out'
 		});
 		expect(userPayload.value.phaseState.currentPhase).toBe('closing');

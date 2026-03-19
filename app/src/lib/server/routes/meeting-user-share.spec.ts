@@ -17,6 +17,7 @@ describe('POST /meeting/[id]/user-share', () => {
 				characterId: null,
 				isUserShare: true,
 				content: 'I want to die tonight.',
+				interactionType: 'standard',
 				significanceScore: input.significanceScore,
 				sequenceOrder: 0,
 				createdAt: '2026-02-19T00:00:00.000Z'
@@ -73,6 +74,7 @@ describe('POST /meeting/[id]/user-share', () => {
 				characterId: null,
 				isUserShare: true,
 				content: 'I do not know what to do.',
+				interactionType: 'standard',
 				significanceScore: input.significanceScore,
 				sequenceOrder: 1,
 				createdAt: '2026-02-19T00:00:01.000Z'
@@ -128,6 +130,7 @@ describe('POST /meeting/[id]/user-share', () => {
 				characterId: null,
 				isUserShare: true,
 				content: 'I do not know if I can keep doing this.',
+				interactionType: 'standard',
 				significanceScore: input.significanceScore,
 				sequenceOrder: 2,
 				createdAt: '2026-02-19T00:00:01.500Z'
@@ -180,6 +183,7 @@ describe('POST /meeting/[id]/user-share', () => {
 				characterId: null,
 				isUserShare: true,
 				content: 'I had a rough night but I am here.',
+				interactionType: 'standard',
 				significanceScore: input.significanceScore,
 				sequenceOrder: 3,
 				createdAt: '2026-02-19T00:00:01.900Z'
@@ -232,6 +236,7 @@ describe('POST /meeting/[id]/user-share', () => {
 				characterId: null,
 				isUserShare: true,
 				content: 'I am not sure what happens next.',
+				interactionType: 'standard',
 				significanceScore: input.significanceScore,
 				sequenceOrder: 4,
 				createdAt: '2026-02-19T00:00:02.200Z'
@@ -282,6 +287,7 @@ describe('POST /meeting/[id]/user-share', () => {
 				characterId: null,
 				isUserShare: true,
 				content: 'I am staying with it.',
+				interactionType: 'standard',
 				significanceScore: 4,
 				sequenceOrder: 2,
 				createdAt: '2026-02-19T00:00:02.000Z'

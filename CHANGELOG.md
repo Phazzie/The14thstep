@@ -2,6 +2,17 @@
 
 All notable changes to this repository are documented in this file.
 
+## [2026-03-19]
+
+### Added
+
+- Added the living ExecPlan `plans/restore-virtual-recovery-meeting-execplan.md` for restoring the meeting page from dashboard flow back to the original room-led meeting experience.
+
+### Changed
+
+- Captured restore-specific architecture decisions in `decision-log.md`, including persisted room roster ownership, `seat_order` for stable intro order, truthful interaction-type persistence, and explicit listening-only handling.
+- Recorded restore-planning lessons in `LESSONS_LEARNED.md` so future meeting-flow work does not repeat the same roster/persistence/contract mistakes.
+
 ## [2026-03-16]
 
 ### Added
@@ -373,6 +384,30 @@ All notable changes to this repository are documented in this file.
 - Post-integration validation passes with clean `svelte-check` and `75` passing unit tests (`npm run test:unit -- --run`).
 - After Milestone 5 closeout refactor, `npm run check` passes clean and unit suite passes with `77` tests.
 - After Milestone 6 closeout updates, `npm run check` passes clean and unit suite passes with `78` tests including continuity verification.
+
+## [2026-03-19]
+
+### Changed
+- Preserved `interactionType` end-to-end through the meeting seam, Supabase adapter, fixtures, and route handlers, including `hard_question` and `farewell`.
+- Added persisted meeting-roster loading/saving on the meeting page loader and a Supabase migration for `seat_order` plus expanded share interaction values.
+- Reworked the meeting share route so it uses the persisted roster, completes introductions against the full room, and stops auto-advancing sharing rounds before the user turn.
+- Replaced the meeting page dashboard with a room-led sequence pass: auto opening beats, introductions, room-led topic handoff, three-round flow, crisis interruption, closing, and post-meeting reflection.
+- Removed transcript-facing debug leakage from share cards and softened the input copy so the UI reads like a room instead of a form.
+- Added visitor narrative-field generation so the random room participants are valid prompt subjects instead of sparse placeholder profiles.
+- Added explicit topic-selection semantics in the share route: `standard` keeps the room in `topic_selection` for Marcus's ask, while `respond_to` acknowledges the chosen topic and advances to round one.
+
+### Fixed
+- `EMPTY_CHAIR` now routes to Chrystal's reading instead of Marcus.
+- Listening-only sessions no longer stall on the intro/topic controls; the room can keep moving without user clicks.
+- Meeting-roster persistence now fails closed instead of silently continuing with unsaved generated visitors.
+- Crisis now stops the sequence engine instead of letting queued room beats keep firing behind the intervention.
+- `Keep coming back` now renders as a ritual beat, the stray `Return to Meeting` control is gone, and the end state closes into reflection plus `New meeting`.
+- Topic selection now uses an explicit pick-then-confirm control instead of turning every option into an immediate commit button.
+
+### Verified
+- `npm run test:unit -- --run src/lib/core/character-selector.spec.ts src/lib/seams/database/contract.test.ts src/lib/server/seams/database/adapter.spec.ts src/lib/server/routes/meeting-page-load.spec.ts src/lib/server/routes/meeting-share.spec.ts src/lib/server/routes/meeting-ritual-phase.integration.spec.ts`
+- `timeout 180s npm run check` completed with `0 errors`; one file still reports 8 known Svelte rune warnings documented in `DEFERRED.md`.
+- `timeout 180s npx eslint src/routes/meeting/[id]/+page.svelte src/routes/meeting/[id]/share/+server.ts src/lib/components/MeetingCircle.svelte src/lib/components/MeetingReflection.svelte src/lib/components/SystemMessage.svelte src/lib/components/UserInput.svelte src/lib/core/character-selector.ts src/lib/core/character-selector.spec.ts src/lib/server/routes/meeting-share.spec.ts src/lib/server/routes/meeting-ritual-phase.integration.spec.ts`
 
 ## [2026-02-15]
 

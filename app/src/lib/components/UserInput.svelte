@@ -22,20 +22,22 @@
 	{#if listeningOnly}
 		<p class="listening-note">Listening mode enabled. Keep the room open and receive shares.</p>
 	{:else}
-		<label for="user-share">Your Share</label>
 		<textarea
 			id="user-share"
 			rows="5"
-			value={value}
+			{value}
 			oninput={(event) => onValueChange((event.currentTarget as HTMLTextAreaElement).value)}
-			placeholder={crisisMode ? "Take your time. We're here." : 'Type your share...'}
-			disabled={disabled}
+			placeholder={crisisMode ? "Take your time. We're here." : "Say what's true."}
+			{disabled}
 		></textarea>
 		<div class="actions">
-			<button type="button" onclick={onSubmit} disabled={disabled || !value.trim()} class="submit-btn">
-				Submit Share
-			</button>
-			<button type="button" onclick={onPass} disabled={disabled} class="pass-btn">Pass</button>
+			<button
+				type="button"
+				onclick={onSubmit}
+				disabled={disabled || !value.trim()}
+				class="submit-btn">Share</button
+			>
+			<button type="button" onclick={onPass} {disabled} class="pass-btn">Pass</button>
 		</div>
 	{/if}
 </section>
@@ -44,14 +46,6 @@
 	.input-shell {
 		display: grid;
 		gap: 0.52rem;
-	}
-
-	label {
-		font-size: 0.74rem;
-		text-transform: uppercase;
-		letter-spacing: 0.1em;
-		font-weight: 700;
-		color: #ffd7a0;
 	}
 
 	textarea {

@@ -1,4 +1,11 @@
-import type { MeetingPhaseState } from '$lib/core/types';
+import type {
+	CharacterRole,
+	CharacterStatus,
+	CharacterTier,
+	MeetingParticipant,
+	MeetingPhaseState,
+	ShareInteractionType
+} from '$lib/core/types';
 import { SeamErrorCodes, type SeamErrorCode, type SeamResult } from '$lib/core/seam';
 
 export interface UserProfile {
@@ -26,9 +33,30 @@ export interface ShareRecord {
 	characterId: string | null;
 	isUserShare: boolean;
 	content: string;
+	interactionType: ShareInteractionType;
 	significanceScore: number;
 	sequenceOrder: number;
 	createdAt: string;
+}
+
+export interface MeetingParticipantSeed {
+	id: string;
+	name: string;
+	tier: CharacterTier;
+	status: CharacterStatus;
+	archetype: string;
+	wound: string;
+	contradiction: string;
+	voice: string;
+	quirk: string;
+	color: string;
+	avatar: string;
+	cleanTime: string;
+	meetingCount: number;
+	lastSeenAt: string | null;
+	role: CharacterRole;
+	isVisitor: boolean;
+	seatOrder: number;
 }
 
 export type CallbackType =
@@ -101,6 +129,11 @@ export interface DatabasePort {
 		input: Omit<MeetingRecord, 'id' | 'startedAt' | 'endedAt'>
 	): Promise<SeamResult<MeetingRecord>>;
 	appendShare(input: Omit<ShareRecord, 'id' | 'createdAt'>): Promise<SeamResult<ShareRecord>>;
+	saveMeetingParticipants(input: {
+		meetingId: string;
+		participants: MeetingParticipantSeed[];
+	}): Promise<SeamResult<MeetingParticipant[]>>;
+	getMeetingParticipants(meetingId: string): Promise<SeamResult<MeetingParticipant[]>>;
 	getHeavyMemory(userId: string): Promise<SeamResult<ShareRecord[]>>;
 	getShareById(shareId: string): Promise<SeamResult<ShareRecord>>;
 	getMeetingShares(meetingId: string): Promise<SeamResult<ShareRecord[]>>;
@@ -137,6 +170,38 @@ function isNonEmptyString(value: unknown): value is string {
 
 function isNullableString(value: unknown): value is string | null {
 	return value === null || typeof value === 'string';
+}
+
+function isCharacterTier(value: unknown): value is CharacterTier {
+	return (
+		value === 'core' ||
+		value === 'regular' ||
+		value === 'pool' ||
+		value === 'visitor' ||
+		value === 'archived'
+	);
+}
+
+function isCharacterStatus(value: unknown): value is CharacterStatus {
+	return value === 'active' || value === 'relapsed' || value === 'archived';
+}
+
+function isCharacterRole(value: unknown): value is CharacterRole {
+	return value === 'chair' || value === 'active_sharer' || value === 'quiet_presence';
+}
+
+function isShareInteractionType(value: unknown): value is ShareInteractionType {
+	return (
+		value === 'standard' ||
+		value === 'respond_to' ||
+		value === 'disagree' ||
+		value === 'parallel_story' ||
+		value === 'expand' ||
+		value === 'crosstalk' ||
+		value === 'callback' ||
+		value === 'hard_question' ||
+		value === 'farewell'
+	);
 }
 
 function isCallbackType(value: unknown): value is CallbackType {
@@ -218,6 +283,7 @@ export function validateShareRecord(value: unknown): value is ShareRecord {
 		(value.characterId === null || isNonEmptyString(value.characterId)) &&
 		typeof value.isUserShare === 'boolean' &&
 		isNonEmptyString(value.content) &&
+		isShareInteractionType(value.interactionType) &&
 		Number.isInteger(significanceScore) &&
 		typeof significanceScore === 'number' &&
 		significanceScore >= 0 &&
@@ -240,6 +306,7 @@ export function validateAppendShareInput(
 		(value.characterId === null || isNonEmptyString(value.characterId)) &&
 		typeof value.isUserShare === 'boolean' &&
 		isNonEmptyString(value.content) &&
+		isShareInteractionType(value.interactionType) &&
 		Number.isInteger(significanceScore) &&
 		typeof significanceScore === 'number' &&
 		significanceScore >= 0 &&
@@ -247,6 +314,45 @@ export function validateAppendShareInput(
 		Number.isInteger(sequenceOrder) &&
 		typeof sequenceOrder === 'number' &&
 		sequenceOrder >= 0
+	);
+}
+
+export function validateMeetingParticipantSeed(value: unknown): value is MeetingParticipantSeed {
+	if (!isObject(value)) return false;
+	const meetingCount = value.meetingCount;
+	const seatOrder = value.seatOrder;
+	return (
+		isNonEmptyString(value.id) &&
+		isNonEmptyString(value.name) &&
+		isCharacterTier(value.tier) &&
+		isCharacterStatus(value.status) &&
+		isNonEmptyString(value.archetype) &&
+		isNonEmptyString(value.wound) &&
+		isNonEmptyString(value.contradiction) &&
+		isNonEmptyString(value.voice) &&
+		isNonEmptyString(value.quirk) &&
+		isNonEmptyString(value.color) &&
+		isNonEmptyString(value.avatar) &&
+		isNonEmptyString(value.cleanTime) &&
+		Number.isInteger(meetingCount) &&
+		typeof meetingCount === 'number' &&
+		meetingCount >= 0 &&
+		isNullableString(value.lastSeenAt) &&
+		isCharacterRole(value.role) &&
+		typeof value.isVisitor === 'boolean' &&
+		Number.isInteger(seatOrder) &&
+		typeof seatOrder === 'number' &&
+		seatOrder >= 0
+	);
+}
+
+export function validateMeetingParticipant(value: unknown): value is MeetingParticipant {
+	if (!validateMeetingParticipantSeed(value)) return false;
+	const participant = value as MeetingParticipant;
+	return (
+		typeof participant.sharesCount === 'number' &&
+		Number.isInteger(participant.sharesCount) &&
+		participant.sharesCount >= 0
 	);
 }
 

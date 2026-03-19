@@ -19,6 +19,7 @@ describe('milestone 6 continuity verification', () => {
 							characterId: 'marcus',
 							isUserShare: false,
 							content: 'I stayed and did not run this time.',
+							interactionType: 'respond_to',
 							significanceScore: 8,
 							sequenceOrder: 1,
 							createdAt: '2026-02-10T00:00:00.000Z'
@@ -29,6 +30,7 @@ describe('milestone 6 continuity verification', () => {
 							characterId: null,
 							isUserShare: true,
 							content: 'I came back tonight even though I wanted to hide.',
+							interactionType: 'standard',
 							significanceScore: 6,
 							sequenceOrder: 2,
 							createdAt: '2026-02-11T00:00:00.000Z'

@@ -20,6 +20,12 @@ function createUnavailableDatabaseAdapter(message: string): DatabasePort {
 		async appendShare() {
 			return err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, message);
 		},
+		async saveMeetingParticipants() {
+			return err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, message);
+		},
+		async getMeetingParticipants() {
+			return err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, message);
+		},
 		async getHeavyMemory() {
 			return err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, message);
 		},

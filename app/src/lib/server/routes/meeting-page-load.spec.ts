@@ -1,6 +1,39 @@
 import { describe, expect, it } from 'vitest';
 import { load } from '../../../routes/meeting/[id]/+page.server';
 
+function createDatabaseStub(overrides: Record<string, unknown> = {}) {
+	const persistedParticipants = [
+		{
+			id: 'marcus',
+			name: 'Marcus',
+			tier: 'core' as const,
+			status: 'active' as const,
+			archetype: 'chair',
+			wound: 'grief',
+			contradiction: 'soft voice, hard edge',
+			voice: 'measured',
+			quirk: 'leans back before he speaks',
+			color: '#c58a31',
+			avatar: 'M',
+			cleanTime: '12 years',
+			meetingCount: 0,
+			lastSeenAt: null,
+			role: 'chair' as const,
+			isVisitor: false,
+			seatOrder: 0,
+			sharesCount: 0
+		}
+	];
+
+	return {
+		getMeetingShares: async () => ({ ok: true, value: [] }),
+		getMeetingPhase: async () => ({ ok: true, value: null }),
+		getMeetingParticipants: async () => ({ ok: true, value: [] }),
+		saveMeetingParticipants: async (_input: unknown) => ({ ok: true, value: persistedParticipants }),
+		...overrides
+	};
+}
+
 describe('meeting page server load', () => {
 	it('flags initial crisis mode when setup mind text has crisis keywords', async () => {
 		const result = await load({
@@ -8,10 +41,7 @@ describe('meeting page server load', () => {
 			locals: {
 				userId: 'user-1',
 				seams: {
-					database: {
-						getMeetingShares: async () => ({ ok: true, value: [] }),
-						getMeetingPhase: async () => ({ ok: true, value: null })
-					}
+					database: createDatabaseStub()
 				}
 			},
 			url: new URL('http://localhost/meeting/meeting-1?mind=I%20want%20to%20die')
@@ -29,10 +59,7 @@ describe('meeting page server load', () => {
 			locals: {
 				userId: 'user-1',
 				seams: {
-					database: {
-						getMeetingShares: async () => ({ ok: true, value: [] }),
-						getMeetingPhase: async () => ({ ok: true, value: null })
-					}
+					database: createDatabaseStub()
 				}
 			},
 			url: new URL('http://localhost/meeting/meeting-1?mind=Staying%20for%20the%20next%2024%20hours')
@@ -47,7 +74,7 @@ describe('meeting page server load', () => {
 			locals: {
 				userId: 'user-1',
 				seams: {
-					database: {
+					database: createDatabaseStub({
 						getMeetingShares: async () =>
 							({
 								ok: true,
@@ -58,14 +85,14 @@ describe('meeting page server load', () => {
 										characterId: null,
 										isUserShare: true,
 										content: 'I want to die tonight',
+										interactionType: 'standard',
 										significanceScore: 10,
 										sequenceOrder: 1,
 										createdAt: '2026-02-19T00:00:00.000Z'
 									}
 								]
-							}) as never,
-						getMeetingPhase: async () => ({ ok: true, value: null })
-					}
+							}) as never
+					})
 				}
 			},
 			url: new URL('http://localhost/meeting/meeting-1?mind=staying%20present')
@@ -83,8 +110,7 @@ describe('meeting page server load', () => {
 			locals: {
 				userId: 'user-1',
 				seams: {
-					database: {
-						getMeetingShares: async () => ({ ok: true, value: [] }),
+					database: createDatabaseStub({
 						getMeetingPhase: async () => ({
 							ok: true,
 							value: {
@@ -95,7 +121,7 @@ describe('meeting page server load', () => {
 								userHasSharedInRound: true
 							}
 						})
-					}
+					})
 				}
 			},
 			url: new URL('http://localhost/meeting/meeting-1?mind=staying%20present')
@@ -114,13 +140,12 @@ describe('meeting page server load', () => {
 				locals: {
 					userId: 'user-1',
 					seams: {
-						database: {
-							getMeetingShares: async () => ({ ok: true, value: [] }),
+						database: createDatabaseStub({
 							getMeetingPhase: async () => ({
 								ok: false,
 								error: { code: 'NOT_FOUND', message: 'missing' }
 							})
-						}
+						})
 					}
 				},
 				url: new URL('http://localhost/meeting/missing-meeting?mind=staying%20present')
