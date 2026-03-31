@@ -183,6 +183,25 @@ describe('auth callback route', () => {
 		});
 	});
 
+	it('redirects magic-link-cancelled when callback completion returns UPSTREAM_ERROR', async () => {
+		const auth = createAuthSeamStub();
+		auth.completeAuthCallback.mockResolvedValue(
+			err(SeamErrorCodes.UPSTREAM_ERROR, 'token not found', { upstreamStatus: 404 })
+		);
+		const { cookies } = createCookieJar();
+
+		await expect(
+			GET({
+				url: new URL('http://localhost/auth/callback?code=abc123'),
+				cookies,
+				locals: { seams: { auth, database: {} } }
+			} as never)
+		).rejects.toSatisfy((error: unknown) => {
+			expectRedirectLike(error, 303, '/?auth=magic-link-cancelled');
+			return true;
+		});
+	});
+
 	it('redirects auth-failed when callback completion hits upstream failures', async () => {
 		const auth = createAuthSeamStub();
 		auth.completeAuthCallback.mockResolvedValue(

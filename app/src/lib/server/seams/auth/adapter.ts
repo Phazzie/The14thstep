@@ -106,6 +106,7 @@ const UNAUTHORIZED_UPSTREAM_CODES = new Set([
 	'bad_jwt',
 	'invalid_credentials',
 	'no_authorization',
+	'otp_expired',
 	'session_expired',
 	'session_not_found',
 	'user_not_found'
