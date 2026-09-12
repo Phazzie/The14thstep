@@ -24,6 +24,7 @@
 	{:else}
 		<textarea
 			id="user-share"
+			aria-label="Your share"
 			rows="5"
 			{value}
 			oninput={(event) => onValueChange((event.currentTarget as HTMLTextAreaElement).value)}

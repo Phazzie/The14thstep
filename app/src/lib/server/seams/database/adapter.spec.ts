@@ -110,11 +110,6 @@ function createHarness(responses: MockResponses = {}) {
 	};
 	const shareSingle = responses.shareSingle ?? { data: null, error: null, status: 200 };
 	const heavyMemorySelect = responses.heavyMemorySelect ?? { data: [], error: null, status: 200 };
-	const meetingParticipantsMaybeSingle = responses.meetingParticipantsMaybeSingle ?? {
-		data: null,
-		error: null,
-		status: 200
-	};
 	const meetingParticipantsSelect = responses.meetingParticipantsSelect ?? {
 		data: [],
 		error: null,

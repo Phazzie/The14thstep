@@ -314,13 +314,31 @@ export function isRoundComplete(state: MeetingPhaseState): boolean {
 }
 
 /**
+ * Visitor seats a meeting roster carries beyond the core characters.
+ */
+export const DEFAULT_VISITOR_SEAT_COUNT = 2;
+
+/**
+ * Count the visitor seats in a roster.
+ *
+ * A roster that is short of the core cast is a core-only fallback rather than a
+ * real roster, so it reports the canonical visitor count instead of zero. Every
+ * caller must agree on this number: if one route counts the seats and another
+ * assumes the default, they disagree about when introductions are complete and
+ * the persisted phase silently stops advancing.
+ */
+export function visitorSeatCount(roster: readonly unknown[]): number {
+	const extraSeats = roster.length - INTRO_ORDER.length;
+	return extraSeats > 0 ? extraSeats : DEFAULT_VISITOR_SEAT_COUNT;
+}
+
+/**
  * Check if introductions phase is complete.
- * All core characters plus any random visitors/user must introduce.
- * For now, we check if at least the 6 core characters have spoken.
+ * Every core character, every visitor, and the user must introduce.
  */
 export function areIntroductionsComplete(
 	state: MeetingPhaseState,
-	randomVisitorCount: number = 2
+	randomVisitorCount: number = DEFAULT_VISITOR_SEAT_COUNT
 ): boolean {
 	const coreCharactersRequired = INTRO_ORDER.length;
 	const totalRequired = coreCharactersRequired + randomVisitorCount + 1; // +1 for user

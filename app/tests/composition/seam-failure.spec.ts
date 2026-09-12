@@ -107,6 +107,7 @@ describe('composition: seam failure injection', () => {
 					database: {
 						getMeetingShares: async () => ok([]),
 						getMeetingPhase: async () => ok(null),
+						getMeetingParticipants: async () => ok([]),
 						updateMeetingPhase: async () => ok(undefined),
 						getHeavyMemory: async () => ok([]),
 						getActiveCallbacks: async () => ok([])
@@ -157,6 +158,7 @@ describe('composition: seam failure injection', () => {
 					database: {
 						getMeetingShares: async () => ok([]),
 						getMeetingPhase: async () => ok(null),
+						getMeetingParticipants: async () => ok([]),
 						updateMeetingPhase: async () => ok(undefined),
 						getHeavyMemory: async () => ok([]),
 						getActiveCallbacks: async () => ok([]),
@@ -197,6 +199,7 @@ describe('composition: seam failure injection', () => {
 					database: {
 						getMeetingShares: async () => ok([]),
 						getMeetingPhase: async () => ok(null),
+						getMeetingParticipants: async () => ok([]),
 						updateMeetingPhase: updateSpy,
 						getHeavyMemory: async () => ok([]),
 						getActiveCallbacks: async () => ok([]),

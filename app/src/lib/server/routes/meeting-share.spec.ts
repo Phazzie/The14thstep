@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CORE_CHARACTERS } from '$lib/core/characters';
 import { MeetingPhase } from '$lib/core/types';
-import { buildInteractionAwarePrompt, POST } from '../../../routes/meeting/[id]/share/+server';
+import { _buildInteractionAwarePrompt, POST } from '../../../routes/meeting/[id]/share/+server';
 
 describe('POST /meeting/[id]/share', () => {
 	it('uses dedicated prompt builders for crosstalk, hard questions, and farewells', () => {
@@ -15,7 +15,7 @@ describe('POST /meeting/[id]/share', () => {
 			isUserShare: index === 1
 		}));
 
-		const crosstalkPrompt = buildInteractionAwarePrompt(
+		const crosstalkPrompt = _buildInteractionAwarePrompt(
 			heather,
 			MeetingPhase.SHARING_ROUND_1,
 			'crosstalk',
@@ -25,7 +25,7 @@ describe('POST /meeting/[id]/share', () => {
 			recentShares,
 			recentTranscript
 		);
-		const hardQuestionPrompt = buildInteractionAwarePrompt(
+		const hardQuestionPrompt = _buildInteractionAwarePrompt(
 			heather,
 			MeetingPhase.SHARING_ROUND_2,
 			'hard_question',
@@ -35,7 +35,7 @@ describe('POST /meeting/[id]/share', () => {
 			recentShares,
 			recentTranscript
 		);
-		const farewellPrompt = buildInteractionAwarePrompt(
+		const farewellPrompt = _buildInteractionAwarePrompt(
 			heather,
 			MeetingPhase.POST_MEETING,
 			'farewell',
@@ -62,7 +62,7 @@ describe('POST /meeting/[id]/share', () => {
 			isUserShare: true
 		}));
 
-		const topicAckPrompt = buildInteractionAwarePrompt(
+		const topicAckPrompt = _buildInteractionAwarePrompt(
 			marcus,
 			MeetingPhase.TOPIC_SELECTION,
 			'respond_to',

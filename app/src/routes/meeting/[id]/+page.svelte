@@ -36,7 +36,7 @@
 
 	interface TranscriptSystem {
 		id: string;
-		kind: 'system' | 'ritual' | 'action' | 'local-user';
+		kind: 'system' | 'ritual' | 'action';
 		text: string;
 	}
 
@@ -220,10 +220,6 @@
 
 	function pushAction(text: string) {
 		pushTranscriptItem({ id: nextLocalId('action'), kind: 'action', text });
-	}
-
-	function pushLocalUserIntro(text: string) {
-		pushTranscriptItem({ id: nextLocalId('user-intro'), kind: 'local-user', text });
 	}
 
 	function upsertShare(share: ShareRecord) {
@@ -724,7 +720,20 @@
 
 	async function handleIntroduceSelf() {
 		inputMode = 'none';
-		pushLocalUserIntro(introText());
+		// The user's introduction is a real share. Persisting it is what closes the
+		// introductions round server-side and moves the room on to topic selection;
+		// a local-only line leaves the persisted phase stuck on `introductions`.
+		try {
+			const result = await postUserShare(introText());
+			if (result.crisis) {
+				await requestCrisisSupport(introText());
+				return;
+			}
+		} catch (cause) {
+			errorMessage = cause instanceof Error ? cause.message : String(cause);
+			inputMode = 'intro';
+			return;
+		}
 		pushSystem(`Hi ${userName}.`);
 		if (newcomerGreetingNeeded) {
 			pushAction('A couple people nod like they knew this might be your first time.');
@@ -983,11 +992,6 @@
 							onExpand={requestExpandShare}
 							expanding={expandedShareId === item.entry.id}
 						/>
-					{:else if item.kind === 'local-user'}
-						<li class="local-user-share">
-							<p class="speaker">{userName}</p>
-							<p>{item.text}</p>
-						</li>
 					{:else if item.kind === 'action'}
 						<li class="action-line"><p>{item.text}</p></li>
 					{:else}
@@ -1142,23 +1146,6 @@
 
 	.action-line p {
 		margin: 0;
-	}
-
-	.local-user-share {
-		list-style: none;
-		padding: 0.8rem;
-		border-radius: 0.82rem;
-		border: 1px solid rgba(255, 196, 112, 0.45);
-		background: rgba(37, 28, 16, 0.6);
-		color: #f9f4ea;
-	}
-
-	.local-user-share .speaker {
-		margin: 0 0 0.35rem;
-		font-size: 0.73rem;
-		text-transform: uppercase;
-		letter-spacing: 0.1em;
-		color: #ffd59d;
 	}
 
 	.streaming-preview {

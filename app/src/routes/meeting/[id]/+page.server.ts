@@ -80,13 +80,16 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
 		});
 		if (savedParticipants.ok && savedParticipants.value.length > 0) {
 			participants.splice(0, participants.length, ...savedParticipants.value);
-		} else if (!savedParticipants.ok) {
-			console.warn(
-				`[meeting page] saveMeetingParticipants failed for meeting=${meetingId}: ${savedParticipants.error.message}`
-			);
-			throw error(502, 'Unable to load meeting roster');
 		} else {
-			throw error(502, 'Unable to load meeting roster');
+			// The roster is derived deterministically from the meeting id, so it comes
+			// back the same on every load. Keep the room open on the generated seats
+			// rather than closing the door on someone because a write blipped.
+			const reason = savedParticipants.ok
+				? 'no rows returned'
+				: savedParticipants.error.message;
+			console.warn(
+				`[meeting page] saveMeetingParticipants failed for meeting=${meetingId}: ${reason}; continuing on the generated roster`
+			);
 		}
 	}
 

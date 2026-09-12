@@ -4,8 +4,6 @@
 		speakerName: string;
 		content: string;
 		isUserShare: boolean;
-		significanceScore: number;
-		sequenceOrder: number;
 	}
 
 	let {

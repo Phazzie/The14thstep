@@ -12,6 +12,7 @@ import {
 import {
 	areIntroductionsComplete,
 	selectPromptForPhase,
+	visitorSeatCount,
 	INTRO_ORDER,
 	initializeMeetingPhase,
 	recordCharacterSpoke,
@@ -517,7 +518,7 @@ function mapRecentSharesFromMeeting(
 	});
 }
 
-export function buildInteractionAwarePrompt(
+export function _buildInteractionAwarePrompt(
 	character: CharacterProfile,
 	currentPhase: MeetingPhase,
 	interactionType: ShareInteractionType,
@@ -748,7 +749,7 @@ function createShareStream(
 						);
 					}
 				}
-				const prompt = buildInteractionAwarePrompt(
+				const prompt = _buildInteractionAwarePrompt(
 					selectedCharacter,
 					currentPhase,
 					interactionType,
@@ -878,10 +879,7 @@ function createShareStream(
 					transitionTrigger = interactionType === 'respond_to' ? 'share_complete' : null;
 				} else if (
 					currentPhase === MeetingPhase.INTRODUCTIONS &&
-					areIntroductionsComplete(
-						phaseStateAfterShare,
-						Math.max(0, meetingCharacters.length - INTRO_ORDER.length)
-					)
+					areIntroductionsComplete(phaseStateAfterShare, visitorSeatCount(meetingCharacters))
 				) {
 					transitionTrigger = 'round_complete';
 				}
