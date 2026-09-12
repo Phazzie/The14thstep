@@ -2,6 +2,11 @@
 
 This directory contains the SvelteKit application for the Recovery Meeting Simulator.
 
+For current project status and active work, read [../STATUS.md](../STATUS.md)
+before using this runbook. The production operations section records deployment
+details from an earlier environment; verify provider targets and environment
+configuration before any external operation.
+
 ## Local Run
 
 ```bash

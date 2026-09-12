@@ -18,3 +18,7 @@ repo root is the live entry point.
 
 If you find something here that is still true and still matters, move it into a
 live document or file it as an issue. Do not leave it as the only copy.
+
+The `conductor/` directory is a prior planning system whose `plan.md` workflow
+does not govern this checkout. `implementation-reports/` holds completed M13
+and M18 reports that describe earlier code and verification snapshots.

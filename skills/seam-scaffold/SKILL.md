@@ -1,15 +1,20 @@
 ---
 name: seam-scaffold
-description: Scaffold new seam bundles for the hexagonal architecture used in this project. Use when adding a seam and you need the standard contract/probe/fixtures/mock/contract-test/adapter file layout plus seam-registry.json entry.
+description: Legacy scaffold reference for new seam bundles. The bundled script is not a drop-in command for this checkout because it assumes `src/` and `seam-registry.json` share one root.
 ---
 
 # Seam Scaffold
 
-Use the bundled script to create seam files with consistent paths and templates.
+The current application source is in `app/src/`, while `seam-registry.json` is
+at the repository root. The bundled script assumes both paths are under one
+root, so it can create files in the wrong location or a second registry. Do not
+run it against this checkout until the tool itself is reconciled with the
+repository layout. Follow the seam workflow in `app/AGENTS.md` for new seams.
 
 ## Run
 
-From repo root, run:
+The historical command below shows the script's original interface. It is not a
+safe command for this checkout:
 
     python skills/seam-scaffold/scripts/seam_scaffold.py --name grok-ai --type io --classification sensitive
 

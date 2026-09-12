@@ -2,10 +2,11 @@
 
 Scope: apply these rules for work under `plans/`.
 
-## Canonical plan
+## Plan authority
 
-- The active plan is `plans/the-14th-step-execplan.md`.
-- For slice-promotion / local-to-remote sync work, create or maintain a dedicated living ExecPlan alongside the main product plan.
+- `STATUS.md` is the entry point for current work and its tracks. Keep one live execplan per track, as required by the root guide.
+- `plans/the-14th-step-execplan.md` contains the overall product plan; do not assume it is the execution plan for every task. Use the relevant track plan and identify unresolved conflicts rather than silently choosing a product or architecture direction.
+- For slice-promotion / local-to-remote sync work, maintain the relevant existing plan; create a dedicated plan only when that work needs a separate resumable track.
 - Authoring and maintenance requirements are defined in repository-root `PLANS.md`.
 
 ## ExecPlan maintenance rules
@@ -16,7 +17,7 @@ Scope: apply these rules for work under `plans/`.
   - `Surprises & Discoveries`
   - `Decision Log`
   - `Outcomes & Retrospective`
-- At every real stopping point or handoff, update the living sections before treating the plan as current.
+- When executing or substantively revising a plan, update affected living sections at stopping points or handoffs. A link repair or document move does not by itself establish new milestone progress, decisions, or lessons.
 - Do not ask for "next steps" unless blocked by missing credentials, missing infrastructure access, or conflicting product direction.
 - When plan scope or approach changes, add a revision note at the bottom describing what changed and why.
 

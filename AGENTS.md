@@ -7,21 +7,27 @@ This root file defines global rules. For detailed instructions, also read the ne
 
 ## Global rules
 
-- Keep repository governance artifacts current as work proceeds:
-  - `plans/the-14th-step-execplan.md`
+- Keep affected repository governance artifacts current when their status, decisions, or outcomes materially change; do not add entries to every log for every edit:
+  - the active execplan for the affected track, identified through `STATUS.md`
   - `decision-log.md`
   - `CHANGELOG.md`
   - `LESSONS_LEARNED.md`
   - `DEFERRED.md`
-- Track work as GitHub issues under an epic. Epics are listed in `STATUS.md`. Keep planning in issues and one live execplan per track; do not add another status document to the repo root.
+- Track work as GitHub issues under an epic when GitHub writes are authorized; otherwise use the local handoff. Epics are listed in `STATUS.md`. Keep one live execplan per track; do not add another status document to the repo root.
 - `archive/` is finished history. Read it for context, never for direction.
 - A plan that lives only on an unmerged branch does not exist. If work is worth resuming, its plan belongs on `main`.
-- If work is intentionally deferred, incomplete, or left as a known follow-up, create a GitHub issue before finishing the task/PR and link it in your summary.
+- If work is intentionally deferred, incomplete, or left as a known follow-up, link an existing GitHub issue or create one when GitHub writes are within the user's authorized scope. For local-only work, report the follow-up in the handoff without making external writes a prerequisite to completion.
 - Follow Seam-Driven Development for app implementation. Summary order: contract, probe, fixtures, mock, contract test, adapter, composition wiring. See `app/AGENTS.md` for the full workflow and gate checks.
-- Proceed milestone by milestone unless blocked by missing credentials, missing infrastructure access, or conflicting product direction.
+- When implementing a milestone plan, proceed within the assigned scope unless blocked by missing credentials, missing infrastructure access, or conflicting product direction. A bounded documentation task does not authorize continuing into application milestones.
 - When promoting local work to remote, use decision-gated slices from current `origin/main`; do not push a dirty lab branch wholesale.
 - Do not commit secrets. Keep credentials in local env files only.
-- Prefer Linux shell commands and Bash-oriented workflows for reproducibility.
+- Use commands appropriate to the available shell; keep shared runbook commands explicit about their environment. Do not require Bash for local documentation work in PowerShell.
+
+## Documentation-only work
+
+- For documentation edits and moves that do not change executable behavior, verify content preservation, affected references, and the diff. Application implementation gates and live seam probes do not apply solely because a document lives under `app/`.
+- Update existing navigation and affected guidance; do not create a new ExecPlan or status document solely for a bounded cleanup. Preserve substantive history and unresolved product decisions.
+- Task-specific limits on commits, external writes, and delegation take precedence over workflow examples below.
 
 ## WHAT THIS APP IS
 
@@ -68,13 +74,13 @@ This section adds concrete examples for rules that can be interpreted multiple w
 
 ### Global rules examples
 
-- Keep repository governance artifacts current as work proceeds.
-  - Do: After finishing Milestone 8 work, update `plans/the-14th-step-execplan.md`, add an entry to `decision-log.md`, and append to `CHANGELOG.md` and `LESSONS_LEARNED.md` in the same PR.
+- Keep affected repository governance artifacts current when their contents materially change.
+  - Do: After finishing a milestone, update its active plan and record actual decisions, shipped changes, and lessons in the relevant logs.
   - Don't: Merge feature code and leave governance docs stale for a later cleanup PR.
 - Follow Seam-Driven Development order (contract, probe, fixtures, mock, contract test, adapter, composition wiring).
   - Do: Define/adjust the seam contract first, create probe fixtures, then write adapter and wire routes only after contract tests pass.
   - Don't: Start by editing route handlers and adapter SQL calls, then retrofit contracts and tests afterward.
-- Proceed milestone by milestone unless blocked by missing credentials, missing infrastructure access, or conflicting product direction.
+- When implementing a milestone plan, proceed within the assigned scope.
   - Do: Finish the current milestone acceptance criteria before opening unrelated future-milestone implementation work.
   - Don't: Jump from Milestone 5 into Milestone 9 polish while Milestone 5 core acceptance checks are still failing.
 - When promoting local work to remote, use decision-gated slices from current `origin/main`; do not push a dirty lab branch wholesale.
@@ -129,14 +135,6 @@ This section adds concrete examples for rules that can be interpreted multiple w
   - Do: Reject and retry when text ends in advice, explicit emotion labels, or interchangeable language.
   - Don't: Pass a share that could be spoken by any character in any meeting.
 
-## Line Items Without Examples (And Why)
-
-- `## WHAT THIS APP IS` mission paragraph: no Do/Don't example because it is product purpose context, not an executable rule.
-- `## PROMPT-CRITICAL FILES` paths: no Do/Don't examples per path because these are location references, not behavioral constraints.
-- `Do not commit secrets. Keep credentials in local env files only.` no example added because the rule is already explicit and safety-critical without interpretation room.
-- `Prefer Linux shell commands and Bash-oriented workflows for reproducibility.` no example added because it is a straightforward tooling preference with low ambiguity.
-- `## Nested guides` paths: no Do/Don't example because these are pointers to deeper instructions, not action rules by themselves.
-
 ## Nested guides
 
 - App implementation rules: `app/AGENTS.md`
@@ -146,11 +144,9 @@ This section adds concrete examples for rules that can be interpreted multiple w
 
 ## Subagent usage (Codex)
 
-- `explorer` subagents are best for fast codebase reconnaissance: finding files, line numbers, existing helpers, and summarizing what is already implemented.
-- Use `explorer` before manual searching when a task starts with "where is X?" or "what already exists?".
-- `worker` subagents are for implementation work (editing files, fixing tests, scoped refactors). Assign clear ownership (specific files or one subsystem).
-- Use `worker` only for non-overlapping edits. Do not run multiple workers on the same files at the same time.
-- Default subagents are general-purpose and useful for small, self-contained tasks that do not need deep repo expertise or broad code search.
+- Delegation is optional, not a prerequisite for searching or editing. Follow the current task's delegation limits; do not spawn agents when the task asks for one agent working sequentially.
+- When delegation is permitted and useful, assign one bounded discovery question or implementation outcome using agent capabilities actually available in the session. Do not assume named `explorer` or `worker` types exist.
+- Give each editing agent explicit file ownership. Do not run multiple writers on the same files at the same time or delegate dependent changes concurrently.
 - Prefer one precise subagent task over a vague multi-step prompt. Ask for outputs with file paths and line numbers.
 - For parallel work, split by independent scope (for example: route audit vs adapter audit), then merge results in the main agent.
 - Main agent remains responsible for final integration, conflict resolution, verification, and user-facing summary.
