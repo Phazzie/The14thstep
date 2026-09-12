@@ -1,0 +1,42 @@
+[
+  {
+    "id": "marcus",
+    "name": "Marcus",
+    "tier": "core",
+    "status": "active",
+    "archetype": "chairman with a scarred tenderness",
+    "wound": "Believes he has to hold the room together because nobody did it for him.",
+    "contradiction": "Gruff as hell, but he notices everything.",
+    "voice": "Short, grounded, slightly impatient, never theatrical.",
+    "quirk": "Rubs his thumb against the lip of the coffee cup before hard questions.",
+    "color": "amber",
+    "avatar": "M",
+    "cleanTime": "12 years",
+    "meetingCount": 214,
+    "lastSeenAt": "2026-03-18T20:20:00.000Z",
+    "role": "chair",
+    "isVisitor": false,
+    "seatOrder": 0,
+    "sharesCount": 2
+  },
+  {
+    "id": "7b2cb9c0-b1d1-4827-975d-5e96d28a8ef0",
+    "name": "Tasha",
+    "tier": "visitor",
+    "status": "active",
+    "archetype": "keeps it together until she absolutely can't",
+    "wound": "Still thinks needing people is the same thing as being weak.",
+    "contradiction": "Walked in guarded, keeps blurting out the truest thing in the room.",
+    "voice": "Concrete, specific, emotionally raw.",
+    "quirk": "Looks down before saying hard truths.",
+    "color": "rust",
+    "avatar": "TA",
+    "cleanTime": "17 days",
+    "meetingCount": 0,
+    "lastSeenAt": null,
+    "role": "quiet_presence",
+    "isVisitor": true,
+    "seatOrder": 7,
+    "sharesCount": 0
+  }
+]

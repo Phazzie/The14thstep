@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CORE_CHARACTERS } from './characters';
 import { selectCharacters } from './character-selector';
+import { validateCharacterNarrativeFields } from './characters';
 import type { CharacterProfile } from './types';
 
 const regulars: CharacterProfile[] = [
@@ -55,6 +56,20 @@ describe('selectCharacters', () => {
 		const selected = selectCharacters({ availableCharacters: [...CORE_CHARACTERS, ...regulars] });
 		const marcus = selected.find((character) => character.id === 'marcus');
 		expect(marcus?.role).toBe('chair');
+	});
+
+	it('gives generated visitors full narrative fields for prompting', () => {
+		const selected = selectCharacters({
+			availableCharacters: [...CORE_CHARACTERS, ...regulars],
+			random: () => 0.35,
+			nowIso: '2026-02-16T00:00:00.000Z'
+		});
+		const visitors = selected.filter((character) => character.isVisitor);
+
+		expect(visitors).toHaveLength(2);
+		for (const visitor of visitors) {
+			expect(validateCharacterNarrativeFields(visitor).ok).toBe(true);
+		}
 	});
 
 	it('fills additional seats from regular/pool when target size is larger', () => {

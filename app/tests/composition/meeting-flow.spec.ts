@@ -4,6 +4,7 @@ import { buildPromptContext } from '$lib/core/memory-builder';
 import { scanForCallbacks } from '$lib/core/callback-scanner';
 import { addShare, closeMeeting, createMeeting } from '$lib/core/meeting';
 import { SeamErrorCodes, err, ok } from '$lib/core/seam';
+import type { MeetingParticipant } from '$lib/core/types';
 import type {
 	CallbackRecord,
 	CallbackScope,
@@ -26,6 +27,7 @@ interface InMemoryState {
 	meetings: MeetingRecord[];
 	shares: ShareRecord[];
 	callbacks: CallbackRecord[];
+	participants: MeetingParticipant[];
 	ids: {
 		meeting: number;
 		share: number;
@@ -52,6 +54,7 @@ function createInMemoryDatabase(userId: string): { state: InMemoryState; databas
 		meetings: [],
 		shares: [],
 		callbacks: [],
+		participants: [],
 		ids: { meeting: 0, share: 0, callback: 0 }
 	};
 
@@ -102,6 +105,18 @@ function createInMemoryDatabase(userId: string): { state: InMemoryState; databas
 			return ok(meeting);
 		},
 
+		async saveMeetingParticipants(input) {
+			state.participants = input.participants.map((participant) => ({
+				...participant,
+				sharesCount: 0
+			}));
+			return ok(state.participants);
+		},
+
+		async getMeetingParticipants() {
+			return ok(state.participants);
+		},
+
 		async appendShare(input) {
 			state.ids.share += 1;
 			const share: ShareRecord = {
@@ -110,6 +125,7 @@ function createInMemoryDatabase(userId: string): { state: InMemoryState; databas
 				characterId: input.characterId,
 				isUserShare: input.isUserShare,
 				content: input.content,
+				interactionType: input.interactionType,
 				significanceScore: input.significanceScore,
 				sequenceOrder: input.sequenceOrder,
 				createdAt: isoNow(state.ids.share * 1000)

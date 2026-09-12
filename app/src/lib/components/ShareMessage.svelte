@@ -4,8 +4,6 @@
 		speakerName: string;
 		content: string;
 		isUserShare: boolean;
-		significanceScore: number;
-		sequenceOrder: number;
 	}
 
 	let {
@@ -37,15 +35,13 @@
 			aria-expanded={isExpanded}
 			aria-controls={expandedRegionId}
 		>
-			{expanding ? 'Expanding...' : isExpanded ? 'Expanded' : 'Expand'}
+			{expanding ? 'Listening...' : isExpanded ? 'Told me more' : 'Tell me more'}
 		</button>
 	{/if}
 
 	{#if expandedText}
 		<p id={expandedRegionId} class="expanded">{expandedText}</p>
 	{/if}
-
-	<p class="meta">Significance {entry.significanceScore} · #{entry.sequenceOrder}</p>
 </li>
 
 <style>
@@ -67,7 +63,9 @@
 		text-transform: uppercase;
 		letter-spacing: 0.1em;
 		color: #ffd59d;
-		font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+		font-family:
+			ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+			monospace;
 	}
 
 	.body {
@@ -104,11 +102,5 @@
 		color: #ede9fe;
 		font-size: 0.88rem;
 		line-height: 1.45;
-	}
-
-	.meta {
-		margin: 0.55rem 0 0;
-		font-size: 0.72rem;
-		color: #9db0d4;
 	}
 </style>

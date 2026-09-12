@@ -1,10 +1,11 @@
 import { SeamErrorCodes, err, ok, type SeamResult } from '$lib/core/seam';
 import { CORE_CHARACTERS } from '$lib/core/characters';
-import { MeetingPhase, type MeetingPhaseState } from '$lib/core/types';
+import { MeetingPhase, type MeetingParticipant, type MeetingPhaseState } from '$lib/core/types';
 import {
 	type CallbackRecord,
 	type DatabasePort,
 	type EnsureUserProfileInput,
+	type MeetingParticipantSeed,
 	type MeetingRecord,
 	type ShareRecord,
 	type UserProfile,
@@ -13,6 +14,8 @@ import {
 	validateCreateCallbackInput,
 	validateEnsureUserProfileInput,
 	validateGetMeetingCountAfterDateInput,
+	validateMeetingParticipant,
+	validateMeetingParticipantSeed,
 	validateAppendShareInput,
 	validateCreateMeetingInput,
 	validateMeetingRecord,
@@ -267,15 +270,73 @@ function serializeMeetingPhaseState(
 
 function mapShareRecordRow(row: unknown): ShareRecord {
 	const record = isObject(row) ? row : {};
+	const character = isObject(record.characters) ? record.characters : null;
+	const characterName = character ? asString(character.name) : undefined;
+	const characterIntroStyle = character ? asString(character.intro_style) : undefined;
+	const appCharacterId =
+		characterIntroStyle ??
+		(characterName ? CORE_CHARACTER_ID_BY_NAME.get(characterName) : undefined) ??
+		asNullableString(record.character_id) ??
+		null;
 	return {
 		id: asString(record.id) ?? '',
 		meetingId: asString(record.meeting_id) ?? '',
-		characterId: asNullableString(record.character_id) ?? null,
+		characterId: appCharacterId,
 		isUserShare: asBoolean(record.is_user_share) ?? false,
 		content: asString(record.content) ?? '',
+		interactionType: (asString(record.interaction_type) as ShareRecord['interactionType']) ?? 'standard',
 		significanceScore: asNumber(record.significance_score) ?? Number.NaN,
 		sequenceOrder: asNumber(record.sequence_order) ?? Number.NaN,
 		createdAt: asString(record.created_at) ?? ''
+	};
+}
+
+function cleanTimeLabelFromRow(row: Record<string, unknown>, fallback: string): string {
+	const profileEvolved = isObject(row.profile_evolved) ? row.profile_evolved : null;
+	const cleanTimeLabel =
+		profileEvolved && typeof profileEvolved.cleanTimeLabel === 'string'
+			? profileEvolved.cleanTimeLabel
+			: null;
+	if (isNonEmptyString(cleanTimeLabel)) return cleanTimeLabel;
+	return fallback;
+}
+
+function mapMeetingParticipantRow(row: unknown): MeetingParticipant | null {
+	if (!isObject(row)) return null;
+	const character = isObject(row.characters) ? row.characters : null;
+	if (!character) return null;
+
+	const introStyle = asString(character.intro_style);
+	const coreId = (introStyle && CORE_CHARACTERS.find((entry) => entry.id === introStyle)?.id) ?? null;
+	const coreCharacter =
+		(coreId ? CORE_CHARACTERS.find((entry) => entry.id === coreId) : null) ??
+		CORE_CHARACTERS.find((entry) => entry.name === asString(character.name));
+
+	const fallbackId = asString(character.id) ?? '';
+	const fallbackName = asString(character.name) ?? '';
+	const fallbackTier = (asString(character.tier) as MeetingParticipant['tier']) ?? 'visitor';
+	const fallbackStatus = (asString(character.status) as MeetingParticipant['status']) ?? 'active';
+	const cleanTime = cleanTimeLabelFromRow(character, coreCharacter?.cleanTime ?? '24 hours');
+
+	return {
+		id: introStyle ?? coreCharacter?.id ?? fallbackId,
+		name: coreCharacter?.name ?? fallbackName,
+		tier: coreCharacter?.tier ?? fallbackTier,
+		status: coreCharacter?.status ?? fallbackStatus,
+		archetype: coreCharacter?.archetype ?? (asString(character.archetype) ?? ''),
+		wound: coreCharacter?.wound ?? (asString(character.wound) ?? ''),
+		contradiction: coreCharacter?.contradiction ?? (asString(character.contradiction) ?? ''),
+		voice: coreCharacter?.voice ?? (asString(character.voice) ?? ''),
+		quirk: coreCharacter?.quirk ?? (asString(character.quirk) ?? ''),
+		color: coreCharacter?.color ?? (asString(character.color) ?? ''),
+		avatar: coreCharacter?.avatar ?? (asString(character.avatar) ?? ''),
+		cleanTime,
+		meetingCount: asNumber(character.meeting_count) ?? coreCharacter?.meetingCount ?? 0,
+		lastSeenAt: asNullableString(character.last_seen_at) ?? coreCharacter?.lastSeenAt ?? null,
+		role: (asString(row.role) as MeetingParticipant['role']) ?? 'quiet_presence',
+		isVisitor: (coreCharacter?.tier ?? fallbackTier) === 'visitor',
+		seatOrder: asNumber(row.seat_order) ?? Number.NaN,
+		sharesCount: asNumber(row.shares_count) ?? 0
 	};
 }
 
@@ -309,7 +370,7 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 		const coreNames = CORE_CHARACTERS.map((character) => character.name);
 		const existingResponse = (await supabase
 			.from('characters')
-			.select('id, name')
+			.select('id, name, intro_style')
 			.in('name', coreNames)) as QueryResponseLike<unknown[]>;
 		if (existingResponse.error) return mapUpstreamError(method, existingResponse);
 		if (!Array.isArray(existingResponse.data)) {
@@ -344,13 +405,13 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 						intro_style: character.id
 					}))
 				)
-				.select('id, name')) as QueryResponseLike<unknown[]>;
+				.select('id, name, intro_style')) as QueryResponseLike<unknown[]>;
 			if (insertResponse.error) return mapUpstreamError(method, insertResponse);
 		}
 
 		const finalResponse = (await supabase
 			.from('characters')
-			.select('id, name')
+			.select('id, name, intro_style')
 			.in('name', coreNames)) as QueryResponseLike<unknown[]>;
 		if (finalResponse.error) return mapUpstreamError(method, finalResponse);
 		if (!Array.isArray(finalResponse.data)) {
@@ -366,9 +427,10 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 		for (const row of finalResponse.data) {
 			if (!isObject(row)) continue;
 			const dbId = asString(row.id);
+			const introStyle = asString(row.intro_style);
 			const name = asString(row.name);
-			if (!isNonEmptyString(dbId) || !isNonEmptyString(name)) continue;
-			const domainId = CORE_CHARACTER_ID_BY_NAME.get(name);
+			if (!isNonEmptyString(dbId) || (!isNonEmptyString(introStyle) && !isNonEmptyString(name))) continue;
+			const domainId = introStyle ?? (name ? CORE_CHARACTER_ID_BY_NAME.get(name) : undefined);
 			if (!domainId) continue;
 			dbIdByDomainId.set(domainId, dbId);
 			domainIdByDbId.set(dbId, domainId);
@@ -418,11 +480,114 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 		}
 
 		const coreName = CORE_CHARACTER_NAME_BY_ID.get(characterId);
+		const directLookup = (await supabase
+			.from('characters')
+			.select('id, intro_style')
+			.eq('intro_style', characterId)
+			.maybeSingle()) as QueryResponseLike;
+		if (directLookup.error) return mapUpstreamError(method, directLookup);
+		if (isObject(directLookup.data) && isNonEmptyString(directLookup.data.id)) {
+			return ok(directLookup.data.id);
+		}
+
 		return err(SeamErrorCodes.INPUT_INVALID, `Unknown characterId: ${characterId}`, {
 			method,
 			provider: 'supabase',
 			expectedCoreName: coreName ?? null
 		});
+	}
+
+	async function loadMeetingParticipantsInternal(
+		method: keyof DatabasePort,
+		meetingId: string
+	): Promise<SeamResult<MeetingParticipant[]>> {
+	const response = (await supabase
+		.from('meeting_participants')
+		.select(
+			[
+				'meeting_id',
+				'role',
+				'shares_count',
+				'seat_order',
+				'characters!inner(',
+					'  id,',
+					'  name,',
+					'  tier,',
+					'  archetype,',
+					'  clean_time_start,',
+					'  voice,',
+					'  wound,',
+					'  contradiction,',
+					'  quirk,',
+					'  color,',
+					'  avatar,',
+					'  meeting_count,',
+					'  last_seen_at,',
+					'  status,',
+					'  profile_evolved,',
+					'  intro_style',
+					')'
+				].join(' ')
+			)
+			.eq('meeting_id', meetingId)
+			.order('seat_order', { ascending: true })) as QueryResponseLike<unknown[]>;
+
+		if (response.error) return mapUpstreamError(method, response);
+		if (!Array.isArray(response.data)) {
+			return err(SeamErrorCodes.CONTRACT_VIOLATION, 'meeting participants response is not an array', {
+				method,
+				provider: 'supabase'
+			});
+		}
+
+		const participants = response.data
+			.map((row) => mapMeetingParticipantRow(row))
+			.filter((participant): participant is MeetingParticipant => participant !== null);
+		if (!participants.every((participant) => validateMeetingParticipant(participant))) {
+			return err(SeamErrorCodes.CONTRACT_VIOLATION, 'meeting participants violate MeetingParticipant[]', {
+				method,
+				provider: 'supabase'
+			});
+		}
+		return ok(participants);
+	}
+
+	async function createVisitorCharacter(
+		method: keyof DatabasePort,
+		participant: MeetingParticipantSeed
+	): Promise<SeamResult<string>> {
+		const response = (await supabase
+			.from('characters')
+			.insert({
+				name: participant.name,
+				tier: participant.tier,
+				archetype: participant.archetype,
+				clean_time_start: new Date().toISOString().slice(0, 10),
+				voice: participant.voice,
+				wound: participant.wound,
+				contradiction: participant.contradiction,
+				quirk: participant.quirk,
+				color: participant.color,
+				avatar: participant.avatar,
+				status: participant.status,
+				intro_style: participant.id,
+				profile_evolved: {
+					cleanTimeLabel: participant.cleanTime,
+					sourceParticipantId: participant.id,
+					isVisitor: participant.isVisitor
+				}
+			})
+			.select('id')
+			.single()) as QueryResponseLike;
+		if (response.error) return mapUpstreamError(method, response);
+		const dbId = isObject(response.data) ? asString(response.data.id) : undefined;
+		if (!isNonEmptyString(dbId)) {
+			return err(SeamErrorCodes.CONTRACT_VIOLATION, 'visitor insert did not return a valid id', {
+				method,
+				provider: 'supabase'
+			});
+		}
+		return ok(dbId);
 	}
 
 	return {
@@ -602,6 +767,69 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 			return ok(meeting);
 		},
 
+		async saveMeetingParticipants(input) {
+			if (
+				!isObject(input) ||
+				!isNonEmptyString(input.meetingId) ||
+				!Array.isArray(input.participants) ||
+				!input.participants.every((participant) => validateMeetingParticipantSeed(participant))
+			) {
+				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid saveMeetingParticipants input');
+			}
+
+			const existingParticipants = await loadMeetingParticipantsInternal(
+				'saveMeetingParticipants',
+				input.meetingId
+			);
+			if (!existingParticipants.ok) return existingParticipants;
+			if (existingParticipants.value.length > 0) {
+				return existingParticipants;
+			}
+
+			const participants = [...input.participants].sort((left, right) => left.seatOrder - right.seatOrder);
+			const persistedRows: Array<{
+				meeting_id: string;
+				character_id: string;
+				role: MeetingParticipant['role'];
+				seat_order: number;
+				shares_count: number;
+			}> = [];
+
+			for (const participant of participants) {
+				let dbCharacterId: string;
+				if (participant.isVisitor) {
+					const createdVisitor = await createVisitorCharacter('saveMeetingParticipants', participant);
+					if (!createdVisitor.ok) return createdVisitor;
+					dbCharacterId = createdVisitor.value;
+				} else {
+					const resolved = await resolveDbCharacterId('saveMeetingParticipants', participant.id);
+					if (!resolved.ok) return resolved;
+					dbCharacterId = resolved.value;
+				}
+
+				persistedRows.push({
+					meeting_id: input.meetingId,
+					character_id: dbCharacterId,
+					role: participant.role,
+					seat_order: participant.seatOrder,
+					shares_count: 0
+				});
+			}
+
+			const insertResponse = (await supabase.from('meeting_participants').insert(persistedRows)) as QueryResponseLike;
+			if (insertResponse.error) return mapUpstreamError('saveMeetingParticipants', insertResponse);
+
+			return loadMeetingParticipantsInternal('saveMeetingParticipants', input.meetingId);
+		},
+
+		async getMeetingParticipants(meetingId) {
+			if (!isNonEmptyString(meetingId)) {
+				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid meetingId');
+			}
+
+			return loadMeetingParticipantsInternal('getMeetingParticipants', meetingId);
+		},
+
 		async appendShare(input) {
 			if (!validateAppendShareInput(input)) {
 				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid appendShare input');
@@ -623,14 +851,35 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 					content: input.content,
 					significance_score: input.significanceScore,
 					sequence_order: input.sequenceOrder,
-					interaction_type: 'standard'
+					interaction_type: input.interactionType
 				})
 				.select(
-					'id, meeting_id, character_id, is_user_share, content, significance_score, sequence_order, created_at'
+					'id, meeting_id, character_id, is_user_share, content, interaction_type, significance_score, sequence_order, created_at, characters(id, name, intro_style)'
 				)
 				.single()) as QueryResponseLike;
 
 			if (response.error) return mapUpstreamError('appendShare', response);
+
+			if (dbCharacterId) {
+				const participantRow = (await supabase
+					.from('meeting_participants')
+					.select('shares_count')
+					.eq('meeting_id', input.meetingId)
+					.eq('character_id', dbCharacterId)
+					.maybeSingle()) as QueryResponseLike;
+				if (participantRow.error) return mapUpstreamError('appendShare', participantRow);
+				if (isObject(participantRow.data)) {
+					const nextSharesCount = (asNumber(participantRow.data.shares_count) ?? 0) + 1;
+					const participantUpdate = (await supabase
+						.from('meeting_participants')
+						.update({ shares_count: nextSharesCount })
+						.eq('meeting_id', input.meetingId)
+						.eq('character_id', dbCharacterId)
+						.select('meeting_id')
+						.maybeSingle()) as QueryResponseLike;
+					if (participantUpdate.error) return mapUpstreamError('appendShare', participantUpdate);
+				}
+			}
 
 			const share = mapShareRecordRow(response.data);
 			if (share.characterId !== null) {
@@ -653,7 +902,7 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 			const response = (await supabase
 				.from('shares')
 				.select(
-					'id, meeting_id, character_id, is_user_share, content, significance_score, sequence_order, created_at, meetings!inner(user_id)'
+					'id, meeting_id, character_id, is_user_share, content, interaction_type, significance_score, sequence_order, created_at, characters(id, name, intro_style), meetings!inner(user_id)'
 				)
 				.eq('meetings.user_id', userId)
 				.order('created_at', { ascending: false })
@@ -685,7 +934,7 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 			const response = (await supabase
 				.from('shares')
 				.select(
-					'id, meeting_id, character_id, is_user_share, content, significance_score, sequence_order, created_at'
+					'id, meeting_id, character_id, is_user_share, content, interaction_type, significance_score, sequence_order, created_at, characters(id, name, intro_style)'
 				)
 				.eq('id', shareId)
 				.maybeSingle()) as QueryResponseLike;
@@ -719,7 +968,7 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 			const response = (await supabase
 				.from('shares')
 				.select(
-					'id, meeting_id, character_id, is_user_share, content, significance_score, sequence_order, created_at'
+					'id, meeting_id, character_id, is_user_share, content, interaction_type, significance_score, sequence_order, created_at, characters(id, name, intro_style)'
 				)
 				.eq('meeting_id', meetingId)
 				.order('sequence_order', { ascending: true })

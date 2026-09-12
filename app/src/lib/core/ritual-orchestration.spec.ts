@@ -10,6 +10,8 @@ import {
 	recordUserShared,
 	isRoundComplete,
 	areIntroductionsComplete,
+	visitorSeatCount,
+	DEFAULT_VISITOR_SEAT_COUNT,
 	INTRO_ORDER
 } from './ritual-orchestration';
 import type { CharacterProfile } from './types';
@@ -457,6 +459,44 @@ describe('ritual-orchestration', () => {
 
 			// Should not be complete if expecting 3 visitors
 			expect(areIntroductionsComplete(state, 3)).toBe(false);
+		});
+	});
+
+	describe('visitorSeatCount', () => {
+		it('counts the seats a full roster carries beyond the core cast', () => {
+			const roster = [...INTRO_ORDER, 'visitor-a', 'visitor-b'];
+			expect(visitorSeatCount(roster)).toBe(2);
+		});
+
+		it('reports the canonical count for a core-only fallback roster', () => {
+			// A roster no larger than the core cast means participants failed to load,
+			// not that the meeting genuinely has no visitors.
+			expect(visitorSeatCount(INTRO_ORDER)).toBe(DEFAULT_VISITOR_SEAT_COUNT);
+			expect(visitorSeatCount([])).toBe(DEFAULT_VISITOR_SEAT_COUNT);
+		});
+
+		it('agrees with the areIntroductionsComplete default so routes cannot drift', () => {
+			// Regression: the share route counted roster seats while the user-share route
+			// used the default. On a core-only fallback they disagreed, and the persisted
+			// phase stopped advancing past `introductions` for the rest of the meeting.
+			const roster = [...INTRO_ORDER, 'visitor-a', 'visitor-b'];
+			let state = initializeMeetingPhase();
+			for (const id of roster) {
+				const recorded = recordCharacterSpoke(state, id);
+				expect(recorded.ok).toBe(true);
+				state = (recorded as Extract<typeof recorded, { ok: true }>).value;
+			}
+
+			// Every character has introduced. The room still waits on the user.
+			expect(areIntroductionsComplete(state, visitorSeatCount(roster))).toBe(false);
+
+			const withUser = recordUserShared(state);
+			expect(withUser.ok).toBe(true);
+			state = (withUser as Extract<typeof withUser, { ok: true }>).value;
+
+			// Both call styles must now agree that introductions are done.
+			expect(areIntroductionsComplete(state, visitorSeatCount(roster))).toBe(true);
+			expect(areIntroductionsComplete(state)).toBe(true);
 		});
 	});
 

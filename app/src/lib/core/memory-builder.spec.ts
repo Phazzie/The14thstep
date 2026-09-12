@@ -11,6 +11,7 @@ const shares: ShareRecord[] = [
 		characterId: 'marcus',
 		isUserShare: false,
 		content: 'standard',
+		interactionType: 'standard',
 		significanceScore: 3,
 		sequenceOrder: 1,
 		createdAt: '2026-02-10T00:00:00.000Z'
@@ -21,6 +22,7 @@ const shares: ShareRecord[] = [
 		characterId: null,
 		isUserShare: true,
 		content: 'heavy user event',
+		interactionType: 'standard',
 		significanceScore: 6,
 		sequenceOrder: 2,
 		createdAt: '2026-02-11T00:00:00.000Z'
@@ -31,6 +33,7 @@ const shares: ShareRecord[] = [
 		characterId: 'heather',
 		isUserShare: false,
 		content: 'breakthrough',
+		interactionType: 'respond_to',
 		significanceScore: 8,
 		sequenceOrder: 3,
 		createdAt: '2026-02-12T00:00:00.000Z'
@@ -41,6 +44,7 @@ const shares: ShareRecord[] = [
 		characterId: 'gypsy',
 		isUserShare: false,
 		content: 'low score but in last meeting',
+		interactionType: 'standard',
 		significanceScore: 2,
 		sequenceOrder: 4,
 		createdAt: '2026-02-13T00:00:00.000Z'
