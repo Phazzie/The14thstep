@@ -71,6 +71,7 @@ describe('POST /meeting/[id]/close', () => {
 									characterId: null,
 									isUserShare: true,
 									content: 'I am staying tonight.',
+									interactionType: 'standard',
 									significanceScore: 6,
 									sequenceOrder: 0,
 									createdAt: '2026-02-22T00:01:00.000Z'

@@ -2,6 +2,47 @@
 
 This file captures practical lessons we want future work to reuse.
 
+## 2026-03-19 (Restore Planning)
+
+### Process
+
+- **A feel-heavy restore plan still has to be brutally concrete**: If the plan hand-waves schema, persistence, or route validation details, the executing agent will fill those gaps with shortcuts.
+- **Self-contained ExecPlans beat elegant ones**: If a stateless agent needs the original chat prompt to understand the plan, the plan is not done.
+
+### Technical
+
+- **Random room participants need a real persistence model**: In this repo that means persisted participant rows plus stable seat order, not client-only shuffles.
+- **New share interaction types are not real until the whole stack agrees**: Core union, route validation, seam contract, adapter mapping, and database constraint all have to line up.
+- **Listening-only is easy to regress during meeting-flow rewrites**: It is mostly “skip this gate” logic, which means it disappears unless it is named explicitly in the plan and tests.
+
+## 2026-03-19
+
+### Process
+
+- **When production feels mysteriously “disconnected,” verify the infrastructure before rewriting code**: In this case the app still expected Supabase, Vercel still had Supabase env vars, and the real problem was that both Vercel projects were pointed at the same dead backend tenant.
+- **Blocked production time should still produce clean forward motion**: Merging the small auth hardening slice and opening a bounded narrative-context hardening PR was better than forcing speculative production code while the real backend remained unavailable.
+- **Write the catch-up note while the picture is fresh**: Once the diagnosis spans Vercel project links, stale env vars, merged PRs, blocked infra, and future slices, a single current-state memo is more valuable than expecting anyone to reconstruct the story from chat.
+
+### Technical
+
+- **A project switch is not automatically the cause of a backend outage**: The healthy `app` Vercel project and the old `the14thstep` project both carried the same stale Supabase ref, so moving aliases/projects did not sever a live database. It preserved an already-broken backend config.
+- **A DNS-resolvable Postgres host is not enough**: The pooler hostname can resolve while the tenant behind every Postgres URL is still dead. Probing all configured Postgres URLs matters before attempting a seam-level transport rewrite.
+- **If old data does not matter, fresh backend reprovision is cleaner than speculative adapter work**: Reconnecting the app to a new Supabase project and replaying the existing migrations is less debt than building a new production adapter against dead credentials just to avoid creating a replacement backend.
+
+## 2026-03-19 (Room Restore Execution)
+
+### Process
+
+- **A harsh re-audit after the first frontend pass is worth it**: The initial room-led rewrite looked plausibly done, but the critique step exposed exactly where the page was still cheating: crisis continuation, listening-only shortcuts, topic handoff drift, and dead-end refresh behavior.
+- **Backend truth beats frontend elegance when a room sequence needs to feel real**: The cleanest fixes came from making the server distinguish topic ask vs topic acknowledgment and from letting persisted phase state drive the page, not from layering more client-only choreography on top.
+
+### Technical
+
+- **One persisted phase can still hold two beats if the route understands interaction type**: `TOPIC_SELECTION` only became honest once `standard` meant “Marcus sets the topic in the room” and `respond_to` meant “Marcus acknowledges the chosen topic and moves the room forward.”
+- **Generated visitor characters need full narrative fields, not just names and colors**: Otherwise they degrade prompt quality exactly when the room is trying to feel most alive.
+- **Crisis interruption is not complete until the sequence engine stops advancing**: It is not enough to render the crisis response inline; the page must cancel the active share stream, clear pending user-turn continuations, and refuse to fire the next scheduled room beat.
+- **Svelte 5 rune warnings are easy to tolerate and still worth logging explicitly**: They are not blocking errors here, but leaving them unnamed makes later state bugs harder to triage because the meeting page already has noisy initialization semantics.
+
 ## 2026-03-14
 
 ### Process
@@ -178,3 +219,12 @@ This file captures practical lessons we want future work to reuse.
 ### Technical
 - Existing `node_modules` from another platform can break local test runs; a clean `npm install` fixed missing Linux-native Rollup binaries.
 - Lint tooling can behave differently from tests/checks in this environment, so verification should include multiple commands and timeout-aware triage.
+
+## 2026-03-19
+
+### Technical
+- The meeting phase machine must advance sharing rounds on the user turn, not on the second character share. If the share route advances early, the room stops feeling like a meeting and starts skipping over the user.
+- A persisted meeting roster is only real if the loader refuses to continue when roster persistence fails. Quietly falling back to generated visitor IDs turns a state bug into long-term drift.
+- `interactionType` only matters if it survives every seam layer. Adding enum values without preserving them through fixtures, adapters, routes, and tests creates fake support that breaks the first time the UI leans on it.
+- The introductions gate has two separate shortcut risks: the share route can jump to topic selection when all characters have spoken, and the user-share route can do the same with a simplistic speaker-count rule. Both have to use the real introduction-completion logic or the room quietly stops waiting for the user.
+- Svelte 5 rune warnings about capturing `data` in state initializers are worth fixing early. They are easy to ignore, but they make it harder to tell whether later page bugs are real state mistakes or just noisy initialization patterns.

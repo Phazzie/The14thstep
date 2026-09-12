@@ -48,6 +48,8 @@ function createDeps(overrides: Partial<MeetingWorkflowDeps> = {}): MeetingWorkfl
 				startedAt: '2026-02-16T00:00:00.000Z',
 				endedAt: null
 			}),
+		saveMeetingParticipants: async () => ok([]),
+		getMeetingParticipants: async () => ok([]),
 		appendShare: async (input) =>
 			ok<ShareRecord>({
 				id: 'share-1',
@@ -55,6 +57,7 @@ function createDeps(overrides: Partial<MeetingWorkflowDeps> = {}): MeetingWorkfl
 				characterId: input.characterId,
 				isUserShare: input.isUserShare,
 				content: input.content,
+				interactionType: input.interactionType,
 				significanceScore: input.significanceScore,
 				sequenceOrder: input.sequenceOrder,
 				createdAt: '2026-02-16T00:01:00.000Z'
@@ -67,6 +70,7 @@ function createDeps(overrides: Partial<MeetingWorkflowDeps> = {}): MeetingWorkfl
 				characterId: 'marcus',
 				isUserShare: false,
 				content: 'Share lookup',
+				interactionType: 'respond_to',
 				significanceScore: 6,
 				sequenceOrder: 1,
 				createdAt: '2026-02-16T00:01:00.000Z'

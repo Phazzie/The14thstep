@@ -61,3 +61,20 @@ export function bestEffortRandomInt(maxExclusive: number): number {
 
 	return value % max;
 }
+
+function hashSeed(seed: string): number {
+	let hash = 2166136261;
+	for (let index = 0; index < seed.length; index += 1) {
+		hash ^= seed.charCodeAt(index);
+		hash = Math.imul(hash, 16777619);
+	}
+	return hash >>> 0;
+}
+
+export function createSeededRandom(seed: string): () => number {
+	let state = hashSeed(seed) || 1;
+	return () => {
+		state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+		return state / 4_294_967_296;
+	};
+}

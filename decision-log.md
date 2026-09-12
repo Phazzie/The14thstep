@@ -1,5 +1,12 @@
 # Decision Log
 
+## 2026-03-19
+
+- The virtual-meeting restore will use a meeting-scoped persisted participant roster as the source of truth, not client-only fake `random1` / `random2` speakers.
+- The roster restore needs a real persistence story: database-created visitor character ids plus `seat_order` on `meeting_participants`, not synthetic selector ids pretending to be database ids.
+- Opening, reading, and introduction beats remain phase-driven in the share route; `crosstalk`, `hard_question`, and `farewell` are the interaction-type additions that must be wired and persisted truthfully.
+- Listening-only remains a supported mode in the restore: the user still joins, introduces themself, and chooses a topic, but later share gates and the hard question are skipped.
+
 ## 2026-02-15
 
 - Repository execution will follow `plans/the-14th-step-execplan.md` as the canonical working plan.
@@ -28,6 +35,10 @@
 - Added a dedicated `database.completeMeeting` seam operation to persist close-state metadata through the adapter boundary instead of writing close updates directly inside route handlers.
 - Enforced Milestone 6 retrieval logic in the pure memory-builder core (rather than adapter-only filtering) so memory rules remain deterministic and testable with fixture/mocked seam inputs.
 - Retained `getHeavyMemory` seam name but shifted semantics to return ordered user meeting-share history; rule selection now occurs in `memory-builder` to support last-3-meetings continuity and prompt composition.
+- Treated the meeting restore as a backend-truth problem first: interaction types, roster persistence, and phase ownership were wired through the seam before trusting the page rewrite.
+- Split `topic_selection` into two durable beats without inventing a new phase: `standard` now keeps Marcus in the topic-setting beat, while `respond_to` acknowledges the chosen topic and advances the room.
+- Accepted a bounded stop rule on refresh recovery: pending user gates and fresh post-user transitions resume truthfully, while fully replay-free mid-beat auto-resume is deferred until the ritual state model can encode more substep detail.
+- Kept the remaining Svelte 5 rune warnings explicit instead of pretending they were harmless noise; they are logged as deferred cleanup, not hidden under a green test run.
 
 ## 2026-02-19
 
@@ -66,6 +77,7 @@
 - Renamed route-test helper export in `app/src/routes/meeting/[id]/share/+server.ts` to `_generateValidatedShare` to comply with SvelteKit endpoint export validation rules while preserving direct route-module test coverage.
 - Increased Playwright `webServer.timeout` from `180000` to `300000` after measuring local `npm run build` wall time (~2m12s) and confirming the previous timeout created false e2e startup failures in this workspace.
 - Accepted a local closeout exception for `npm run check` root-cause diagnosis (silent `svelte-check` stall) while still requiring fallback verification lanes (`tsc`, contracts/core/composition tests, build, and Playwright e2e) to pass and be documented.
+- Moved the room-restoration work into the seam/persistence layers before touching the meeting page: persisted roster bootstrap in `+page.server.ts`, preserved `interactionType` end-to-end, and corrected the share route so introductions complete on the full roster and sharing rounds advance on the user turn instead of the second character share.
 
 ## 2026-03-04
 

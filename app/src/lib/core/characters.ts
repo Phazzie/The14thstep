@@ -216,6 +216,57 @@ export const VISITOR_CLEAN_TIMES = [
 	'relapsed 11 days back'
 ] as const;
 
+export const VISITOR_LIES = [
+	'If I keep moving, nobody gets close enough to see how scared I am.',
+	'I can keep one foot out the door and still call this honest.',
+	'If I sound fine, maybe I do not have to admit how bad it got.',
+	'If I disappear first, nobody gets to leave me.'
+] as const;
+
+export const VISITOR_DISCOMFORT_REGISTERS = [
+	'Looks at the floor, starts twice, then says the part they were trying to skip.',
+	'Laughs once with no joy in it, then grips the coffee cup harder.',
+	'Voice gets flatter the closer they get to the truth.',
+	'Shoulders tense, eyes drift to the door, then they stay and finish the sentence.'
+] as const;
+
+export const VISITOR_PROGRAM_RELATIONSHIPS = [
+	'Does not trust the room yet, but keeps showing up because being alone is worse.',
+	'Needs structure and hates needing it.',
+	'Still testing whether honesty here gets used against them.',
+	'Wants what the room has, resents how slowly it comes.'
+] as const;
+
+export const VISITOR_LOST_THINGS = [
+	'custody time, steady sleep, and the feeling of being welcome at home',
+	'a job they liked, people who answered the phone, and any clean sense of time',
+	'trust from family, a place to land, and the story they told about who they were',
+	'months they cannot get back and the version of them that used to feel easy'
+] as const;
+
+export const VISITOR_VOICE_EXAMPLE_SETS = [
+	[
+		'I keep saying I am fine like that word still means something.',
+		'I know exactly where the lie starts and I still catch myself halfway through it.',
+		'I came in here wanting to leave and I am still here, so that has to count for something.'
+	],
+	[
+		'Everybody says one day at a time and I am over here trying to survive the next hour.',
+		'I can hear myself making excuses while I am making them.',
+		'I do not need a miracle tonight. I need to not disappear.'
+	],
+	[
+		'I got real good at acting normal right up until my life fell through the floor.',
+		'I want help and I hate that those two words fit in the same mouth.',
+		'I am tired of calling fear a plan.'
+	],
+	[
+		'I keep showing up mad and somehow that still counts as showing up.',
+		'I know how to leave before anybody can ask the real question.',
+		'I am trying not to confuse shame with truth tonight.'
+	]
+] as const satisfies readonly [readonly [string, string, string], ...readonly [string, string, string][]];
+
 function isNonEmptyString(value: unknown): value is string {
 	return typeof value === 'string' && value.trim().length > 0;
 }

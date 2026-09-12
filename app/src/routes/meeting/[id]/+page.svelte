@@ -1,9 +1,13 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
+	import { onMount } from 'svelte';
+	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import MeetingCircle from '$lib/components/MeetingCircle.svelte';
 	import MeetingReflection from '$lib/components/MeetingReflection.svelte';
 	import ShareMessage from '$lib/components/ShareMessage.svelte';
 	import SystemMessage from '$lib/components/SystemMessage.svelte';
 	import UserInput from '$lib/components/UserInput.svelte';
+	import { createSeededRandom } from '$lib/core/random-utils';
 	import type { PageData } from './$types';
 
 	interface SeamError {
@@ -20,19 +24,30 @@
 		characterId: string | null;
 		isUserShare: boolean;
 		content: string;
+		interactionType: string;
 		significanceScore: number;
 		sequenceOrder: number;
 		createdAt: string;
 	}
 
-	interface TranscriptEntry extends ShareRecord {
+	interface TranscriptShare extends ShareRecord {
 		speakerName: string;
 	}
 
-	interface CloseSummaryValue {
-		meetingId: string;
-		summary: string;
-		phaseState?: RitualPhaseStateSnapshot;
+	interface TranscriptSystem {
+		id: string;
+		kind: 'system' | 'ritual' | 'action' | 'local-user';
+		text: string;
+	}
+
+	type TranscriptItem = { id: string; kind: 'share'; entry: TranscriptShare } | TranscriptSystem;
+
+	interface RitualPhaseStateSnapshot {
+		currentPhase: string;
+		phaseStartedAt: string | Date | null;
+		roundNumber?: number;
+		charactersSpokenThisRound: string[];
+		userHasSharedInRound: boolean;
 	}
 
 	interface UserShareValue {
@@ -47,6 +62,12 @@
 		expandedText: string;
 	}
 
+	interface CloseSummaryValue {
+		meetingId: string;
+		summary: string;
+		phaseState?: RitualPhaseStateSnapshot;
+	}
+
 	interface CrisisResponseValue {
 		shares: ShareRecord[];
 		phaseState?: RitualPhaseStateSnapshot;
@@ -57,728 +78,1231 @@
 		};
 	}
 
-	interface RitualPhaseStateSnapshot {
-		currentPhase: string;
-		phaseStartedAt: string | Date | null;
-		roundNumber?: number;
-		charactersSpokenThisRound: string[];
-		userHasSharedInRound: boolean;
-	}
-
-	type MeetingPhase = 'sharing' | 'closing' | 'reflection';
+	type InputMode = 'none' | 'intro' | 'topic' | 'share' | 'reflection';
+	type TurnOutcome = 'shared' | 'crisis';
 
 	let { data }: { data: PageData } = $props();
-	const defaultTopic = $derived(data.defaultTopic);
-	const initialUserName = $derived(data.initialUserName);
-	const initialMood = $derived(data.initialMood);
-	const initialCrisisMode = $derived(data.initialCrisisMode === true);
-	const shouldTriggerInitialCrisisSupport = $derived(
-		data.shouldTriggerInitialCrisisSupport === true
+	const meetingId = $derived(data.meetingId);
+	const loadedCharacters = $derived(
+		[...data.characters].sort((left, right) => left.seatOrder - right.seatOrder)
 	);
-	const ROOM_LED_PHASES = new Set([
-		'setup',
-		'opening',
-		'empty_chair',
-		'introductions',
-		'topic_selection'
+	const loadedPhaseState = $derived(
+		(data.phaseState as RitualPhaseStateSnapshot | undefined) ?? null
+	);
+
+	const TOPIC_OPTIONS = [
+		'Staying clean when everything falls apart',
+		"People who don't understand what we've been through",
+		'Trusting yourself again',
+		'The difference between being alone and being lonely',
+		"When the people closest to you don't believe you've changed",
+		'Dealing with the things you did',
+		'Finding reasons to stay',
+		'Coming back after relapse',
+		'The people we lost',
+		'When staying clean feels harder than using'
+	];
+
+	const NEWCOMER_CLEAN_TIME = new Set([
+		'This is my first meeting',
+		'Less than a week',
+		"I'm not clean right now"
 	]);
-	const SHARING_ROUND_PHASES = new Set(['sharing_round_1', 'sharing_round_2', 'sharing_round_3']);
-	let topic = $state('');
-	let userName = $state('');
-	let userMood = $state('present');
-	let userShareText = $state('');
-	let transcript = $state<TranscriptEntry[]>([]);
+
+	const ACTION_LINES: Record<string, string[]> = {
+		marcus: ['Marcus shifts in his chair.', 'Marcus rubs the edge of his coffee cup.'],
+		heather: ['Heather nods once.', 'Heather looks down for a second.'],
+		meechie: ['Meechie leans back and lets it hang.', 'Meechie scrubs a hand over his jaw.'],
+		gemini: ['Gemini exhales through her nose.', 'Gemini folds her arms tighter.'],
+		gypsy: ['Gypsy shifts in her chair.', 'Gypsy taps one finger against her cup.'],
+		chrystal: ['Chrystal looks up over the page.', 'Chrystal smooths the folded paper again.']
+	};
+
+	const sequenceRandom = createSeededRandom(`${meetingId}:room-sequence`);
+	const meetingCharacters = loadedCharacters;
+	const speakingOrder = shuffle(
+		meetingCharacters.filter((character) => character.id !== 'marcus'),
+		createSeededRandom(`${meetingId}:speaking-order`)
+	);
+
+	let transcript = $state<TranscriptItem[]>([]);
 	let expandedShares = $state<Record<string, string>>({});
-	let streamingDraft = $state('');
+	let ritualPhaseState = $state<RitualPhaseStateSnapshot | null>(loadedPhaseState);
+	let topic = $state(data.defaultTopic);
+	let selectedTopic = $state('');
+	let userName = $state(data.initialUserName);
+	let userMood = $state(data.initialMood);
+	let userShareText = $state('');
 	let summaryText = $state('');
-	let statusLine = $state('');
 	let errorMessage = $state('');
-	let crisisMode = $state(false);
-	let crisisResources = $state({
-		title: "If you're in crisis",
-		lines: [
-			'988 - Suicide & Crisis Lifeline',
-			'1-800-662-4357 - SAMHSA National Helpline',
-			'You can stay here with us.'
-		]
-	});
-	let heavyMode = $state(false);
-	let sharing = $state(false);
-	let postingShare = $state(false);
-	let closing = $state(false);
-	let expandingShareId = $state<string | null>(null);
+	let inputMode = $state<InputMode>('none');
+	let currentPrompt = $state('');
+	let crisisMode = $state(data.initialCrisisMode === true);
 	let crisisResponding = $state(false);
-	let setupCrisisSupportRequested = $state(false);
+	let crisisResources = $state<CrisisResponseValue['resources'] | null>(null);
+	let isCharacterThinking = $state(false);
+	let streamingPreview = $state('');
 	let activeCharacterId = $state<string | null>(null);
-	let meetingPhase = $state<MeetingPhase>('sharing');
-	let ritualPhaseState = $state<RitualPhaseStateSnapshot | null>(null);
+	let expandedShareId = $state<string | null>(null);
 	let transcriptContainer: HTMLDivElement | null = null;
+	let initialized = false;
+	let runToken = 0;
+	let localCounter = 0;
+	let currentShareSource: EventSource | null = null;
+	let pendingTurn: {
+		resolve: (value: TurnOutcome) => void;
+		prompt: string;
+	} | null = null;
+
+	const derivedInitialCleanTime = $derived(data.initialCleanTime ?? '');
+	const newcomerGreetingNeeded = $derived(NEWCOMER_CLEAN_TIME.has(derivedInitialCleanTime));
 
 	$effect(() => {
-		if (!topic) topic = defaultTopic;
-		if (!userName) userName = initialUserName;
-		if (userMood === 'present') userMood = initialMood;
-	});
-
-	$effect(() => {
-		const serverPhaseState =
-			(data.phaseState as unknown as RitualPhaseStateSnapshot | undefined) ?? null;
-		if (!ritualPhaseState && serverPhaseState) {
-			ritualPhaseState = serverPhaseState;
-		}
-	});
-
-	$effect(() => {
-		if (!initialCrisisMode) return;
-		if (!crisisMode) crisisMode = true;
-		if (!shouldTriggerInitialCrisisSupport || setupCrisisSupportRequested) return;
-		setupCrisisSupportRequested = true;
-		void requestCrisisSupport(topic || defaultTopic);
-	});
-
-	$effect(() => {
-		const transcriptCount = transcript.length;
+		const transcriptSize = transcript.length;
 		if (transcriptContainer) {
 			transcriptContainer.scrollTop = transcriptContainer.scrollHeight;
 		}
-		void transcriptCount;
+		void transcriptSize;
 	});
 
-	function isRoomLedPhase(phase: string | null | undefined): boolean {
-		return typeof phase === 'string' && ROOM_LED_PHASES.has(phase);
+	function shuffle<T>(items: T[], random: () => number): T[] {
+		const copy = [...items];
+		for (let index = copy.length - 1; index > 0; index -= 1) {
+			const swapIndex = Math.floor(random() * (index + 1));
+			[copy[index], copy[swapIndex]] = [copy[swapIndex], copy[index]];
+		}
+		return copy;
 	}
 
-	function isSharingRoundPhase(phase: string | null | undefined): boolean {
-		return typeof phase === 'string' && SHARING_ROUND_PHASES.has(phase);
+	function nextLocalId(prefix: string): string {
+		localCounter += 1;
+		return `${prefix}-${localCounter}`;
 	}
 
-	function shouldAutoRetryRoomLedShare(phase: string | null | undefined): boolean {
-		return typeof phase === 'string' && ROOM_LED_PHASES.has(phase);
+	function wait(ms: number, token: number): Promise<void> {
+		return new Promise((resolve, reject) => {
+			const timer = setTimeout(() => {
+				if (token !== runToken) {
+					reject(new Error('sequence-cancelled'));
+					return;
+				}
+				resolve();
+			}, ms);
+
+			if (token !== runToken) {
+				clearTimeout(timer);
+				reject(new Error('sequence-cancelled'));
+			}
+		});
 	}
 
-	function shouldDisableUserInput(): boolean {
-		return (
-			postingShare ||
-			sharing ||
-			crisisResponding ||
-			meetingPhase !== 'sharing' ||
-			isRoomLedPhase(ritualPhaseState?.currentPhase)
+	function speakerName(characterId: string | null): string {
+		if (!characterId) return userName;
+		return meetingCharacters.find((character) => character.id === characterId)?.name ?? 'Someone';
+	}
+
+	function shareCount(): number {
+		return transcript.filter((item) => item.kind === 'share' && item.entry.sequenceOrder >= 0)
+			.length;
+	}
+
+	function pushTranscriptItem(item: TranscriptItem) {
+		transcript = [...transcript, item];
+	}
+
+	function pushSystem(text: string) {
+		pushTranscriptItem({ id: nextLocalId('system'), kind: 'system', text });
+	}
+
+	function pushRitual(text: string) {
+		pushTranscriptItem({ id: nextLocalId('ritual'), kind: 'ritual', text });
+	}
+
+	function pushAction(text: string) {
+		pushTranscriptItem({ id: nextLocalId('action'), kind: 'action', text });
+	}
+
+	function pushLocalUserIntro(text: string) {
+		pushTranscriptItem({ id: nextLocalId('user-intro'), kind: 'local-user', text });
+	}
+
+	function upsertShare(share: ShareRecord) {
+		const entry: TranscriptShare = {
+			...share,
+			speakerName: share.isUserShare ? userName : speakerName(share.characterId)
+		};
+		const nextItems = [...transcript];
+		const existingIndex = nextItems.findIndex(
+			(item) => item.kind === 'share' && item.entry.id === share.id
 		);
+		if (existingIndex >= 0) {
+			nextItems[existingIndex] = { id: share.id, kind: 'share', entry };
+		} else {
+			nextItems.push({ id: share.id, kind: 'share', entry });
+		}
+		transcript = nextItems;
+		if (!share.isUserShare && share.characterId) {
+			activeCharacterId = share.characterId;
+		}
 	}
 
-	$effect(() => {
-		const currentRitualPhase = ritualPhaseState?.currentPhase;
-		const userIsTyping = userShareText.trim().length > 0;
-		const shouldAutoRunOpening = isRoomLedPhase(currentRitualPhase);
-		const shouldAutoRunSharingRound = isSharingRoundPhase(currentRitualPhase) && !userIsTyping;
+	function closeCurrentShareSource() {
+		currentShareSource?.close();
+		currentShareSource = null;
+		isCharacterThinking = false;
+		streamingPreview = '';
+	}
 
-		if (
-			meetingPhase !== 'sharing' ||
-			sharing ||
-			postingShare ||
-			closing ||
-			crisisMode ||
-			crisisResponding ||
-			errorMessage ||
-			(!shouldAutoRunOpening && !shouldAutoRunSharingRound)
-		) {
+	function isMeaningfulUserShareText(content: string): boolean {
+		const normalized = content.trim().toLowerCase();
+		return normalized.length > 0 && normalized !== "i'll pass for now." && normalized !== 'ill pass for now.';
+	}
+
+	function meaningfulUserShareCount(): number {
+		return transcript.filter(
+			(item) =>
+				item.kind === 'share' &&
+				item.entry.isUserShare &&
+				isMeaningfulUserShareText(item.entry.content)
+		).length;
+	}
+
+	function latestMeaningfulUserShare(): TranscriptShare | null {
+		for (let index = transcript.length - 1; index >= 0; index -= 1) {
+			const item = transcript[index];
+			if (
+				item.kind === 'share' &&
+				item.entry.isUserShare &&
+				isMeaningfulUserShareText(item.entry.content)
+			) {
+				return item.entry;
+			}
+		}
+		return null;
+	}
+
+	function findCharacterById(characterId: string | undefined) {
+		if (!characterId) return null;
+		return meetingCharacters.find((character) => character.id === characterId) ?? null;
+	}
+
+	function pickFarewellCharacter() {
+		for (let index = transcript.length - 1; index >= 0; index -= 1) {
+			const item = transcript[index];
+			if (item.kind === 'share' && !item.entry.isUserShare && item.entry.characterId) {
+				const matched = findCharacterById(item.entry.characterId);
+				if (matched && matched.id !== 'marcus') return matched;
+			}
+		}
+		return speakingOrder.find((character) => character.id !== 'marcus') ?? meetingCharacters[1] ?? null;
+	}
+
+	function promptForResumedPhase(phase: string | undefined): string {
+		switch (phase) {
+			case 'sharing_round_1':
+				return 'What comes up for you?';
+			case 'sharing_round_2':
+				return 'How does this land?';
+			case 'sharing_round_3':
+				return 'Anything else before we close?';
+			default:
+				return '';
+		}
+	}
+
+	function syncInputModeFromPersistedPhase() {
+		if (!ritualPhaseState) {
+			inputMode = 'none';
+			currentPrompt = '';
 			return;
 		}
 
-		const delay = shouldAutoRunOpening ? (transcript.length === 0 ? 350 : 1200) : 9000;
-		const timer = setTimeout(() => {
-			requestCharacterShare();
-		}, delay);
+		if (crisisMode) {
+			inputMode = 'none';
+			currentPrompt = '';
+			return;
+		}
 
-		return () => clearTimeout(timer);
-	});
+		switch (ritualPhaseState.currentPhase) {
+			case 'topic_selection':
+				inputMode = 'topic';
+				currentPrompt = '';
+				return;
+			case 'introductions':
+				if (ritualPhaseState.charactersSpokenThisRound.length >= meetingCharacters.length) {
+					inputMode = 'intro';
+					currentPrompt = '';
+					return;
+				}
+				break;
+			case 'sharing_round_1':
+				if (!ritualPhaseState.userHasSharedInRound && ritualPhaseState.charactersSpokenThisRound.length >= 2) {
+					inputMode = 'share';
+					currentPrompt = promptForResumedPhase(ritualPhaseState.currentPhase);
+					return;
+				}
+				break;
+			case 'sharing_round_2':
+				if (!ritualPhaseState.userHasSharedInRound && ritualPhaseState.charactersSpokenThisRound.length >= 3) {
+					inputMode = 'share';
+					currentPrompt = promptForResumedPhase(ritualPhaseState.currentPhase);
+					return;
+				}
+				break;
+			case 'sharing_round_3':
+				if (!ritualPhaseState.userHasSharedInRound && ritualPhaseState.charactersSpokenThisRound.length >= 3) {
+					inputMode = 'share';
+					currentPrompt = promptForResumedPhase(ritualPhaseState.currentPhase);
+					return;
+				}
+				break;
+			case 'post_meeting':
+				inputMode = 'reflection';
+				currentPrompt = '';
+				return;
+		}
 
-	function isRecord(value: unknown): value is Record<string, unknown> {
-		return typeof value === 'object' && value !== null;
+		inputMode = 'none';
+		currentPrompt = '';
+	}
+
+	function shouldAutoResumeFromPersistedPhase() {
+		if (!ritualPhaseState || crisisMode) return false;
+		if (ritualPhaseState.userHasSharedInRound) return false;
+		if (ritualPhaseState.charactersSpokenThisRound.length > 0) return false;
+
+		return (
+			ritualPhaseState.currentPhase === 'sharing_round_1' ||
+			ritualPhaseState.currentPhase === 'sharing_round_2' ||
+			ritualPhaseState.currentPhase === 'sharing_round_3' ||
+			ritualPhaseState.currentPhase === 'closing'
+		);
 	}
 
 	function parseSeamResult<T>(value: unknown): SeamResult<T> | null {
-		if (!isRecord(value) || typeof value.ok !== 'boolean') return null;
-		if (value.ok) return { ok: true, value: value.value as T };
 		if (
-			!isRecord(value.error) ||
-			typeof value.error.message !== 'string' ||
-			typeof value.error.code !== 'string'
+			!value ||
+			typeof value !== 'object' ||
+			typeof (value as { ok?: unknown }).ok !== 'boolean'
+		) {
+			return null;
+		}
+		const result = value as {
+			ok: boolean;
+			value?: T;
+			error?: { code?: unknown; message?: unknown; details?: unknown };
+		};
+		if (result.ok) return { ok: true, value: result.value as T };
+		if (
+			!result.error ||
+			typeof result.error.code !== 'string' ||
+			typeof result.error.message !== 'string'
 		) {
 			return null;
 		}
 		return {
 			ok: false,
 			error: {
-				code: value.error.code,
-				message: value.error.message,
-				details: isRecord(value.error.details) ? value.error.details : undefined
+				code: result.error.code,
+				message: result.error.message,
+				details:
+					result.error.details && typeof result.error.details === 'object'
+						? (result.error.details as Record<string, unknown>)
+						: undefined
 			}
 		};
 	}
 
-	function characterName(characterId: string | null): string {
-		if (!characterId) return userName;
-		const character = data.characters.find((entry) => entry.id === characterId);
-		return character?.name ?? 'Character';
+	function maybeAddNonverbalReaction(excludedIds: string[]) {
+		if (sequenceRandom() > 0.3) return;
+		const candidate = speakingOrder.find((character) => !excludedIds.includes(character.id));
+		if (!candidate) return;
+		const actions = ACTION_LINES[candidate.id] ?? [`${candidate.name} shifts in their chair.`];
+		const line = actions[Math.floor(sequenceRandom() * actions.length)] ?? actions[0];
+		pushAction(line);
 	}
 
-	function upsertShare(share: ShareRecord) {
-		const speakerName = share.isUserShare ? userName : characterName(share.characterId);
-		const entry: TranscriptEntry = { ...share, speakerName };
-		const existingIndex = transcript.findIndex((item) => item.id === share.id);
-
-		if (existingIndex >= 0) {
-			const copy = [...transcript];
-			copy[existingIndex] = entry;
-			transcript = copy.sort((left, right) => left.sequenceOrder - right.sequenceOrder);
-		} else {
-			transcript = [...transcript, entry].sort(
-				(left, right) => left.sequenceOrder - right.sequenceOrder
-			);
-		}
-
-		if (!entry.isUserShare && entry.characterId) activeCharacterId = entry.characterId;
+	function maybeAddAlmostShare(excludedIds: string[]) {
+		if (sequenceRandom() > 0.2) return;
+		const candidate = speakingOrder.find((character) => !excludedIds.includes(character.id));
+		if (!candidate) return;
+		pushAction(`${candidate.name} starts to say something, stops.`);
 	}
 
-	async function submitUserShare(content: string = userShareText.trim()) {
-		if (!content || postingShare || data.listeningOnly) return;
-
+	async function streamCharacterShare(
+		options: {
+			characterId?: string;
+			interactionType?: string;
+		} = {}
+	): Promise<ShareRecord> {
 		errorMessage = '';
-		statusLine = '';
-		postingShare = true;
+		closeCurrentShareSource();
 
-		try {
-			const response = await fetch(`/meeting/${data.meetingId}/user-share`, {
-				method: 'POST',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({
-					content,
-					sequenceOrder: transcript.length,
-					interactionType: 'standard',
-					isFirstUserShare: transcript.every((entry) => !entry.isUserShare)
-				})
-			});
-			const payload = parseSeamResult<UserShareValue>(await response.json());
-
-			if (!payload) {
-				errorMessage = 'Unexpected user-share response format.';
-				return;
-			}
-			if (!payload.ok) {
-				errorMessage = payload.error.message;
-				return;
-			}
-
-			upsertShare(payload.value.share);
-			crisisMode = payload.value.crisis;
-			heavyMode = payload.value.heavy;
-			if (payload.value.phaseState) ritualPhaseState = payload.value.phaseState;
-			userShareText = '';
-			statusLine = crisisMode
-				? 'Crisis mode detected. The room will stay with you.'
-				: heavyMode
-					? 'Your share was saved (heavy topic noted).'
-					: 'Your share was saved.';
-
-			if (crisisMode) {
-				await requestCrisisSupport(content);
-			}
-		} catch (cause) {
-			errorMessage = cause instanceof Error ? cause.message : String(cause);
-		} finally {
-			postingShare = false;
-		}
-	}
-
-	async function submitPass() {
-		if (data.listeningOnly) return;
-		await submitUserShare("I'll pass for now.");
-	}
-
-	async function requestExpandShare(shareId: string) {
-		const selected = transcript.find((entry) => entry.id === shareId);
-		if (!selected || selected.isUserShare || expandingShareId) return;
-
-		errorMessage = '';
-		statusLine = '';
-		expandingShareId = shareId;
-
-		try {
-			const response = await fetch(`/meeting/${data.meetingId}/expand`, {
-				method: 'POST',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({
-					shareId,
-					topic,
-					recentShares: transcript.slice(-6).map((entry) => ({
-						speaker: entry.speakerName,
-						content: entry.content
-					}))
-				})
-			});
-			const payload = parseSeamResult<ExpandShareValue>(await response.json());
-
-			if (!payload) {
-				errorMessage = 'Unexpected expand response format.';
-				return;
-			}
-			if (!payload.ok) {
-				errorMessage = payload.error.message;
-				return;
-			}
-
-			expandedShares = {
-				...expandedShares,
-				[payload.value.shareId]: payload.value.expandedText
-			};
-			statusLine = 'Expanded share ready.';
-		} catch (cause) {
-			errorMessage = cause instanceof Error ? cause.message : String(cause);
-		} finally {
-			expandingShareId = null;
-		}
-	}
-
-	function requestCharacterShare() {
-		if (sharing || crisisMode || meetingPhase !== 'sharing') return;
-
-		errorMessage = '';
-		statusLine = '';
-		streamingDraft = '';
-		sharing = true;
-
-		const search = new URLSearchParams({
+		const search = new SvelteURLSearchParams({
 			topic,
-			sequenceOrder: String(transcript.length),
+			sequenceOrder: String(shareCount()),
 			crisisMode: crisisMode ? '1' : '0',
-			interactionType: 'respond_to',
+			interactionType: options.interactionType ?? 'standard',
 			userName,
 			userMood
 		});
+		if (options.characterId) search.set('characterId', options.characterId);
 
-		const eventSource = new EventSource(`/meeting/${data.meetingId}/share?${search.toString()}`);
+		return await new Promise<ShareRecord>((resolve, reject) => {
+			const source = new EventSource(`/meeting/${meetingId}/share?${search.toString()}`);
+			currentShareSource = source;
+			isCharacterThinking = true;
+			let resolved = false;
 
-		eventSource.addEventListener('chunk', (event) => {
-			const parsed = parseSeamResult<{ chunk?: string }>(
-				JSON.parse((event as MessageEvent<string>).data)
-			);
-			if (parsed?.ok && typeof parsed.value.chunk === 'string') {
-				streamingDraft = streamingDraft
-					? `${streamingDraft} ${parsed.value.chunk}`
-					: parsed.value.chunk;
-			}
-		});
+			source.addEventListener('meta', (event) => {
+				const parsed = parseSeamResult<{ character?: { id?: string } }>(
+					JSON.parse((event as MessageEvent<string>).data)
+				);
+				if (parsed?.ok && parsed.value.character?.id) {
+					activeCharacterId = parsed.value.character.id;
+				}
+			});
 
-		eventSource.addEventListener('persisted', (event) => {
-			const parsed = parseSeamResult<{
-				share?: ShareRecord;
-				phaseState?: RitualPhaseStateSnapshot;
-				generation?: { attempts?: number; fallbackUsed?: boolean };
-			}>(JSON.parse((event as MessageEvent<string>).data));
-			if (parsed?.ok) {
+			source.addEventListener('chunk', (event) => {
+				const parsed = parseSeamResult<{ chunk?: string }>(
+					JSON.parse((event as MessageEvent<string>).data)
+				);
+				if (parsed?.ok && typeof parsed.value.chunk === 'string') {
+					streamingPreview = `${streamingPreview}${streamingPreview ? ' ' : ''}${parsed.value.chunk}`;
+				}
+			});
+
+			source.addEventListener('persisted', (event) => {
+				const parsed = parseSeamResult<{
+					share?: ShareRecord;
+					phaseState?: RitualPhaseStateSnapshot;
+				}>(JSON.parse((event as MessageEvent<string>).data));
+				if (!parsed?.ok || !parsed.value.share) return;
 				if (parsed.value.phaseState) ritualPhaseState = parsed.value.phaseState;
-			}
-			if (parsed?.ok && isRecord(parsed.value.share)) {
-				upsertShare(parsed.value.share as ShareRecord);
-				statusLine = parsed.value.generation?.fallbackUsed
-					? 'Character share saved (safe fallback used).'
-					: 'Character share generated and saved.';
-				streamingDraft = '';
-			}
-		});
+				upsertShare(parsed.value.share);
+				closeCurrentShareSource();
+				resolved = true;
+				resolve(parsed.value.share);
+			});
 
-		eventSource.addEventListener('error', (event) => {
-			let parsed: SeamResult<unknown> | null = null;
-			try {
-				parsed = parseSeamResult(JSON.parse((event as MessageEvent<string>).data));
-			} catch {
-				parsed = null;
-			}
-			const parsedMessage = parsed && !parsed.ok ? parsed.error.message : 'Share stream failed.';
-			const shouldRetryRoomLedShare = shouldAutoRetryRoomLedShare(ritualPhaseState?.currentPhase);
-			if (parsedMessage.toLowerCase().includes('crisis mode')) {
-				crisisMode = true;
-				errorMessage = '';
-				statusLine = 'Crisis mode is active. Character shares are paused.';
-			} else if (shouldRetryRoomLedShare) {
-				errorMessage = '';
-				statusLine = 'Character share failed. Retrying the room.';
-			} else {
-				errorMessage = parsedMessage;
-			}
-			eventSource.close();
-			sharing = false;
-		});
+			source.addEventListener('error', (event) => {
+				let parsed: SeamResult<unknown> | null = null;
+				try {
+					parsed = parseSeamResult(JSON.parse((event as MessageEvent<string>).data));
+				} catch {
+					parsed = null;
+				}
+				closeCurrentShareSource();
+				if (resolved) return;
+				reject(new Error(parsed && !parsed.ok ? parsed.error.message : 'Share stream failed.'));
+			});
 
-		eventSource.addEventListener('done', () => {
-			eventSource.close();
-			sharing = false;
+			source.addEventListener('done', () => {
+				closeCurrentShareSource();
+			});
 		});
+	}
+
+	async function postUserShare(content: string): Promise<UserShareValue> {
+		const response = await fetch(`/meeting/${meetingId}/user-share`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				content,
+				sequenceOrder: shareCount(),
+				interactionType: 'standard',
+				isFirstUserShare: transcript.every(
+					(item) => item.kind !== 'share' || item.entry.isUserShare === false
+				)
+			})
+		});
+		const payload = parseSeamResult<UserShareValue>(await response.json());
+		if (!payload) throw new Error('Unexpected user-share response.');
+		if (!payload.ok) throw new Error(payload.error.message);
+		upsertShare(payload.value.share);
+		if (payload.value.phaseState) ritualPhaseState = payload.value.phaseState;
+		crisisMode = payload.value.crisis;
+		return payload.value;
 	}
 
 	async function requestCrisisSupport(userText: string) {
 		if (crisisResponding) return;
-
-		errorMessage = '';
 		crisisResponding = true;
-		statusLine = '... room goes quiet ...';
-
 		try {
-			const response = await fetch(`/meeting/${data.meetingId}/crisis`, {
+			const response = await fetch(`/meeting/${meetingId}/crisis`, {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
 				body: JSON.stringify({
 					userText,
 					userName,
-					sequenceOrder: transcript.length
+					sequenceOrder: shareCount()
 				})
 			});
 			const payload = parseSeamResult<CrisisResponseValue>(await response.json());
-
-			if (!payload) {
-				errorMessage = 'Unexpected crisis response format.';
-				return;
-			}
-			if (!payload.ok) {
-				errorMessage = payload.error.message;
-				return;
-			}
-
-			for (const share of payload.value.shares) {
-				upsertShare(share);
-			}
+			if (!payload) throw new Error('Unexpected crisis response.');
+			if (!payload.ok) throw new Error(payload.error.message);
+			for (const share of payload.value.shares) upsertShare(share);
 			if (payload.value.phaseState) ritualPhaseState = payload.value.phaseState;
-			if (payload.value.resources?.sticky) {
-				crisisResources = {
-					title: payload.value.resources.title,
-					lines: payload.value.resources.lines
-				};
-			}
-			statusLine = 'Crisis support responses added. You are not alone.';
-		} catch (cause) {
-			errorMessage = cause instanceof Error ? cause.message : String(cause);
+			crisisResources = payload.value.resources;
+			crisisMode = true;
+			inputMode = 'none';
+			currentPrompt = '';
+			pushSystem('The room stopped and turned toward you.');
 		} finally {
 			crisisResponding = false;
 		}
 	}
 
-	async function requestCloseSummary() {
-		if (closing || meetingPhase !== 'sharing') return;
-
-		errorMessage = '';
-		statusLine = '';
-		closing = true;
-		meetingPhase = 'closing';
-
+	async function requestExpandShare(shareId: string) {
+		const selected = transcript.find((item) => item.kind === 'share' && item.entry.id === shareId);
+		if (!selected || selected.kind !== 'share' || selected.entry.isUserShare || expandedShareId)
+			return;
+		expandedShareId = shareId;
 		try {
-			const response = await fetch(`/meeting/${data.meetingId}/close`, {
+			const response = await fetch(`/meeting/${meetingId}/expand`, {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
 				body: JSON.stringify({
+					shareId,
 					topic,
-					lastShares: transcript.slice(-8).map((entry) => ({
-						speakerName: entry.speakerName,
-						content: entry.content
-					}))
+					recentShares: transcript
+						.filter(
+							(item): item is { id: string; kind: 'share'; entry: TranscriptShare } =>
+								item.kind === 'share'
+						)
+						.slice(-6)
+						.map((item) => ({
+							speaker: item.entry.speakerName,
+							content: item.entry.content
+						}))
 				})
 			});
-			const payload = parseSeamResult<CloseSummaryValue>(await response.json());
-
-			if (!payload) {
-				errorMessage = 'Unexpected close response format.';
-				meetingPhase = 'sharing';
-				return;
-			}
-			if (!payload.ok) {
-				errorMessage = payload.error.message;
-				meetingPhase = 'sharing';
-				return;
-			}
-
-			summaryText = payload.value.summary;
-			if (payload.value.phaseState) ritualPhaseState = payload.value.phaseState;
-			meetingPhase = 'reflection';
-			statusLine = 'Close summary ready.';
+			const payload = parseSeamResult<ExpandShareValue>(await response.json());
+			if (!payload) throw new Error('Unexpected expand response.');
+			if (!payload.ok) throw new Error(payload.error.message);
+			expandedShares = { ...expandedShares, [payload.value.shareId]: payload.value.expandedText };
 		} catch (cause) {
 			errorMessage = cause instanceof Error ? cause.message : String(cause);
-			meetingPhase = 'sharing';
 		} finally {
-			closing = false;
+			expandedShareId = null;
 		}
 	}
+
+	function introText(): string {
+		const cleanTimeLine = derivedInitialCleanTime ? ` ${derivedInitialCleanTime}.` : '';
+		return `I'm ${userName}. I'm an addict.${cleanTimeLine}`;
+	}
+
+	function hasAskedHardQuestion(): boolean {
+		return transcript.some(
+			(item) =>
+				item.kind === 'share' &&
+				!item.entry.isUserShare &&
+				item.entry.interactionType === 'hard_question'
+		);
+	}
+
+	function shouldAskHardQuestion(): boolean {
+		return !data.listeningOnly && meaningfulUserShareCount() >= 2 && !hasAskedHardQuestion();
+	}
+
+	function lastUserTurnWasMeaningful(): boolean {
+		for (let index = transcript.length - 1; index >= 0; index -= 1) {
+			const item = transcript[index];
+			if (item.kind === 'share') {
+				return item.entry.isUserShare && isMeaningfulUserShareText(item.entry.content);
+			}
+		}
+		return false;
+	}
+
+	function resolveRoundTwoSpeakers() {
+		let first = speakingOrder[2] ?? speakingOrder[0] ?? meetingCharacters[0];
+		let second = speakingOrder[3] ?? speakingOrder[1] ?? speakingOrder[0] ?? meetingCharacters[1] ?? first;
+		const latestUserShare = latestMeaningfulUserShare();
+		const parallelCharacterId = latestUserShare
+			? detectParallelStoryCharacter(latestUserShare.content)
+			: null;
+
+		if (parallelCharacterId && parallelCharacterId !== second.id) {
+			const mapped = findCharacterById(parallelCharacterId);
+			if (mapped) {
+				first = mapped;
+			}
+		}
+
+		if (second.id === first.id) {
+			second =
+				speakingOrder.find(
+					(character) => character.id !== first.id && character.id !== (speakingOrder[2]?.id ?? '')
+				) ??
+				meetingCharacters.find((character) => character.id !== first.id) ??
+				second;
+		}
+
+		return { first, second };
+	}
+
+	async function waitForUserTurn(prompt: string): Promise<TurnOutcome> {
+		currentPrompt = prompt;
+		if (data.listeningOnly) {
+			inputMode = 'none';
+			currentPrompt = '';
+			pendingTurn = { resolve: () => undefined, prompt };
+			await wait(1200, runToken);
+			return await handleSubmitShare("I'll pass for now.");
+		}
+		inputMode = 'share';
+		return await new Promise<TurnOutcome>((resolve) => {
+			pendingTurn = { resolve, prompt };
+		});
+	}
+
+	async function continueFromPersistedPhase(currentPhase: string | undefined) {
+		if (!currentPhase || crisisMode) return;
+		switch (currentPhase) {
+			case 'sharing_round_1':
+				await runRoundOne();
+				return;
+			case 'sharing_round_2':
+				await runRoundTwo();
+				return;
+			case 'sharing_round_3':
+				if (shouldAskHardQuestion()) {
+					await wait(900, runToken);
+					await streamCharacterShare({
+						characterId: sequenceRandom() > 0.5 ? 'meechie' : 'marcus',
+						interactionType: 'hard_question'
+					});
+					await wait(1200, runToken);
+				}
+				await runRoundThree();
+				return;
+			case 'closing':
+				await runClosing();
+				return;
+		}
+	}
+
+	async function handleSubmitShare(content = userShareText.trim()): Promise<TurnOutcome> {
+		if (!content || crisisResponding) return 'shared';
+		try {
+			inputMode = 'none';
+			currentPrompt = '';
+			const result = await postUserShare(content);
+			userShareText = '';
+			if (result.heavy) {
+				pushAction('The room goes quiet.');
+				await wait(3500, runToken);
+			} else {
+				await wait(1500, runToken);
+			}
+			if (result.crisis) {
+				await requestCrisisSupport(content);
+				pendingTurn?.resolve('crisis');
+				pendingTurn = null;
+				return 'crisis';
+			}
+			const waitingTurn = pendingTurn;
+			pendingTurn = null;
+			waitingTurn?.resolve('shared');
+			if (!waitingTurn) {
+				await continueFromPersistedPhase(result.phaseState?.currentPhase);
+			}
+			pendingTurn = null;
+			return 'shared';
+		} catch (cause) {
+			errorMessage = cause instanceof Error ? cause.message : String(cause);
+			inputMode = 'share';
+			return 'shared';
+		}
+	}
+
+	async function handlePass() {
+		await handleSubmitShare("I'll pass for now.");
+	}
+
+	async function handleIntroduceSelf() {
+		inputMode = 'none';
+		pushLocalUserIntro(introText());
+		pushSystem(`Hi ${userName}.`);
+		if (newcomerGreetingNeeded) {
+			pushAction('A couple people nod like they knew this might be your first time.');
+			await wait(1200, runToken);
+		} else {
+			await wait(1200, runToken);
+		}
+		await streamCharacterShare({ characterId: 'marcus', interactionType: 'standard' });
+		selectedTopic = TOPIC_OPTIONS.includes(topic) ? topic : '';
+		inputMode = 'topic';
+	}
+
+	async function chooseTopic(nextTopic: string) {
+		topic = nextTopic;
+		selectedTopic = nextTopic;
+		inputMode = 'none';
+		await streamCharacterShare({ characterId: 'marcus', interactionType: 'respond_to' });
+		await wait(900, runToken);
+		await runRounds();
+	}
+
+	async function runRounds() {
+		await runRoundOne();
+	}
+
+	async function runRoundOne() {
+		const roundOneA = speakingOrder[0] ?? meetingCharacters[0];
+		const roundOneB = speakingOrder[1] ?? meetingCharacters[1] ?? roundOneA;
+		await streamCharacterShare({ characterId: roundOneA?.id, interactionType: 'respond_to' });
+		if (roundOneB && sequenceRandom() > 0.6) {
+			await wait(700, runToken);
+			await streamCharacterShare({
+				characterId: roundOneB.id,
+				interactionType: 'crosstalk'
+			});
+		}
+		maybeAddNonverbalReaction([roundOneA?.id ?? '', roundOneB?.id ?? '']);
+		await wait(900, runToken);
+		await streamCharacterShare({ characterId: roundOneB?.id, interactionType: 'respond_to' });
+		await wait(900, runToken);
+		const outcome = await waitForUserTurn('What comes up for you?');
+		if (outcome === 'crisis') return;
+		await runRoundTwo();
+	}
+
+	async function runRoundTwo() {
+		const { first, second } = resolveRoundTwoSpeakers();
+		await streamCharacterShare({ characterId: first?.id, interactionType: 'respond_to' });
+		maybeAddAlmostShare([first?.id ?? '', second?.id ?? '']);
+		await wait(900, runToken);
+		if (second && sequenceRandom() > 0.6) {
+			await streamCharacterShare({ characterId: second.id, interactionType: 'crosstalk' });
+			await wait(700, runToken);
+		}
+		await streamCharacterShare({ characterId: second?.id, interactionType: 'respond_to' });
+		const questionPool = [speakingOrder[0], speakingOrder[1], first, second].filter(
+			(character, index, list): character is NonNullable<typeof character> =>
+				Boolean(character) && list.findIndex((candidate) => candidate?.id === character?.id) === index
+		);
+		const questionAsker = questionPool[Math.floor(sequenceRandom() * questionPool.length)];
+		if (questionAsker) {
+			await wait(900, runToken);
+			await streamCharacterShare({ characterId: questionAsker.id, interactionType: 'respond_to' });
+		}
+		const outcome = await waitForUserTurn('How does this land?');
+		if (outcome === 'crisis') return;
+
+		if (shouldAskHardQuestion()) {
+			await wait(900, runToken);
+			await streamCharacterShare({
+				characterId: sequenceRandom() > 0.5 ? 'meechie' : 'marcus',
+				interactionType: 'hard_question'
+			});
+			await wait(1200, runToken);
+		}
+		await runRoundThree();
+	}
+
+	async function runRoundThree() {
+		const roundThreeA = speakingOrder[4] ?? speakingOrder[2] ?? meetingCharacters[2] ?? meetingCharacters[0];
+		const roundThreeB =
+			speakingOrder[5] ?? speakingOrder[3] ?? meetingCharacters[3] ?? meetingCharacters[1] ?? roundThreeA;
+		await streamCharacterShare({ characterId: roundThreeA?.id, interactionType: 'respond_to' });
+		maybeAddNonverbalReaction([roundThreeA?.id ?? '', roundThreeB?.id ?? '']);
+		await wait(900, runToken);
+		await streamCharacterShare({ characterId: roundThreeB?.id, interactionType: 'respond_to' });
+		await wait(900, runToken);
+		await streamCharacterShare({ characterId: 'marcus', interactionType: 'respond_to' });
+		const outcome = await waitForUserTurn('Anything else before we close?');
+		if (outcome === 'crisis') return;
+		await runClosing();
+	}
+
+	function detectParallelStoryCharacter(content: string): string | null {
+		const normalized = content.toLowerCase();
+		if (normalized.includes('custody') || normalized.includes('kid')) return 'marcus';
+		if (normalized.includes('prison') || normalized.includes('jail')) return 'heather';
+		if (normalized.includes('relapse') || normalized.includes('slip')) return 'gemini';
+		if (
+			normalized.includes('running') ||
+			normalized.includes('moved') ||
+			normalized.includes('city')
+		)
+			return 'gypsy';
+		return null;
+	}
+
+	async function runClosing() {
+		if (lastUserTurnWasMeaningful()) {
+			await streamCharacterShare({ characterId: 'marcus', interactionType: 'respond_to' });
+			await wait(1100, runToken);
+		}
+		await streamCharacterShare({ characterId: 'marcus', interactionType: 'respond_to' });
+		await wait(2000, runToken);
+		const goodbyeCharacter = findCharacterById('heather') ?? speakingOrder[0] ?? meetingCharacters[1] ?? null;
+		if (goodbyeCharacter) {
+			await streamCharacterShare({
+				characterId: goodbyeCharacter.id,
+				interactionType: 'respond_to'
+			});
+			await wait(1500, runToken);
+		}
+		pushRitual('— Keep coming back —');
+		await wait(900, runToken);
+		const farewellCharacter = pickFarewellCharacter();
+		if (farewellCharacter) {
+			await streamCharacterShare({
+				characterId: farewellCharacter.id,
+				interactionType: 'farewell'
+			});
+		}
+
+		const response = await fetch(`/meeting/${meetingId}/close`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				topic,
+				lastShares: transcript
+					.filter(
+						(item): item is { id: string; kind: 'share'; entry: TranscriptShare } =>
+							item.kind === 'share'
+					)
+					.slice(-8)
+					.map((item) => ({
+						speakerName: item.entry.speakerName,
+						content: item.entry.content
+					}))
+			})
+		});
+		const payload = parseSeamResult<CloseSummaryValue>(await response.json());
+		if (!payload) throw new Error('Unexpected close response.');
+		if (!payload.ok) throw new Error(payload.error.message);
+		summaryText = payload.value.summary;
+		if (payload.value.phaseState) ritualPhaseState = payload.value.phaseState;
+		currentPrompt = '';
+		inputMode = 'reflection';
+	}
+
+	async function runFreshMeeting(token: number) {
+		try {
+			await wait(500, token);
+			pushSystem("This chair stays empty for everyone who couldn't make it tonight.");
+			await wait(2000, token);
+			await streamCharacterShare({ characterId: 'marcus' });
+			await wait(3000, token);
+			pushSystem('— moment of silence —');
+			await wait(3000, token);
+			pushAction('Chrystal pulls out a folded paper.');
+			await wait(800, token);
+			await streamCharacterShare({ characterId: 'chrystal' });
+			await wait(3500, token);
+			pushSystem('— introductions —');
+			await wait(800, token);
+
+			for (const character of meetingCharacters) {
+				await streamCharacterShare({ characterId: character.id });
+				if (sequenceRandom() > 0.5) {
+					pushSystem(`Hi ${character.name}!`);
+				}
+				await wait(600, token);
+			}
+
+			pushAction('The room settles. Everyone is waiting.');
+			await wait(1500, token);
+			inputMode = 'intro';
+		} catch (cause) {
+			if (cause instanceof Error && cause.message === 'sequence-cancelled') return;
+			errorMessage = cause instanceof Error ? cause.message : String(cause);
+		}
+	}
+
+	onMount(() => {
+		if (initialized) return;
+		initialized = true;
+		runToken += 1;
+		const token = runToken;
+
+		for (const share of data.initialShares ?? []) {
+			upsertShare(share as ShareRecord);
+		}
+
+		if (
+			data.initialCrisisMode &&
+			data.shouldTriggerInitialCrisisSupport &&
+			!data.initialShares?.length
+		) {
+			void requestCrisisSupport(topic);
+			return () => {
+				runToken += 1;
+			};
+		}
+
+		if (!data.initialShares?.length) {
+			void runFreshMeeting(token);
+		} else if (shouldAutoResumeFromPersistedPhase()) {
+			void continueFromPersistedPhase(ritualPhaseState?.currentPhase);
+		} else {
+			syncInputModeFromPersistedPhase();
+		}
+
+		return () => {
+			closeCurrentShareSource();
+			runToken += 1;
+		};
+	});
 </script>
 
-<main class="room-shell">
-	<section class="room-panel room-meta">
-		<header class="room-head">
-			<p class="kicker">Room Live</p>
-			<h1>Meeting Room</h1>
-			<p class="meeting-id">Meeting ID: <code>{data.meetingId}</code></p>
-			<p class="phase-pill">Phase: {ritualPhaseState?.currentPhase ?? 'unknown'}</p>
-			<p class="member-line">{userName} · {data.initialCleanTime ?? 'clean time not set'}</p>
-		</header>
-
-		<MeetingCircle characters={data.characters} {activeCharacterId} {crisisMode} />
-
-		<section class="edit-grid" aria-label="Meeting metadata">
-			<label>
-				<span>Topic</span>
-				<input bind:value={topic} />
-			</label>
-			<label>
-				<span>Your Name</span>
-				<input bind:value={userName} />
-			</label>
-			<label>
-				<span>Mood</span>
-				<input bind:value={userMood} />
-			</label>
-		</section>
+<main class="meeting-shell">
+	<section class="circle-wrap">
+		<MeetingCircle characters={meetingCharacters} {activeCharacterId} {crisisMode} />
 	</section>
 
-	<section class="room-panel room-transcript">
-		<div class="toolbar">
-			{#if sharing}
-				<p class="toolbar-status">The room keeps moving on its own.</p>
-			{/if}
-			<button
-				type="button"
-				onclick={requestCloseSummary}
-				disabled={closing || sharing || meetingPhase !== 'sharing'}
-			>
-				{closing ? 'Closing Meeting...' : 'Close Meeting'}
-			</button>
-		</div>
-
+	<section class="transcript-wrap">
 		{#if errorMessage}
-			<SystemMessage message={errorMessage} kind="error" />
+			<div class="inline-system"><SystemMessage message={errorMessage} kind="error" /></div>
 		{/if}
-		{#if statusLine}
-			<SystemMessage message={statusLine} kind="info" />
-		{/if}
-		{#if streamingDraft}
-			<SystemMessage message={`Streaming: ${streamingDraft}`} kind="success" />
+		{#if isCharacterThinking}
+			<div class="thinking-line" aria-live="polite" aria-label="Someone is gathering themselves to speak">
+				<span></span><span></span><span></span>
+			</div>
 		{/if}
 
-		<div bind:this={transcriptContainer} class="transcript-scroll" aria-live="polite">
-			{#if transcript.length === 0}
-				<SystemMessage message="No shares yet." kind="info" />
-			{:else}
-				<ol class="transcript-list">
-					{#each transcript as entry (entry.id)}
+		<div bind:this={transcriptContainer} class="transcript-scroll">
+			<ol class="transcript-list">
+				{#if streamingPreview}
+					<li class="streaming-preview">
+						<p class="speaker">{speakerName(activeCharacterId)}</p>
+						<p>{streamingPreview}</p>
+					</li>
+				{/if}
+				{#each transcript as item (item.id)}
+					{#if item.kind === 'share'}
 						<ShareMessage
-							{entry}
-							expandedText={expandedShares[entry.id]}
+							entry={item.entry}
+							expandedText={expandedShares[item.entry.id]}
 							onExpand={requestExpandShare}
-							expanding={expandingShareId === entry.id}
+							expanding={expandedShareId === item.entry.id}
 						/>
-					{/each}
-				</ol>
-			{/if}
+					{:else if item.kind === 'local-user'}
+						<li class="local-user-share">
+							<p class="speaker">{userName}</p>
+							<p>{item.text}</p>
+						</li>
+					{:else if item.kind === 'action'}
+						<li class="action-line"><p>{item.text}</p></li>
+					{:else}
+						<li class="inline-system">
+							<SystemMessage message={item.text} kind={item.kind === 'ritual' ? 'ritual' : 'info'} />
+						</li>
+					{/if}
+				{/each}
+			</ol>
 		</div>
 	</section>
 
-	<section class="room-panel room-turn">
+	<section class="input-wrap">
 		{#if crisisMode}
-			<section class="crisis-card" role="status" aria-live="polite">
-				<h2>{crisisResources.title}</h2>
-				{#each crisisResources.lines as line (`${line}`)}
-					<p>{line}</p>
-				{/each}
-			</section>
+			<div class="inline-system">
+				<SystemMessage message="The meeting stopped. Stay with the room." kind="error" />
+			</div>
+			{#if crisisResources}
+				<div class="control-card crisis-card">
+					<p class="prompt-line">{crisisResources.title}</p>
+					<ul class="resource-list">
+						{#each crisisResources.lines as line (line)}
+							<li>{line}</li>
+						{/each}
+					</ul>
+				</div>
+			{/if}
 		{/if}
 
-		{#if meetingPhase === 'reflection' && summaryText}
-			<MeetingReflection summary={summaryText} onClose={() => (meetingPhase = 'sharing')} />
+		{#if inputMode === 'intro'}
+			<div class="control-card">
+				<button class="primary-btn" type="button" onclick={handleIntroduceSelf}>
+					Introduce yourself
+				</button>
+			</div>
+		{:else if inputMode === 'topic'}
+			<div class="control-card">
+				<p class="prompt-line">Pick what is on the table tonight.</p>
+				<div class="topic-grid">
+					{#each TOPIC_OPTIONS as option (option)}
+						<button
+							type="button"
+							class:selected={selectedTopic === option}
+							class="topic-btn"
+							onclick={() => (selectedTopic = option)}
+						>
+							{option}
+						</button>
+					{/each}
+				</div>
+				<div class="topic-actions">
+					<button
+						type="button"
+						class="primary-btn"
+						disabled={!selectedTopic}
+						onclick={() => selectedTopic && chooseTopic(selectedTopic)}
+					>
+						Bring that into the room
+					</button>
+				</div>
+			</div>
+		{:else if inputMode === 'share'}
+			<div class="control-card">
+				<p class="prompt-line">{currentPrompt}</p>
+				<UserInput
+					value={userShareText}
+					onValueChange={(next) => (userShareText = next)}
+					onSubmit={() => void handleSubmitShare()}
+					onPass={() => void handlePass()}
+					disabled={crisisResponding}
+					{crisisMode}
+					listeningOnly={data.listeningOnly}
+				/>
+			</div>
+		{:else if inputMode === 'reflection'}
+			<div class="control-card">
+				<p class="prompt-line">Meeting's over. You showed up.</p>
+				{#if summaryText}
+					<MeetingReflection summary={summaryText} />
+				{/if}
+				<div class="end-actions">
+					<a class="primary-btn link-btn" href={resolve('/')}>New meeting</a>
+				</div>
+			</div>
 		{:else}
-			<UserInput
-				value={userShareText}
-				onValueChange={(next) => (userShareText = next)}
-				onSubmit={() => submitUserShare()}
-				onPass={submitPass}
-				disabled={shouldDisableUserInput()}
-				{crisisMode}
-				listeningOnly={data.listeningOnly}
-			/>
+			<div class="control-card waiting-card" aria-hidden="true"></div>
 		{/if}
 	</section>
 </main>
 
 <style>
-	.room-shell {
-		max-width: 1300px;
+	:global(body) {
+		background:
+			radial-gradient(circle at top, rgba(196, 127, 54, 0.14), transparent 28%),
+			linear-gradient(180deg, #090d14 0%, #111827 50%, #090d14 100%);
+	}
+
+	.meeting-shell {
+		max-width: 860px;
 		margin: 0 auto;
-		padding: 1rem;
+		padding: 1rem 0.9rem 2rem;
 		display: grid;
-		grid-template-columns: 1fr;
 		gap: 0.9rem;
 	}
 
-	.room-panel {
+	.circle-wrap,
+	.transcript-wrap,
+	.input-wrap,
+	.control-card {
+		border: 1px solid rgba(167, 139, 96, 0.22);
 		border-radius: 1rem;
-		border: 1px solid rgba(158, 178, 214, 0.24);
-		background:
-			radial-gradient(circle at 86% 8%, rgba(255, 171, 68, 0.1), transparent 36%),
-			linear-gradient(170deg, rgba(9, 14, 24, 0.94), rgba(7, 10, 17, 0.88));
-		padding: 0.92rem;
+		background: rgba(11, 17, 26, 0.84);
+		backdrop-filter: blur(12px);
 	}
 
-	.room-head h1 {
-		margin: 0.25rem 0 0;
-		font-size: 1.52rem;
-		color: #ffe8bb;
+	.circle-wrap,
+	.input-wrap,
+	.control-card {
+		padding: 0.9rem;
 	}
 
-	.kicker {
-		margin: 0;
-		font-size: 0.72rem;
-		text-transform: uppercase;
-		letter-spacing: 0.12em;
-		color: #f5c87a;
-	}
-
-	.meeting-id,
-	.member-line {
-		margin: 0.35rem 0 0;
-		font-size: 0.84rem;
-		color: #d4e2fb;
-	}
-
-	.phase-pill {
-		display: inline-flex;
-		margin: 0.4rem 0 0;
-		padding: 0.22rem 0.45rem;
-		border-radius: 999px;
-		font-size: 0.72rem;
-		text-transform: uppercase;
-		letter-spacing: 0.07em;
-		background: rgba(21, 31, 51, 0.84);
-		border: 1px solid rgba(123, 156, 214, 0.34);
-		color: #d9e7ff;
-	}
-
-	.edit-grid {
-		margin-top: 0.8rem;
-		display: grid;
-		gap: 0.5rem;
-	}
-
-	.edit-grid label {
-		display: grid;
-		gap: 0.24rem;
-	}
-
-	.edit-grid span {
-		font-size: 0.72rem;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.08em;
-		color: #ffd7a0;
-	}
-
-	.edit-grid input {
-		width: 100%;
-		border-radius: 0.66rem;
-		border: 1px solid rgba(127, 149, 188, 0.36);
-		background: rgba(12, 19, 32, 0.84);
-		color: #e5eeff;
-		padding: 0.48rem 0.58rem;
-		font: inherit;
-		font-size: 0.88rem;
-	}
-
-	.edit-grid input:focus {
-		outline: 2px solid rgba(255, 195, 110, 0.66);
-		outline-offset: 1px;
-	}
-
-	.toolbar {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.45rem;
-		margin-bottom: 0.55rem;
-		align-items: center;
-	}
-
-	.toolbar-status {
-		margin: 0;
-		font-size: 0.78rem;
-		color: #cbdcf8;
-	}
-
-	.toolbar button {
-		min-height: 2.65rem;
-		padding: 0.56rem 0.75rem;
-		border-radius: 0.65rem;
-		border: 1px solid rgba(251, 191, 36, 0.38);
-		background: rgba(122, 58, 17, 0.88);
-		color: #fef3c7;
-		font: inherit;
-		font-size: 0.82rem;
-		font-weight: 700;
-		cursor: pointer;
-	}
-
-	.toolbar button:disabled {
-		opacity: 0.48;
-		cursor: not-allowed;
+	.transcript-wrap {
+		padding: 0.55rem;
+		min-height: 24rem;
 	}
 
 	.transcript-scroll {
-		margin-top: 0.55rem;
-		max-height: 34rem;
-		overflow-y: auto;
-		border-radius: 0.82rem;
-		border: 1px solid rgba(104, 122, 156, 0.32);
-		background: rgba(6, 10, 17, 0.8);
-		padding: 0.62rem;
+		max-height: 55vh;
+		overflow: auto;
+		padding: 0.2rem;
 	}
 
 	.transcript-list {
 		list-style: none;
-		padding: 0;
 		margin: 0;
+		padding: 0;
 		display: grid;
-		gap: 0.52rem;
+		gap: 0.72rem;
+	}
+
+	.inline-system {
+		list-style: none;
+	}
+
+	.action-line {
+		list-style: none;
+		padding: 0.1rem 0.2rem;
+		color: #d9c7a1;
+		font-style: italic;
+		opacity: 0.9;
+	}
+
+	.action-line p {
+		margin: 0;
+	}
+
+	.local-user-share {
+		list-style: none;
+		padding: 0.8rem;
+		border-radius: 0.82rem;
+		border: 1px solid rgba(255, 196, 112, 0.45);
+		background: rgba(37, 28, 16, 0.6);
+		color: #f9f4ea;
+	}
+
+	.local-user-share .speaker {
+		margin: 0 0 0.35rem;
+		font-size: 0.73rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: #ffd59d;
+	}
+
+	.streaming-preview {
+		list-style: none;
+		padding: 0.8rem;
+		border-radius: 0.82rem;
+		border: 1px solid rgba(245, 199, 126, 0.36);
+		background: rgba(20, 27, 39, 0.78);
+		color: #f7f2e7;
+	}
+
+	.streaming-preview p {
+		margin: 0;
+	}
+
+	.streaming-preview p + p {
+		margin-top: 0.4rem;
+		line-height: 1.55;
+	}
+
+	.prompt-line {
+		margin: 0 0 0.75rem;
+		font-size: 0.98rem;
+		line-height: 1.5;
+		color: #efe8da;
+	}
+
+	.thinking-line {
+		display: inline-flex;
+		gap: 0.32rem;
+		padding: 0.2rem 0.15rem 0.6rem;
+	}
+
+	.thinking-line span {
+		width: 0.42rem;
+		height: 0.42rem;
+		border-radius: 999px;
+		background: rgba(245, 199, 126, 0.9);
+		animation: room-pulse 1s infinite ease-in-out;
+	}
+
+	.thinking-line span:nth-child(2) {
+		animation-delay: 0.12s;
+	}
+
+	.thinking-line span:nth-child(3) {
+		animation-delay: 0.24s;
 	}
 
 	.crisis-card {
-		margin-bottom: 0.62rem;
-		padding: 0.74rem;
-		border-radius: 0.78rem;
-		border: 1px solid rgba(253, 164, 175, 0.45);
-		background: rgba(127, 29, 29, 0.24);
-		color: #fecaca;
+		margin-top: 0.8rem;
 	}
 
-	.crisis-card h2 {
+	.resource-list {
 		margin: 0;
-		font-size: 0.92rem;
-		text-transform: uppercase;
-		letter-spacing: 0.08em;
+		padding-left: 1.1rem;
+		display: grid;
+		gap: 0.35rem;
+		color: #fef3c7;
+		line-height: 1.45;
 	}
 
-	.crisis-card p {
-		margin: 0.4rem 0 0;
-		font-size: 0.85rem;
-		line-height: 1.4;
+	.primary-btn,
+	.topic-btn,
+	.link-btn {
+		font: inherit;
 	}
 
-	@media (min-width: 980px) {
-		.room-shell {
-			grid-template-columns: minmax(220px, 1fr) minmax(420px, 2fr) minmax(260px, 1fr);
-			align-items: start;
+	.primary-btn,
+	.link-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		min-height: 2.9rem;
+		padding: 0.7rem 1rem;
+		border-radius: 0.78rem;
+		border: 1px solid rgba(227, 179, 97, 0.55);
+		background: rgba(148, 92, 27, 0.88);
+		color: #fff7ea;
+		font-weight: 700;
+		cursor: pointer;
+		text-decoration: none;
+	}
+
+	.topic-grid {
+		display: grid;
+		gap: 0.55rem;
+	}
+
+	.topic-btn {
+		text-align: left;
+		padding: 0.78rem 0.82rem;
+		border-radius: 0.78rem;
+		border: 1px solid rgba(131, 156, 198, 0.24);
+		background: rgba(16, 24, 36, 0.95);
+		color: #ebf1ff;
+		cursor: pointer;
+	}
+
+	.topic-btn.selected {
+		border-color: rgba(245, 199, 126, 0.58);
+		background: rgba(57, 39, 16, 0.9);
+		color: #fff7ea;
+	}
+
+	.topic-actions {
+		margin-top: 0.8rem;
+	}
+
+	.topic-btn:hover,
+	.primary-btn:hover,
+	.link-btn:hover {
+		filter: brightness(1.08);
+	}
+
+	.waiting-card {
+		min-height: 3.9rem;
+	}
+
+	.end-actions {
+		margin-top: 0.8rem;
+	}
+
+	@keyframes room-pulse {
+		0%,
+		80%,
+		100% {
+			transform: translateY(0);
+			opacity: 0.42;
 		}
 
-		.room-meta {
-			position: sticky;
-			top: 0.8rem;
+		40% {
+			transform: translateY(-0.12rem);
+			opacity: 1;
+		}
+	}
+
+	@media (min-width: 768px) {
+		.meeting-shell {
+			padding: 1.5rem 1.1rem 2.8rem;
 		}
 
-		.room-turn {
-			position: sticky;
-			top: 0.8rem;
+		.topic-grid {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
 		}
 	}
 </style>

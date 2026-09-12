@@ -6,6 +6,7 @@ import {
 	type ShareInteractionType
 } from '$lib/core/meeting';
 import {
+	areIntroductionsComplete,
 	initializeMeetingPhase,
 	isRoundComplete,
 	recordUserShared,
@@ -299,14 +300,11 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 		);
 	}
 
-	const speakerCount =
-		phaseStateAfterUserShare.charactersSpokenThisRound.length +
-		(phaseStateAfterUserShare.userHasSharedInRound ? 1 : 0);
 	let transitionTrigger: 'share_complete' | 'round_complete' | 'user_input' | 'meeting_start' | null = null;
 
 	if (currentPhase === MeetingPhase.TOPIC_SELECTION) {
 		transitionTrigger = 'user_input';
-	} else if (currentPhase === MeetingPhase.INTRODUCTIONS && speakerCount >= 2) {
+	} else if (currentPhase === MeetingPhase.INTRODUCTIONS && areIntroductionsComplete(phaseStateAfterUserShare)) {
 		transitionTrigger = 'round_complete';
 	} else if (
 		(currentPhase === MeetingPhase.SHARING_ROUND_1 ||
