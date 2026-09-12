@@ -2,6 +2,24 @@
 
 All notable changes to this repository are documented in this file.
 
+## 2026-09-12
+
+### Fixed
+- The meeting's persisted phase could not advance past `introductions`, so every later character share was generated from the wrong phase and characters kept introducing themselves instead of discussing the topic. The user's introduction is now a persisted share (#76).
+- `buildInteractionAwarePrompt` was exported from a route module, which SvelteKit rejects. This broke `npm run build` and every e2e run (#76).
+- The share and user-share routes disagreed about when introductions were complete. Both now use `visitorSeatCount` (#7, #76).
+- A failed roster save returned 502 and closed the meeting page instead of falling back to the deterministic roster (#76).
+- The share textarea had no accessible label (#76).
+
+### Changed
+- The meeting page runs as a room: the opening ritual, reading and introductions play without user input, and the room stops only at real turns.
+- Replaced the e2e suite with specs that exercise the room-led flow.
+- Repo layout: added `STATUS.md` as the single entry point, moved finished history to `archive/`, and filed the outstanding work as GitHub epics with sub-issues.
+
+### Known
+- `verify:fixtures` fails on every branch: seam probe fixtures are past their freshness window and refreshing them is blocked behind the production database outage (#91, #71).
+
+
 ## [2026-03-19]
 
 ### Added

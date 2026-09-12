@@ -1,5 +1,8 @@
 # Repository Agent Guide
 
+**Read `STATUS.md` first.** It says what we are building, which epic owns the
+work, and what is blocked. This file is the rules; `STATUS.md` is the map.
+
 This root file defines global rules. For detailed instructions, also read the nearest nested `AGENTS.md` in the directory you are editing.
 
 ## Global rules
@@ -9,6 +12,10 @@ This root file defines global rules. For detailed instructions, also read the ne
   - `decision-log.md`
   - `CHANGELOG.md`
   - `LESSONS_LEARNED.md`
+  - `DEFERRED.md`
+- Track work as GitHub issues under an epic. Epics are listed in `STATUS.md`. Keep planning in issues and one live execplan per track; do not add another status document to the repo root.
+- `archive/` is finished history. Read it for context, never for direction.
+- A plan that lives only on an unmerged branch does not exist. If work is worth resuming, its plan belongs on `main`.
 - If work is intentionally deferred, incomplete, or left as a known follow-up, create a GitHub issue before finishing the task/PR and link it in your summary.
 - Follow Seam-Driven Development for app implementation. Summary order: contract, probe, fixtures, mock, contract test, adapter, composition wiring. See `app/AGENTS.md` for the full workflow and gate checks.
 - Proceed milestone by milestone unless blocked by missing credentials, missing infrastructure access, or conflicting product direction.
