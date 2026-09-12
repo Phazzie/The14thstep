@@ -92,3 +92,12 @@
 - Adopted decision-gated slice promotion as the preferred way to move valuable local work onto `main`, rather than reconciling large dirty branches wholesale.
 - Added nested agent guidance for `app/src/` and `.github/` so source-level implementation rules and automation/workflow rules can evolve without bloating the root guide.
 - Recorded line-ending churn and clean-main-worktree separation as explicit process lessons so future sync work does not mistake formatting noise for product progress.
+
+## 2026-09-12
+
+- Landed the room-led meeting flow through PR #76 rather than merging PR #72 as it stood: #72 would have reverted the Clerk cookie hardening from #69, shipped a build-breaking route export, and left the persisted phase unable to advance past `introductions`.
+- Made the user's introduction a persisted share instead of a local-only transcript line. This is what closes the introductions round server-side; the previous local-only line left the phase machine stuck and every later prompt built from the wrong phase. Resolves the route/core mismatch tracked in #7.
+- Gave both intro-completion call sites one helper, `visitorSeatCount`, which reports the canonical visitor count for a core-only fallback roster rather than zero. The share route counting seats while the user-share route used the default was the actual drift.
+- Chose to degrade rather than fail when `saveMeetingParticipants` errors: the roster is derived deterministically from the meeting id, so the page keeps the room open on the generated seats. Turning someone away from a meeting over a transient write is the worse outcome.
+- Replaced the repo's twenty-document planning sprawl with `STATUS.md` plus GitHub epics and sub-issues. Projects boards were rejected because agents working through the GitHub MCP connection cannot read them; issues and repo files are the only planning surfaces an agent can actually see.
+- Moved finished history to `archive/` and kept one live execplan per track in `plans/`.
