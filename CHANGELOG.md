@@ -15,6 +15,10 @@ All notable changes to this repository are documented in this file.
 - The meeting page runs as a room: the opening ritual, reading and introductions play without user input, and the room stops only at real turns.
 - Replaced the e2e suite with specs that exercise the room-led flow.
 - Repo layout: added `STATUS.md` as the single entry point, moved finished history to `archive/`, and filed the outstanding work as GitHub epics with sub-issues.
+- Added root repository navigation, separated product references from finished
+  history, and mapped every active epic in `STATUS.md` to its live track
+  ExecPlan. The overall product plan now serves as cross-track architecture and
+  milestone history.
 
 ### Known
 - `verify:fixtures` fails on every branch: seam probe fixtures are past their freshness window and refreshing them is blocked behind the production database outage (#91, #71).

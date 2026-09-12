@@ -26,22 +26,26 @@ needs a new database, which needs a human with account access.
 1. This file.
 2. `AGENTS.md`, for the rules that are not negotiable.
 3. The epic you are working in, below.
-4. `plans/restore-virtual-recovery-meeting-execplan.md`, for what the meeting is
-   supposed to feel like, beat by beat. This is the design intent.
+4. The live ExecPlan mapped to that epic in the table below.
 5. `reference/original-artifact.jsx` if you need to feel how the original ran.
 
 ## The work
 
 Each epic is a GitHub issue. Its tasks are sub-issues, and GitHub tracks what is
-done. This table says only what each epic is and why it exists.
+done. This table says what each epic is, why it exists, and which live ExecPlan
+governs work in that track.
 
-| Epic | What it is | Why it matters |
-|---|---|---|
-| [#77](https://github.com/Phazzie/The14thstep/issues/77) | The server should run the meeting, not the browser | The script lives in a Svelte component and drifts from the server's phase machine. Refresh duplicates the transcript. |
-| [#78](https://github.com/Phazzie/The14thstep/issues/78) | Stop leaking what people tell the room | Intake answers ride in the URL. No route checks who owns a meeting. |
-| [#71](https://github.com/Phazzie/The14thstep/issues/71) | Restore the production backend | The site is down. Nothing ships until there is a database. |
-| [#79](https://github.com/Phazzie/The14thstep/issues/79) | Make character identity durable | A character's row can split in two and their memory fragments silently. |
-| [#80](https://github.com/Phazzie/The14thstep/issues/80) | Remove the dead weight | Unwired modules and thousand-line files slow every other change. |
+| Epic | What it is | Why it matters | Live ExecPlan |
+|---|---|---|---|
+| [#77](https://github.com/Phazzie/The14thstep/issues/77) | The server should run the meeting, not the browser | The script lives in a Svelte component and drifts from the server's phase machine. Refresh duplicates the transcript. | [`restore-virtual-recovery-meeting-execplan.md`](plans/restore-virtual-recovery-meeting-execplan.md) |
+| [#78](https://github.com/Phazzie/The14thstep/issues/78) | Stop leaking what people tell the room | Intake answers ride in the URL. No route checks who owns a meeting. | [`production-recovery-and-backlog-execplan.md`](plans/production-recovery-and-backlog-execplan.md) |
+| [#71](https://github.com/Phazzie/The14thstep/issues/71) | Restore the production backend | The site is down. Nothing ships until there is a database. | [`production-recovery-and-backlog-execplan.md`](plans/production-recovery-and-backlog-execplan.md) |
+| [#79](https://github.com/Phazzie/The14thstep/issues/79) | Make character identity durable | A character's row can split in two and their memory fragments silently. | [`production-recovery-and-backlog-execplan.md`](plans/production-recovery-and-backlog-execplan.md) |
+| [#80](https://github.com/Phazzie/The14thstep/issues/80) | Remove the dead weight | Unwired modules and thousand-line files slow every other change. | [`production-recovery-and-backlog-execplan.md`](plans/production-recovery-and-backlog-execplan.md) |
+
+[`the-14th-step-execplan.md`](plans/the-14th-step-execplan.md) preserves the
+cross-track product architecture and earlier milestone record. It is reference
+for decisions that span tracks, not the automatic execution plan for an epic.
 
 Start with [#84](https://github.com/Phazzie/The14thstep/issues/84) if you want
 the highest value per hour. It is small, and the exposure is happening now.

@@ -95,6 +95,13 @@
 
 ## 2026-09-12
 
+- Superseded the 2026-02-15 single-plan rule. `STATUS.md` now maps each active
+  epic to one live ExecPlan: #77 uses the meeting-experience restore plan, while
+  #71, #78, #79, and #80 use the production-recovery and backlog plan.
+  `plans/the-14th-step-execplan.md` remains the cross-track architecture and
+  milestone record rather than the automatic execution plan for every task.
+  This removes contradictory plan authority while preserving the earlier
+  milestone history as evidence.
 - Landed the room-led meeting flow through PR #76 rather than merging PR #72 as it stood: #72 would have reverted the Clerk cookie hardening from #69, shipped a build-breaking route export, and left the persisted phase unable to advance past `introductions`.
 - Made the user's introduction a persisted share instead of a local-only transcript line. This is what closes the introductions round server-side; the previous local-only line left the phase machine stuck and every later prompt built from the wrong phase. Resolves the route/core mismatch tracked in #7.
 - Gave both intro-completion call sites one helper, `visitorSeatCount`, which reports the canonical visitor count for a core-only fallback roster rather than zero. The share route counting seats while the user-share route used the default was the actual drift.
