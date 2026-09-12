@@ -37,8 +37,8 @@ governs work in that track.
 
 | Epic | What it is | Why it matters | Live ExecPlan |
 |---|---|---|---|
-| [#77](https://github.com/Phazzie/The14thstep/issues/77) | The server should run the meeting, not the browser | The script lives in a Svelte component and drifts from the server's phase machine. Refresh duplicates the transcript. | [`restore-virtual-recovery-meeting-execplan.md`](plans/restore-virtual-recovery-meeting-execplan.md) |
-| [#78](https://github.com/Phazzie/The14thstep/issues/78) | Stop leaking what people tell the room | Intake answers ride in the URL. No route checks who owns a meeting. | [`production-recovery-and-backlog-execplan.md`](plans/production-recovery-and-backlog-execplan.md) |
+| [#77](https://github.com/Phazzie/The14thstep/issues/77) | The server should run the meeting, not the browser | The script lives in a Svelte component and drifts from the server's phase machine. Refresh duplicates the transcript. | [`server-owned-meeting-beats-execplan.md`](plans/server-owned-meeting-beats-execplan.md) |
+| [#78](https://github.com/Phazzie/The14thstep/issues/78) | Stop leaking what people tell the room | Intake answers ride in the URL. No route checks who owns a meeting. | [`private-meeting-access-execplan.md`](plans/private-meeting-access-execplan.md) |
 | [#71](https://github.com/Phazzie/The14thstep/issues/71) | Restore the production backend | The site is down. Nothing ships until there is a database. | [`production-recovery-and-backlog-execplan.md`](plans/production-recovery-and-backlog-execplan.md) |
 | [#79](https://github.com/Phazzie/The14thstep/issues/79) | Make character identity durable | A character's row can split in two and their memory fragments silently. | [`production-recovery-and-backlog-execplan.md`](plans/production-recovery-and-backlog-execplan.md) |
 | [#80](https://github.com/Phazzie/The14thstep/issues/80) | Remove the dead weight | Unwired modules and thousand-line files slow every other change. | [`production-recovery-and-backlog-execplan.md`](plans/production-recovery-and-backlog-execplan.md) |
@@ -51,7 +51,9 @@ Start with [#84](https://github.com/Phazzie/The14thstep/issues/84) if you want
 the highest value per hour. It is small, and the exposure is happening now.
 
 Start with [#81](https://github.com/Phazzie/The14thstep/issues/81) if you want
-the change everything else gets easier after.
+the change everything else gets easier after. Finish #84 and #85 first so the
+new meeting endpoint inherits a single ownership gate instead of creating
+another unprotected route.
 
 ## Blocked
 

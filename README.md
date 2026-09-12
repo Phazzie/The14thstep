@@ -14,8 +14,10 @@ The runnable application is in [app](app/). Start with its
 - [AGENTS.md](AGENTS.md) contains repository-wide working rules. Nested
   `AGENTS.md` files add rules for the area being changed.
 - [plans](plans/) contains the live planning material. The overall product
-  plan is [the-14th-step-execplan.md](plans/the-14th-step-execplan.md); the
-  meeting-experience and production-recovery tracks have their own plans.
+  plan is [the-14th-step-execplan.md](plans/the-14th-step-execplan.md). Current
+  execution is split into [private meeting access](plans/private-meeting-access-execplan.md),
+  [server-owned meeting flow](plans/server-owned-meeting-beats-execplan.md),
+  and [production recovery plus backlog](plans/production-recovery-and-backlog-execplan.md).
 - [PLANS.md](PLANS.md) explains how an ExecPlan is maintained when a task
   actually uses one.
 

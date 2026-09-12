@@ -19,6 +19,12 @@ All notable changes to this repository are documented in this file.
   history, and mapped every active epic in `STATUS.md` to its live track
   ExecPlan. The overall product plan now serves as cross-track architecture and
   milestone history.
+- Split the next application work into a private-meeting-access plan for #78
+  and a server-owned-meeting-beats plan for #77. The privacy plan lands first
+  so the new beat endpoint inherits one route-family ownership gate.
+- Archived the March meeting-restoration plan. Its shipped experience record
+  remains useful, but its frontend-owned speaking order and prohibition on an
+  orchestration endpoint conflict with the current server-owned epic.
 
 ### Known
 - `verify:fixtures` fails on every branch: seam probe fixtures are past their freshness window and refreshing them is blocked behind the production database outage (#91, #71).
