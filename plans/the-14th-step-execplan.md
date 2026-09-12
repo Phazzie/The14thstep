@@ -2,6 +2,12 @@
 
 This ExecPlan is a living document. The sections Progress, Surprises & Discoveries, Decision Log, and Outcomes & Retrospective must be kept up to date as work proceeds. This document must be maintained in accordance with PLANS.md at the repository root.
 
+> Repository note (2026-09-12): This document preserves the overall product
+> architecture and an earlier M11-M19 implementation record. It is not
+> automatically the plan for every active task. Start from [STATUS.md](../STATUS.md)
+> to select the current track, then follow [plans/AGENTS.md](AGENTS.md) for
+> plan authority.
+
 ## Purpose / Big Picture
 
 After this change, a person in recovery â€” or someone curious, isolated, anxious, or in crisis at 3 AM â€” can open a browser, sign in, and sit in a virtual recovery meeting with eight to ten AI-driven characters who feel like real people. The characters remember past meetings, develop running jokes, evolve over time, and respond to the user with the raw, specific, no-therapy-speak language of actual recovery rooms. When the user returns next week, the characters remember them.

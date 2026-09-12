@@ -2,7 +2,12 @@
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This document must be maintained in accordance with [PLANS.md](/mnt/c/users/latro/downloads/t/recoverymeeting-autonomous-run/PLANS.md).
+This document must be maintained in accordance with [PLANS.md](../PLANS.md).
+
+> Repository note (2026-09-12): This is the production-recovery and backlog
+> track. Its Vercel, Supabase, GitHub, and checkout observations are a March
+> 2026 snapshot, not current provider evidence. Start from [STATUS.md](../STATUS.md)
+> and re-verify external state before acting on any operational instruction.
 
 ## Purpose / Big Picture
 

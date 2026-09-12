@@ -1,6 +1,11 @@
 # Restore the Virtual Recovery Meeting
 
-This ExecPlan is a living document. Keep `Progress`, `Surprises & Discoveries`, `Decision Log`, `Outcomes & Retrospective`, and the revision note at the bottom current as work proceeds. Maintain this file in accordance with [PLANS.md](/mnt/c/users/latro/downloads/t/recoverymeeting-autonomous-run/PLANS.md).
+This ExecPlan is a living document. Keep `Progress`, `Surprises & Discoveries`, `Decision Log`, `Outcomes & Retrospective`, and the revision note at the bottom current as work proceeds. Maintain this file in accordance with [PLANS.md](../PLANS.md).
+
+> Repository note (2026-09-12): This is the meeting-experience design track.
+> Its behavior target remains useful; checkout-specific commands and operational
+> evidence are historical. Begin from [STATUS.md](../STATUS.md) and run any
+> applicable command from the current checkout.
 
 ## Purpose / Big Picture
 

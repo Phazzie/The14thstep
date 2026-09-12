@@ -4,6 +4,8 @@ Scope: apply these rules for work under `app/`.
 
 For source-level implementation details, also read `app/src/AGENTS.md`.
 
+For documentation-only edits and moves, follow the root guide's documentation scope. The implementation flow and app verification gates below apply to relevant executable changes, not solely to a document's location under `app/`.
+
 ## Architecture rules
 
 - Follow Seam-Driven Development order for I/O seams: contract, probe, fixtures, mock, contract test, adapter, composition wiring.
@@ -43,15 +45,15 @@ For each I/O seam, execute these steps in order:
 
 8. Verification gate
 - Run seam-relevant tests and probes before moving to the next seam.
-- Update plan and governance artifacts (`plans/the-14th-step-execplan.md`, `decision-log.md`, `CHANGELOG.md`, `LESSONS_LEARNED.md`) with meaningful outcomes.
+- Update the active plan for the affected track and relevant governance artifacts (`decision-log.md`, `CHANGELOG.md`, `LESSONS_LEARNED.md`) with meaningful outcomes.
 
 ## Definition of done for app changes
 
 - Relevant tests pass.
 - Relevant probes pass for touched seams.
-- Any intentionally deferred or incomplete app work is tracked in a GitHub issue before the task/PR is considered done.
+- Track intentionally deferred or incomplete app work in GitHub when external writes are authorized; for local-only tasks, report it in the handoff as required by the root guide.
 - ExecPlan progress and logs are updated for meaningful milestones.
-- `CHANGELOG.md` and `LESSONS_LEARNED.md` are updated with concise entries.
+- Update `CHANGELOG.md` for meaningful changes and `LESSONS_LEARNED.md` for actual lessons; do not manufacture entries for unchanged outcomes.
 - No secrets are committed; env changes are reflected in `app/.env.example` only.
 - If the change is being promoted as a clean slice, the diff must stay narrowly scoped to one user-visible step forward.
 
