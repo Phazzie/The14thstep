@@ -559,3 +559,8 @@ not describe application behavior shipped by this documentation PR.
 ### Verified
 - Unit tests and type checks pass after dependency repair in the Linux environment.
 - Supabase schema successfully pushed to remote database.
+
+## 2026-09-14 — pure opening-beat foundation
+
+- Added runtime-validated meeting beat and crisis-trigger contracts, plus deterministic opening selection for explicitly initialized version-1 state. Existing active beats are returned unchanged. Unversioned/incomplete state and a roster without the opening chair are rejected. This is additive offline preparation for #77/#81; production routes and the renderer are not switched.
+- Restored the two missing optional-native lockfile records required by the already-locked websocket dependency graph, without changing existing package versions.
