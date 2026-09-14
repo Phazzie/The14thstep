@@ -61,6 +61,10 @@ All notable changes to this repository are documented in this file.
 - Made crisis-resource visibility a durable monotonic meeting fact committed
   with accepted support, and required one persisted-or-fallback roster resolver
   for the page, `/next`, `/share`, `/close`, and `/expand`.
+- Added a beat-keyed control-completion ledger so topic and user-pass phase
+  changes are replayable after a lost response without fake transcript rows.
+- Narrowed character beats to character-only interaction values; runtime and
+  static validation reject the room-owned `room_cue` and `empty_chair` values.
 
 
 ## [2026-03-19]

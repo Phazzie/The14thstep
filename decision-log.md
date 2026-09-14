@@ -199,3 +199,10 @@
 - One server-side roster resolver now owns persisted-or-deterministic fallback
   for the page loader, `/next`, `/share`, `/close`, and `/expand`, preserving a
   fallback visitor's voice profile and transcript label when saving seats fails.
+- Topic and user-pass outcomes use a meeting-and-beat-keyed control-completion
+  ledger. Its narrow RPC commits the outcome, phase version, and topic when
+  applicable in one transaction, allowing lost-response retries to return the
+  canonical current beat without recording unspoken transcript content.
+- `CharacterShareInteractionType` excludes `room_cue` and `empty_chair` from
+  both the character-beat union and its runtime validator. The complete
+  `ShareInteractionType` still represents persisted room-owned transcript rows.
