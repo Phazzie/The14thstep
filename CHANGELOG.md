@@ -67,7 +67,10 @@ All notable changes to this repository are documented in this file.
   static validation reject the room-owned `room_cue` and `empty_chair` values.
 - Required the server-owned meeting implementation plan to establish durable,
   idempotent database identities for fallback visitors before selecting them,
-  even when saving their meeting-participant associations fails.
+  even when saving their meeting-participant associations fails. Keys are
+  meeting-scoped because current visitor domain ids can repeat across meetings
+  started in the same second, and use a nullable unique constraint that an
+  idempotent Supabase upsert can target.
 - Required generated-share insertion, participant-state updates, and generation
   completion to commit atomically under the current unexpired lease token so an
   expired worker cannot win after another worker takes over.

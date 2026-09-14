@@ -207,8 +207,11 @@
   both the character-beat union and its runtime validator. The complete
   `ShareInteractionType` still represents persisted room-owned transcript rows.
 - Derived fallback visitors receive stable, idempotent database identities
-  before the roster resolver may return them. Meeting-participant association
-  failure can degrade to those durable seats; identity failure cannot.
+  scoped by meeting before the roster resolver may return them. The meeting id
+  prevents equal start-second/slot domain ids from aliasing across rooms, and a
+  nullable named unique constraint supports direct conflict-targeted upsert.
+  Meeting-participant association failure can degrade to those durable seats;
+  identity failure cannot.
 - Accepted generated output enters the shares table only through a transaction
   fenced by the current unexpired generation token. That transaction also
   applies participant state, attaches the share to the run, and completes it,
