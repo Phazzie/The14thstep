@@ -65,6 +65,18 @@ All notable changes to this repository are documented in this file.
   changes are replayable after a lost response without fake transcript rows.
 - Narrowed character beats to character-only interaction values; runtime and
   static validation reject the room-owned `room_cue` and `empty_chair` values.
+- Required the server-owned meeting implementation plan to establish durable,
+  idempotent database identities for fallback visitors before selecting them,
+  even when saving their meeting-participant associations fails.
+- Required generated-share insertion, participant-state updates, and generation
+  completion to commit atomically under the current unexpired lease token so an
+  expired worker cannot win after another worker takes over.
+- Required close callback candidates to resolve from domain character ids to
+  validated database UUIDs before checkpointing, with locked revalidation in
+  the final transaction.
+- Expanded the prompt-repair slice and completion audit to cover every
+  generation builder in `prompt-templates.ts` and worded fixed counts such as
+  `one-sentence`, including the active crosstalk prompt.
 
 
 ## [2026-03-19]

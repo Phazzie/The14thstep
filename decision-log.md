@@ -206,3 +206,15 @@
 - `CharacterShareInteractionType` excludes `room_cue` and `empty_chair` from
   both the character-beat union and its runtime validator. The complete
   `ShareInteractionType` still represents persisted room-owned transcript rows.
+- Derived fallback visitors receive stable, idempotent database identities
+  before the roster resolver may return them. Meeting-participant association
+  failure can degrade to those durable seats; identity failure cannot.
+- Accepted generated output enters the shares table only through a transaction
+  fenced by the current unexpired generation token. That transaction also
+  applies participant state, attaches the share to the run, and completes it,
+  so a stale worker writes nothing after lease takeover.
+- Close preparation resolves callback domain ids to validated database UUIDs
+  before checkpointing, and finalization locks and revalidates those targets.
+- Prompt-rule verification searches every generation builder for worded as
+  well as numeric fixed sentence counts, including hyphenated forms such as
+  `one-sentence`.
