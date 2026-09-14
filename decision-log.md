@@ -191,8 +191,10 @@
 - New meeting orchestration is enabled only for records created with
   `meeting_protocol_version = 1`. Historical state is never translated into an
   inferred beat cursor. Completed legacy records remain readable; unexpected
-  active legacy meetings receive a read-only restart path, and cutover waits for
-  a zero-active-legacy preflight.
+  active legacy meetings receive a read-only restart path. A database singleton
+  and insert trigger fence creation in `draining` while legacy meetings finish
+  and the version-1 application deploys; activation then accepts only stamped
+  inserts, closing the check-to-deploy race across old application instances.
 - Accepted crisis support sets a monotonic `crisis_resources_visible` flag in
   the same versioned phase update. The loader derives the one controlled sticky
   resource payload from that flag after refresh or a lost response.
@@ -217,8 +219,11 @@
   fenced by the current unexpired generation token. That transaction also
   applies participant state, attaches the share to the run, and completes it,
   so a stale worker writes nothing after lease takeover.
-- Close preparation resolves callback domain ids to validated database UUIDs
-  before checkpointing, and finalization locks and revalidates those targets.
+- Close preparation first validates callback candidates against the exact
+  scanned meeting shares: the origin belongs to that meeting, its speaker is
+  the candidate character, and its content contains the quoted text. It then
+  resolves domain ids to database UUIDs; finalization locks and rechecks the
+  origin meeting and speaker relationship before writing.
 - Prompt-rule verification searches every generation builder for worded as
   well as numeric fixed sentence counts, including hyphenated forms such as
   `one-sentence`.
@@ -226,10 +231,10 @@
   including the required three real voice examples. Identity establishment and
   participant reload both return that stored canonical profile; incomplete or
   placeholder snapshots fail validation before roster selection.
-- Application rollback first stops new protocol-version-1 creation, then waits
-  for a zero-active-version-1 preflight. Until it passes, active rows keep the
-  current deployment, use its beat renderer or read-only restart presentation,
-  and never enter the legacy phase-only renderer.
+- Application rollback first transitions the same database fence from
+  `version_1` to `draining`, then waits for a zero-active-version-1 preflight.
+  It deploys the legacy-compatible application while creation remains closed
+  and returns to `legacy` only after every serving instance is ready.
 - The private-meeting migration denies direct application-table and public-RPC
   access to `PUBLIC`, `anon`, and `authenticated`, including default privileges
   for future objects. The server still applies owner filters because its
@@ -243,3 +248,7 @@
   records each expected version; finalization rolls back with a typed stale
   result when another meeting changed a target, then the current token holder
   reloads and replaces only the lifecycle plan before retrying.
+- A stored beat-owned user share with null analysis is recoverable state. The
+  renderer detects it during hydration and sends only its beat id; the route
+  analyzes canonical stored content and uses first-analysis-wins plus the phase
+  compare-and-set to converge with any original request still running.

@@ -56,8 +56,9 @@ All notable changes to this repository are documented in this file.
   the canonical close-run result. Added slow-holder renewal and full-rollback
   acceptance cases.
 - Version-gated the new renderer so historical mid-round phase JSON is never
-  revived as cursor zero. Unexpected active legacy meetings remain read-only
-  with a restart path, and deployment requires a zero-active-legacy preflight.
+  revived as cursor zero. A database `legacy | draining | version_1` creation
+  fence now remains closed through the zero-active-legacy check and renderer
+  deployment, preventing a stale instance from creating an unreadable meeting.
 - Made crisis-resource visibility a durable monotonic meeting fact committed
   with accepted support, and required one persisted-or-fallback roster resolver
   for the page, `/next`, `/share`, `/close`, and `/expand`.
@@ -96,6 +97,12 @@ All notable changes to this repository are documented in this file.
 - Fenced checkpointed callback lifecycle targets with per-callback versions.
   A callback changed by another meeting now invalidates the complete close
   transaction and forces lifecycle-only recomputation under the current token.
+- Required callback candidates to match an eligible canonical origin share in
+  the scanned meeting, that share's speaker, and quoted source content before
+  checkpoint. Close finalization locks and rechecks the origin relationship.
+- Added beat-id-only recovery for a user share that persisted before its
+  analysis or phase update. Refresh hides the completed input and resumes from
+  canonical stored text instead of asking the person to submit it again.
 
 
 ## [2026-03-19]
