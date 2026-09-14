@@ -28,14 +28,16 @@ All notable changes to this repository are documented in this file.
 - Hardened both new ExecPlans during review: the privacy cutover now preserves
   auth infrastructure errors, normalizes malformed meeting ids, removes
   route-level probe identity, and defines a server-side Playwright composition
-  that always starts a fresh server. The meeting plan now claims generation and
-  close work durably, persists room cues, scopes callback effects by meeting,
+  with auth, database, and Grok seam mocks that always starts a fresh server.
+  The meeting plan now claims generation and close work durably, quality-gates
+  crisis and empty-chair output, represents both intake and share crisis sources
+  canonically, atomically commits close phase and result, persists room cues,
+  scopes callback effects by meeting, repairs the close-summary sentence rule,
   hydrates completed reflection text on refresh, promotes migrated routes with
   their renderer as one cutover, derives user, crisis, and expansion decisions
-  from canonical server state, injects transition time, gives every emitted
-  beat a completion path, and quality-gates the empty chair before the renderer
-  depends on it. Both database tracks now probe a real local Supabase stack
-  before capturing fixtures or implementing mocks and adapters.
+  from canonical server state, injects transition time, and gives every emitted
+  beat a completion path. Both database tracks now probe a real local Supabase
+  stack before capturing fixtures or implementing mocks and adapters.
 
 ### Known
 - `verify:fixtures` fails on every branch: seam probe fixtures are past their freshness window and refreshing them is blocked behind the production database outage (#91, #71).

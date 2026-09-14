@@ -150,5 +150,19 @@
   effect keys by both meeting and beat, and mapped the stored meeting summary
   into initial page data so refresh reconstructs the same room and reflection.
 - Required the privacy Playwright suite to set `reuseExistingServer: false`.
-  Its server-side mock composition is only trustworthy when the suite starts
-  the process that owns the required environment and shared fixture state.
+  Its server-side auth, database, and Grok mock composition is only trustworthy
+  when the suite starts the process that owns the required environment and
+  shared fixture state.
+- Applied the existing authenticity and voice-consistency thresholds to crisis
+  support and put that route behind the same leased generation claim. Rejected
+  or competing text cannot persist or become visible; total rejection leaves
+  the support beat active.
+- Replaced share-only crisis provenance with a typed source: either the exact
+  owned user-share row or the owner-checked meeting intake. A persisted handled
+  marker prevents stored setup language from reopening crisis after completion.
+- Made close finalization one RPC that writes the finished meeting phase and the
+  completed canonical close response in the same transaction. A recovery can
+  no longer observe an advanced phase with an unfinished close-run row.
+- Included `buildCloseSummaryPrompt` in the sentence-count cleanup and required
+  the preview-process Grok mock to supply deterministic generation and quality
+  results for route-backed refresh tests without a live provider.

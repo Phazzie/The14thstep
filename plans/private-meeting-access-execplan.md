@@ -14,7 +14,7 @@ The behavior is visible in two ways. The join redirect contains only `/meeting/<
 
 - [x] (2026-09-12 13:45Z) Read the current landing action, meeting loader and child routes, authentication hook, database contract, mock, Supabase adapter, schema, and relevant tests.
 - [x] (2026-09-12 13:45Z) Chose one meeting-scoped persistence contract and one centralized route-ownership gate so later meeting endpoints inherit the same protection.
-- [x] (2026-09-14 03:14Z) Integrated PR review findings for auth-error preservation, malformed ids, probe identity, cutover order, server-side browser fixtures, configured test paths, and the required real-system probe stage.
+- [x] (2026-09-14 03:14Z) Integrated PR review findings for auth-error preservation, malformed ids, probe identity, cutover order, server-side auth, database, and Grok browser fixtures, fresh-server ownership, configured test paths, and the required real-system probe stage.
 - [ ] Milestone 1: extend the meeting persistence contract and migration for private intake snapshots.
 - [ ] Milestone 2: probe a real local Supabase stack, capture fixtures, then implement the mock, contract tests, and adapter.
 - [ ] Milestone 3: preserve authentication failures and enforce ownership before meeting-specific I/O.
@@ -48,6 +48,9 @@ The behavior is visible in two ways. The join redirect contains only `/meeting/<
 
 - Observation: Playwright starts a built preview server, so browser request interception cannot supply the server-side owner lookup used by the hook.
   Evidence: `app/playwright.config.ts` points Playwright at `tests/e2e`; the SvelteKit preview process constructs real server adapters before browser `page.route` handlers can affect them.
+
+- Observation: the same preview process also constructs the real Grok adapter.
+  Evidence: later refresh coverage exercises `/share`, `/crisis`, `/close`, and `/room-moment`; intercepting browser requests cannot replace those routes' outbound server-side model calls without also bypassing the persistence behavior under test.
 
 - Observation: this repository has database fixtures and migrations but no local Supabase configuration or pinned Supabase CLI.
   Evidence: `app/supabase/` contains only `migrations/`; `app/supabase/config.toml` is absent. The production tenant is unavailable, so a real-system probe must use a disposable local Supabase stack or remain explicitly blocked before fixture and mock work.
@@ -91,7 +94,7 @@ The behavior is visible in two ways. The join redirect contains only `/meeting/<
   Date/Author: 2026-09-13 / Codex
 
 - Decision: add a server-only, fixture-backed composition selected explicitly by Playwright's local web server.
-  Rationale: the ownership read runs inside SvelteKit and cannot be mocked from the browser. A dedicated server composition gives the browser story real join, refresh, and cross-session behavior without depending on the unavailable Supabase tenant or exposing a runtime toggle endpoint. Playwright must start that server itself rather than reuse whichever process happens to occupy the port.
+  Rationale: the ownership read and model calls run inside SvelteKit and cannot be mocked from the browser. A dedicated composition uses the existing auth, database, and Grok seam mocks so browser stories execute real application routes without depending on unavailable tenants or exposing a runtime toggle endpoint. Playwright must start that server itself rather than reuse whichever process happens to occupy the port.
   Date/Author: 2026-09-13 / Codex
 
 - Decision: add a pinned local Supabase CLI and capture new database fixtures from its real Postgres/PostgREST stack before implementing the mock or adapter.
@@ -218,11 +221,11 @@ This milestone is complete when the redirect and loader contain no `name`, `clea
 
 ### Milestone 6: provide an honest server composition for browser tests
 
-Add a server-only composition factory under `app/src/lib/server/testing/` that combines the existing auth and database mocks with shared in-memory meeting state. `app/src/hooks.server.ts` may load it only when the preview process starts with `E2E_MOCK_SEAMS=1`; fail startup if that flag appears with `VERCEL=1`. Do not add an HTTP endpoint or application-controlled value that can switch compositions. The default branch of the factory must continue to construct the real adapters.
+Add a server-only composition factory under `app/src/lib/server/testing/` that combines the existing auth, database, and `createGrokAiMock` seam mocks with shared in-memory meeting state. The Grok mock is the instance placed in `event.locals.grokAi`; no route in the suite may construct the real adapter separately. Let the factory accept only code-selected, fixture-backed Grok scenarios so later meeting-flow tests can supply deterministic generation and quality results without request-controlled switching. `app/src/hooks.server.ts` may load this composition only when the preview process starts with `E2E_MOCK_SEAMS=1`; fail startup if that flag appears with `VERCEL=1`. Do not add an HTTP endpoint or application-controlled value that can switch compositions. The default branch of the factory must continue to construct the real adapters.
 
 Set `E2E_MOCK_SEAMS=1` through the `webServer.env` option in `app/playwright.config.ts`, so the flag belongs to the local child process on every supported shell. Set `reuseExistingServer: false` for this mock-backed suite so a process already listening on port 4173 cannot bypass that environment or supply arbitrary state. The mock auth seam must use the existing guest-session bootstrap and cookie path rather than a magic browser header. Keep state by session and meeting id across the landing action, redirect, page load, refresh, and child requests; isolate tests with unique session and meeting data.
 
-Add a focused server-composition test proving the flag selects the shared fixture bundle locally, the default selects real composition, and `VERCEL=1` plus the flag fails closed. Add a Playwright configuration assertion that server reuse is false. This milestone is complete when a freshly started preview-server test can create an owned meeting through the real join action without Supabase and a second browser session resolves to a different owner.
+Add a focused server-composition test proving the flag selects the shared auth, database, and Grok fixture bundle locally, every route receives those exact mock instances, the default selects real composition, and `VERCEL=1` plus the flag fails closed. Add a Playwright configuration assertion that server reuse is false. This milestone is complete when a freshly started preview-server test can create an owned meeting through the real join action without Supabase or Grok and a second browser session resolves to a different owner.
 
 ### Milestone 7: prove the complete local story and record the outcome
 
@@ -262,7 +265,7 @@ After Milestone 6:
     npm.cmd run test:e2e -- --list
     npm.cmd run verify:composition
 
-Expect the local fixture composition, production-disable guard, and Playwright discovery under `tests/e2e` to pass without contacting Supabase. The production-default composition assertion must still select real adapters when `E2E_MOCK_SEAMS` is absent.
+Expect the local fixture composition, production-disable guard, and Playwright discovery under `tests/e2e` to pass without contacting Supabase or Grok. The composition test must prove the local branch installs all three seam mocks and the production-default branch still selects real adapters when `E2E_MOCK_SEAMS` is absent.
 
 At completion:
 
@@ -349,7 +352,7 @@ The implementation must leave these public shapes available in `app/src/lib/seam
 
 `CreateMeetingInput` in `app/src/lib/core/meeting.ts` accepts the three new strings as optional only during the additive compatibility slices and must require them for all new meetings in the final state. The meeting-access module may choose its internal function names, but the hook must expose one nullable `MeetingRecord` as `App.Locals.meetingContext` and must perform exactly one owner-filtered meeting lookup before route-specific meeting I/O. The hook must keep `UNAUTHORIZED` distinct from all other auth seam errors until it has either returned the generic meeting 404 or preserved the existing service-error response.
 
-No new runtime dependency is needed. Pin `supabase@2.117.0` as a development-only local probe tool. Use SvelteKit's existing request hook and HTTP error mechanism, the existing seam result and error codes, Vitest for unit and route tests, and Playwright's configured `app/tests/e2e` directory for the browser story. The server test composition uses the captured seam fixtures and a dedicated process environment value passed through `playwright.config.ts`; it is never selected by request data and refuses to run when `VERCEL=1`. Do not use cookies, `localStorage`, `sessionStorage`, encrypted query parameters, or client-side obfuscation to hold the private intake.
+No new runtime dependency is needed. Pin `supabase@2.117.0` as a development-only local probe tool. Use SvelteKit's existing request hook and HTTP error mechanism, the existing seam result and error codes, Vitest for unit and route tests, and Playwright's configured `app/tests/e2e` directory for the browser story. The server test composition uses the existing fixture-backed auth, database, and Grok mocks plus a dedicated process environment value passed through `playwright.config.ts`; it is never selected by request data and refuses to run when `VERCEL=1`. Do not use cookies, `localStorage`, `sessionStorage`, encrypted query parameters, or client-side obfuscation to hold the private intake.
 
 The only true cross-plan dependency is this plan before `plans/server-owned-meeting-beats-execplan.md`: the later plan adds another child endpoint that must inherit this ownership gate. The production database restoration in #71 blocks applying the migration and verifying the live site, but it does not block writing the migration or completing the local contract, adapter, route, and browser tests.
 
@@ -357,4 +360,4 @@ The only true cross-plan dependency is this plan before `plans/server-owned-meet
 
 2026-09-12: Created this plan after the repository organization pass exposed privacy epic #78 as a distinct application track. The plan separates locally implementable privacy and ownership work from the blocked production-recovery plan and establishes the access boundary needed by the later server-owned meeting-flow work.
 
-2026-09-13: Revised the plan after PR review to preserve non-authorization auth failures, return the generic 404 for malformed ids, retire route-level probe identity, stage the clean-URL cutover in a deployable order, use Playwright's configured test directory, require Playwright to start a fresh non-reused server for the mock composition, define the server-side mock composition required by a built preview server, and restore contract-probe-fixture-mock-test-adapter ordering through a disposable local Supabase stack.
+2026-09-13: Revised the plan after PR review to preserve non-authorization auth failures, return the generic 404 for malformed ids, retire route-level probe identity, stage the clean-URL cutover in a deployable order, use Playwright's configured test directory, require Playwright to start a fresh non-reused server, include the auth, database, and Grok seam mocks in that preview composition, and restore contract-probe-fixture-mock-test-adapter ordering through a disposable local Supabase stack.
