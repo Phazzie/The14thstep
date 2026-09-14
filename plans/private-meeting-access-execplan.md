@@ -17,8 +17,15 @@ The behavior is visible in two ways. The join redirect contains only `/meeting/<
 - [x] (2026-09-14 03:14Z) Integrated PR review findings for auth-error preservation, malformed ids, probe identity, cutover order, server-side auth, database, and Grok browser fixtures, fresh-server ownership, configured test paths, and the required real-system probe stage.
 - [x] (2026-09-14 09:02Z) Closed the direct-PostgREST bypass by adding a default-deny database privilege boundary and an anonymous-key probe to the migration, seam-order, and acceptance requirements.
 - [x] (2026-09-14 09:54Z) Gave the planned migration a distinct fourteen-digit Supabase version prefix so the private, core-identity, and meeting-beat schemas apply in their required order.
-- [ ] Milestone 1: extend the meeting persistence contract and migration for private intake snapshots.
-- [ ] Milestone 2: probe a real local Supabase stack, capture fixtures, then implement the mock, contract tests, and adapter.
+- [x] (2026-09-14 19:04Z) Established the local P00 baseline after adding only the two optional package records missing from the lockfile: the existing database contract suite passes 5/5 and `svelte-check` reports 0 errors with 8 pre-existing warnings.
+- [x] (2026-09-14 19:06Z) P01a complete as an isolated contract checkpoint: 4/4 direct validator tests pass; the old captured meeting fixture/mock now fail 2 existing assertions and `svelte-check` reports 4 expected missing-field producers plus the unchanged 8 warnings.
+- [x] (2026-09-14 19:08Z) P02 complete as an isolated contract checkpoint: 3/3 owner-lookup contract tests pass, including typed port shape, two required nonempty ids, shared `NOT_FOUND`, and the declared error taxonomy.
+- [x] (2026-09-14 19:09Z) P03 complete: the existing core meeting suite passes 14/14 and a focused spy proves optional `userMind`, `userDisplayName`, and `userCleanTime` cross the pure core/database boundary unchanged while old callers remain valid.
+- [x] (2026-09-14 19:10Z) P04 complete as migration text: one uniquely versioned file adds retry-safe nullable `user_display_name` and `user_clean_time`, preserves the historical nullable `user_mind`, and invents no backfill; no database execution is claimed.
+- [x] (2026-09-14 19:11Z) P05 complete as migration text: static checks find all six RLS enables and all current/default table, sequence, and function revokes, with no client policy and no `service_role` revoke; SQL execution and access outcomes remain unproved.
+- [x] (2026-09-14 19:14Z) P06 tooling complete with a startup blocker: exact local CLI `2.117.0` and credential-free config are present, but both Supabase status and Docker server inspection fail because the Docker Desktop Linux engine pipe does not exist.
+- [x] (2026-09-14 19:14Z) Milestone 1: completed the nullable output/compatible input contract, owner-lookup contract, optional pure-core passthrough, nullable migration columns, and default-deny migration text; this remains an unintegrated local checkpoint.
+- [ ] Milestone 2 blocked at the real-probe gate: start the Docker Desktop Linux engine (or provide a separately authorized real test tenant), then run the migration and capture real service-role, anonymous-denial, and authenticated-denial outcomes before any fixture, mock, contract-fidelity, adapter, or composition work.
 - [ ] Milestone 3: preserve authentication failures and enforce ownership before meeting-specific I/O.
 - [ ] Milestone 4: make the loader prefer persisted intake while preserving a temporary compatibility read.
 - [ ] Milestone 5: atomically cut over join and loader behavior to clean URLs only.
@@ -62,6 +69,12 @@ The behavior is visible in two ways. The join redirect contains only `/meeting/<
 
 - Observation: Supabase treats the leading numeric text before the first underscore as the migration version.
   Evidence: any two names beginning `20260912_` both have version `20260912`; descriptive counters after that underscore do not make them distinct or order them.
+
+- Observation: npm 11 could not install this checkout from its existing lockfile until two optional websocket-native package records were restored.
+  Evidence: the first `npm.cmd ci` reported missing `bufferutil@4.1.0` and `utf-8-validate@6.0.6`. Adding only those resolved records allowed the existing database contract suite to pass 5/5 and `svelte-check` to reach its normal 0-error baseline before privacy contract changes.
+
+- Observation: the pinned local Supabase CLI is runnable, but this machine's Docker Desktop Linux engine is not.
+  Evidence: `npm.cmd exec supabase -- --version` returns `2.117.0`; both `supabase status` and Docker server inspection fail on the missing `dockerDesktopLinuxEngine` named pipe, so no migration or real access probe has run.
 
 ## Decision Log
 
@@ -123,7 +136,7 @@ The behavior is visible in two ways. The join redirect contains only `/meeting/<
 
 ## Outcomes & Retrospective
 
-Planning is complete; application behavior has not changed yet. The implementation is divided into seven small outcomes. The first two establish and prove a backward-compatible persistence seam and a default-deny PostgREST boundary against a disposable real local Supabase stack before deriving fixtures and mocks. The next three protect the route family, prepare the loader, and make the clean-URL cutover as one deployable transition. The sixth supplies the server-side test composition needed for an honest browser story, and the seventh verifies the full result. Its migration has a distinct Supabase timestamp version that sorts before the core-identity and meeting-beat migrations. Production deployment and a hosted Supabase migration remain blocked by epic #71; local progress depends on the real local probe succeeding before the mock, adapter, routes, and browser story continue.
+Planning is complete, and Milestone 1 now exists as partial uncommitted local work on `codex/privacy-intake-contract`: the persistence/core contracts, nullable migration columns, and default-deny SQL are written and their direct tests/static checks pass. The application is intentionally not type-green or privacy-complete because fixtures, mock, real adapter, route ownership, and clean-URL behavior have not changed. CLI `2.117.0` and local config are ready, but the Docker engine is unavailable, so Milestone 2 is blocked before any real migration, capture, fixture, mock, adapter, or composition claim. Production deployment and a hosted Supabase migration remain blocked by epic #71.
 
 ## Context and Orientation
 
@@ -386,3 +399,5 @@ The only true cross-plan dependency is this plan before `plans/server-owned-meet
 2026-09-14: Closed the direct-database bypass left by a route-only ownership gate. The privacy migration now enables row-level security with no browser policies, revokes current and default table, sequence, and function privileges from public client roles, and requires real anon-key and authenticated-JWT PostgREST denial probes alongside a passing service-role adapter path.
 
 2026-09-14: Renamed the planned privacy migration to `20260912000100_private_meeting_intake.sql`. Supabase uses the leading numeric segment as the migration version, so the earlier date-plus-counter shape would have collided with later same-day plans instead of enforcing dependency order.
+
+2026-09-14 / PR promotion: the user requested publication of accumulated local work. This clean promotion branch contains only the privacy foundation and its local dependency prerequisites. The draft remains blocked before real database probes and is not merge-ready. The original session's 694-line lockfile diff is historical; this promotion preserves existing package records and adds the 15 required records without unrelated peer-metadata churn. The privacy session branch remains preserved separately. No Docker or hosted verification was performed for this promotion.

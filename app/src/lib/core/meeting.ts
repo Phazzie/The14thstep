@@ -1,3 +1,9 @@
+/**
+ * Purpose: Coordinate pure meeting workflows through injected I/O seams.
+ * Why: Meeting behavior must remain deterministic and independent of real providers.
+ * Info flow: Validated commands enter core functions and are forwarded to database or Grok ports.
+ * Invariants: Core performs no I/O directly; optional intake snapshots pass through unchanged.
+ */
 import { SeamErrorCodes, err, ok, type SeamResult } from './seam';
 import type { DatabasePort, MeetingRecord, ShareRecord } from '$lib/seams/database/contract';
 import type { GrokAiPort } from '$lib/seams/grok-ai/contract';
@@ -10,6 +16,9 @@ export interface CreateMeetingInput {
 	userId: string;
 	topic: string;
 	userMood: string;
+	userMind?: string | null;
+	userDisplayName?: string | null;
+	userCleanTime?: string | null;
 	listeningOnly: boolean;
 }
 
@@ -98,7 +107,11 @@ export async function createMeeting(
 	deps: MeetingWorkflowDeps,
 	input: CreateMeetingInput
 ): Promise<SeamResult<MeetingRecord>> {
-	if (!isNonEmptyString(input.userId) || !isNonEmptyString(input.topic) || !isNonEmptyString(input.userMood)) {
+	if (
+		!isNonEmptyString(input.userId) ||
+		!isNonEmptyString(input.topic) ||
+		!isNonEmptyString(input.userMood)
+	) {
 		return err(SeamErrorCodes.INPUT_INVALID, 'Invalid createMeeting input');
 	}
 
@@ -106,6 +119,9 @@ export async function createMeeting(
 		userId: input.userId,
 		topic: input.topic,
 		userMood: input.userMood,
+		userMind: input.userMind,
+		userDisplayName: input.userDisplayName,
+		userCleanTime: input.userCleanTime,
 		listeningOnly: input.listeningOnly
 	});
 }
@@ -141,7 +157,10 @@ export async function addShare(
 	});
 }
 
-function buildCloseSummaryPrompt(topic: string, lastShares: Array<{ speakerName: string; content: string }>): string {
+function buildCloseSummaryPrompt(
+	topic: string,
+	lastShares: Array<{ speakerName: string; content: string }>
+): string {
 	const transcript = lastShares
 		.slice(-6)
 		.map((share) => `${share.speakerName}: ${share.content}`)

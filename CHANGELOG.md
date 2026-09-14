@@ -559,3 +559,7 @@ not describe application behavior shipped by this documentation PR.
 ### Verified
 - Unit tests and type checks pass after dependency repair in the Linux environment.
 - Supabase schema successfully pushed to remote database.
+
+## 2026-09-14 — private intake foundation (draft)
+
+- Added the nullable intake and owner-lookup contracts, compatible core intake passthrough, planned private-intake migration, and pinned local Supabase configuration for #78/#84/#85. This foundation is incomplete: real migration/probe evidence, captured fixtures, mock/adapter integration and route privacy are still required before merge.
