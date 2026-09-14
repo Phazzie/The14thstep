@@ -26,10 +26,13 @@ All notable changes to this repository are documented in this file.
   remains useful, but its frontend-owned speaking order and prohibition on an
   orchestration endpoint conflict with the current server-owned epic.
 - Hardened both new ExecPlans during review: the privacy cutover now preserves
-  auth infrastructure errors, removes route-level probe identity, and defines
-  a server-side Playwright composition; the meeting plan now claims close work
-  durably, derives user and expansion decisions from canonical server state,
-  quality-gates the empty chair, and lands it before the renderer depends on it.
+  auth infrastructure errors, normalizes malformed meeting ids, removes
+  route-level probe identity, and defines a server-side Playwright composition;
+  the meeting plan now claims close work durably, derives user, crisis, and
+  expansion decisions from canonical server state, injects transition time,
+  gives every emitted beat a completion path, and quality-gates the empty chair
+  before the renderer depends on it. Both database tracks now probe a real local
+  Supabase stack before capturing fixtures or implementing mocks and adapters.
 
 ### Known
 - `verify:fixtures` fails on every branch: seam probe fixtures are past their freshness window and refreshing them is blocked behind the production database outage (#91, #71).

@@ -14,8 +14,9 @@ The behavior is visible in two ways. The join redirect contains only `/meeting/<
 
 - [x] (2026-09-12 13:45Z) Read the current landing action, meeting loader and child routes, authentication hook, database contract, mock, Supabase adapter, schema, and relevant tests.
 - [x] (2026-09-12 13:45Z) Chose one meeting-scoped persistence contract and one centralized route-ownership gate so later meeting endpoints inherit the same protection.
+- [x] (2026-09-14 03:14Z) Integrated PR review findings for auth-error preservation, malformed ids, probe identity, cutover order, server-side browser fixtures, configured test paths, and the required real-system probe stage.
 - [ ] Milestone 1: extend the meeting persistence contract and migration for private intake snapshots.
-- [ ] Milestone 2: implement and verify the mock and Supabase adapter behavior.
+- [ ] Milestone 2: probe a real local Supabase stack, capture fixtures, then implement the mock, contract tests, and adapter.
 - [ ] Milestone 3: preserve authentication failures and enforce ownership before meeting-specific I/O.
 - [ ] Milestone 4: make the loader prefer persisted intake while preserving a temporary compatibility read.
 - [ ] Milestone 5: atomically cut over join and loader behavior to clean URLs only.
@@ -48,6 +49,9 @@ The behavior is visible in two ways. The join redirect contains only `/meeting/<
 - Observation: Playwright starts a built preview server, so browser request interception cannot supply the server-side owner lookup used by the hook.
   Evidence: `app/playwright.config.ts` points Playwright at `tests/e2e`; the SvelteKit preview process constructs real server adapters before browser `page.route` handlers can affect them.
 
+- Observation: this repository has database fixtures and migrations but no local Supabase configuration or pinned Supabase CLI.
+  Evidence: `app/supabase/` contains only `migrations/`; `app/supabase/config.toml` is absent. The production tenant is unavailable, so a real-system probe must use a disposable local Supabase stack or remain explicitly blocked before fixture and mock work.
+
 ## Decision Log
 
 - Decision: store meeting-specific display name, clean time, mood, mind text, and listening choice on the meeting record.
@@ -65,6 +69,10 @@ The behavior is visible in two ways. The join redirect contains only `/meeting/<
 - Decision: add one owner-filtered database read and make the server hook place its result in `event.locals.meetingContext` for every `/meeting/[id]` request.
   Rationale: checking ownership once, before route-specific reads, prevents page and child endpoints from drifting into different authorization rules. The service-role adapter must filter by both meeting id and user id in the database query rather than fetch by id and compare later.
   Date/Author: 2026-09-12 / Codex
+
+- Decision: reject a malformed meeting id as the same generic 404 before calling the UUID database column.
+  Rationale: PostgreSQL reports invalid UUID syntax as an error, which would otherwise turn a guessed malformed path into a 5xx while a missing valid id returns 404. Early format validation preserves indistinguishable outward behavior and avoids unnecessary I/O.
+  Date/Author: 2026-09-13 / Codex
 
 - Decision: return a generic HTTP 404 for no session, nonexistent meeting, and wrong owner.
   Rationale: identical outward behavior does not reveal whether a guessed meeting id exists or who owns it. Authentication still runs normally on the landing page where a session can be established.
@@ -86,13 +94,17 @@ The behavior is visible in two ways. The join redirect contains only `/meeting/<
   Rationale: the ownership read runs inside SvelteKit and cannot be mocked from the browser. A dedicated server composition gives the browser story real join, refresh, and cross-session behavior without depending on the unavailable Supabase tenant or exposing a runtime toggle endpoint.
   Date/Author: 2026-09-13 / Codex
 
+- Decision: add a pinned local Supabase CLI and capture new database fixtures from its real Postgres/PostgREST stack before implementing the mock or adapter.
+  Rationale: repository seam order requires contract, probe, captured fixtures, mock, contract test, adapter, then composition. A disposable local stack produces representative wire behavior without creating a hosted resource or depending on the lost production tenant.
+  Date/Author: 2026-09-13 / Codex
+
 - Decision: finish this plan before adding the server-owned next-beat endpoint in epic #77.
   Rationale: a new endpoint under `/meeting/[id]` should inherit the common protection immediately. Building it first would create another route that has to be secured separately and then migrated.
   Date/Author: 2026-09-12 / Codex
 
 ## Outcomes & Retrospective
 
-Planning is complete; application behavior has not changed yet. The implementation is divided into seven small outcomes. The first two establish and prove a backward-compatible persistence seam. The next three protect the route family, prepare the loader, and make the clean-URL cutover as one deployable transition. The sixth supplies the server-side test composition needed for an honest browser story, and the seventh verifies the full result. Production deployment and a live Supabase migration remain blocked by epic #71, but contract, adapter, route, and browser tests can proceed locally with mocks.
+Planning is complete; application behavior has not changed yet. The implementation is divided into seven small outcomes. The first two establish and prove a backward-compatible persistence seam against a disposable real local Supabase stack before deriving fixtures and mocks. The next three protect the route family, prepare the loader, and make the clean-URL cutover as one deployable transition. The sixth supplies the server-side test composition needed for an honest browser story, and the seventh verifies the full result. Production deployment and a hosted Supabase migration remain blocked by epic #71; local progress depends on the real local probe succeeding before the mock, adapter, routes, and browser story continue.
 
 ## Context and Orientation
 
@@ -110,20 +122,21 @@ A server composition is the bundle of seam implementations placed in `event.loca
 
 ## Requirements
 
-`PRIV-01` requires the join redirect to contain no intake query values. `PRIV-02` requires every intake value needed by the room to survive a refresh of the clean URL. `PRIV-03` requires one owner-filtered lookup before any meeting page or child endpoint reads or mutates that meeting. `PRIV-04` requires missing-session, missing-meeting, and wrong-owner requests to receive the same generic 404. `PRIV-05` requires existing rows and retry behavior to remain safe. `PRIV-06` requires tests to cover normal, listening-only, crisis-language, refresh, and cross-session access.
+`PRIV-01` requires the join redirect to contain no intake query values. `PRIV-02` requires every intake value needed by the room to survive a refresh of the clean URL. `PRIV-03` requires one owner-filtered lookup before any meeting page or child endpoint reads or mutates that meeting. `PRIV-04` requires missing-session, malformed-id, missing-meeting, and wrong-owner requests to receive the same generic 404. `PRIV-05` requires existing rows and retry behavior to remain safe. `PRIV-06` requires tests to cover normal, listening-only, crisis-language, refresh, and cross-session access.
 
 ## Implementation Slices
 
-These are the assignment units for Codex or a subagent, not automatic merge units. Give one agent one slice, its listed files, and its acceptance command. Files that appear in more than one slice are owned sequentially; never assign two writers to them at once. The main agent integrates `PRIV-A` through `PRIV-C` before promoting the persistence foundation. Later milestone boundaries stay deployable; the final clean-URL transition in `PRIV-F` deliberately joins the two dependent edits that must land together.
+These are the assignment units for Codex or a subagent, not automatic merge units. Give one agent one slice, its listed files, and its acceptance command. Files that appear in more than one slice are owned sequentially; never assign two writers to them at once. The main agent integrates `PRIV-A` through `PRIV-D` before promoting the persistence foundation. Later milestone boundaries stay deployable; the final clean-URL transition in `PRIV-G` deliberately joins the two dependent edits that must land together.
 
-- `PRIV-A` extends `MeetingRecord`, validators, and the contract fixtures, gives `CreateMeetingInput` optional compatibility fields, and adds migration `20260912_000004_private_meeting_intake.sql`. It stops when the database contract test expresses the new fields; it does not edit an adapter or route.
-- `PRIV-B` updates only the fixture-backed database mock and its contract expectations for create and owner lookup. It stops when `contract.test.ts` passes against the mock.
-- `PRIV-C` implements the Supabase insert, select, and two-filter owned lookup in `adapter.ts` with focused adapter tests. It stops when the adapter suite proves both filters and indistinguishable not-found results.
-- `PRIV-D` adds `meeting-access.ts`, preserves non-authorization auth errors in the hook, adds `App.Locals.meetingContext`, removes route-level `PROBE_USER_ID` fallbacks, and adds focused access tests. It stops when the page and every current child route are proven to pass through the gate with one durable session identity.
-- `PRIV-E` changes the meeting loader and its tests to prefer an already-authorized meeting context, including historical null fallback, listening-only, crisis, and clean refresh cases. It retains URL reads only as an explicitly tested compatibility fallback for meetings created by the old join action.
-- `PRIV-F` makes the three new `CreateMeetingInput` strings required, changes the landing join action to persist them and emit the exact clean redirect, and deletes the loader's compatibility query reads in the same diff. It stops when both normal and listening-only joins survive refresh with no private URL data.
-- `PRIV-G` adds the server-only in-memory auth/database composition selected by Playwright's local web server and its production-disable guard. It stops when server composition tests prove the fixture state is shared across join and meeting requests and cannot activate on Vercel.
-- `PRIV-H` updates the Playwright user story, runs the full nonfixture checks, and updates the plan and governance records with actual results. It contains no new privacy architecture.
+- `PRIV-A` extends `MeetingRecord` and validators, gives `CreateMeetingInput` optional compatibility fields, and adds migration `20260912_000004_private_meeting_intake.sql`. It stops at the written contract and probe schema; it does not author fixtures, edit a mock, adapter, or route.
+- `PRIV-B` adds the pinned local Supabase CLI/configuration and `probes/privateMeetingAccessProbe.mjs`, runs the migration against that stack, and writes redacted success and failure captures under the database fixtures directory. It stops if no real probe can run and does not hand-author substitute fixture payloads.
+- `PRIV-C` updates only the fixture-backed database mock and adds contract expectations for create and owner lookup from the captured records. It stops when `contract.test.ts` proves schema conformance and mock fidelity.
+- `PRIV-D` implements the Supabase insert, select, and two-filter owned lookup in `adapter.ts` with focused adapter tests. It stops when the adapter suite proves both filters and indistinguishable not-found results against the probed shapes.
+- `PRIV-E` adds `meeting-access.ts`, preserves non-authorization auth errors in the hook, adds `App.Locals.meetingContext`, removes route-level `PROBE_USER_ID` fallbacks, and adds focused access tests. It stops when the page and every current child route are proven to pass through the gate with one durable session identity.
+- `PRIV-F` changes the meeting loader and its tests to prefer an already-authorized meeting context, including historical null fallback, listening-only, crisis, and clean refresh cases. It retains URL reads only as an explicitly tested compatibility fallback for meetings created by the old join action.
+- `PRIV-G` makes the three new `CreateMeetingInput` strings required, changes the landing join action to persist them and emit the exact clean redirect, and deletes the loader's compatibility query reads in the same diff. It stops when both normal and listening-only joins survive refresh with no private URL data.
+- `PRIV-H` adds the server-only in-memory auth/database composition selected by Playwright's local web server and its production-disable guard. It stops when server composition tests prove the fixture state is shared across join and meeting requests and cannot activate on Vercel.
+- `PRIV-I` updates the Playwright user story, runs the full nonfixture checks, and updates the plan and governance records with actual results. It contains no new privacy architecture.
 
 Each slice should be reviewable in one focused diff. If a slice uncovers a new contract decision, return that finding to the main agent instead of silently changing later slices.
 
@@ -139,7 +152,7 @@ Do not translate an auth provider outage, malformed auth response, or other non-
 
 Do not rely on Playwright browser routing to mock server-side auth or database calls. Do not add a public route, query parameter, cookie, or header that switches production into mock mode. The test composition is selected only by the local preview process, must fail closed when `VERCEL=1`, and must not be enabled by application input.
 
-Do not redesign the landing page or meeting UI, alter prompts, implement server-owned beats, provision a live database, rotate credentials, or refresh provider fixtures in this plan. Do not backfill historical meetings with invented names, clean time, or mind text.
+Do not redesign the landing page or meeting UI, alter prompts, implement server-owned beats, provision a hosted database, rotate credentials, or refresh unrelated xAI and legacy provider fixtures in this plan. The new private-meeting database captures from the disposable local stack are required. Do not backfill historical meetings with invented names, clean time, or mind text.
 
 ## Plan of Work
 
@@ -149,31 +162,37 @@ Start with the contract because both the mock and real adapter must agree before
 
     getOwnedMeeting(input: GetOwnedMeetingInput): Promise<SeamResult<MeetingRecord>>;
 
-Extend `CreateMeetingInput` in `app/src/lib/core/meeting.ts` with optional `userDisplayName`, `userCleanTime`, and `userMind` compatibility fields, then pass them to `database.createMeeting`. The temporary optional shape lets the contract, mock, and adapter land without breaking the old join action. `PRIV-F` makes all three nonempty and required in the same slice that updates that caller. Preserve the required mood and the boolean listening choice. Keep `topic` unchanged in this slice.
+Extend `CreateMeetingInput` in `app/src/lib/core/meeting.ts` with optional `userDisplayName`, `userCleanTime`, and `userMind` compatibility fields, then pass them to `database.createMeeting`. The temporary optional shape lets the contract, mock, and adapter land without breaking the old join action. `PRIV-G` makes all three nonempty and required in the same slice that updates that caller. Preserve the required mood and the boolean listening choice. Keep `topic` unchanged in this slice.
 
 Create `app/supabase/migrations/20260912_000004_private_meeting_intake.sql`. It adds nullable text columns `user_display_name` and `user_clean_time` to `public.meetings`. Do not alter the historical migration. Use `add column if not exists` so a retry is harmless. Do not make the columns `not null`: old rows cannot supply truthful snapshots, and fake backfill values would violate the purpose of the plan.
 
-Update the database contract validators and fixtures so a `MeetingRecord` accepts null for the two new snapshot fields and for `userMind`. Add contract assertions showing that new create input returns all five stored intake values and that `getOwnedMeeting` returns the record only for its owner. Add the smallest new fixture needed for the owner-filtered read; do not copy unrelated meeting state into it.
+Update only the runtime validators so a `MeetingRecord` accepts null for the two new snapshot fields and for `userMind`. Define the exact success, missing, wrong-owner, malformed-output, and upstream-failure shapes that the next milestone's probe must capture. Do not create or edit a database fixture yet.
 
-This milestone is complete when the database contract tests fail against the old mock for the new behavior, then pass after the contract and fixture work. It satisfies the contract part of `PRIV-02` and `PRIV-05`.
+This milestone is complete when the contract and probe schema are reviewable and the expected old mock/adapter gaps are recorded for Milestone 2. `PRIV-A` is not promoted by itself; the first green promotion boundary is the completed seam at the end of Milestone 2. This milestone satisfies the contract part of `PRIV-02` and `PRIV-05`.
 
-### Milestone 2: implement both database sides of the seam
+### Milestone 2: probe, capture, mock, test, and adapt the database seam in order
 
-Update `app/src/lib/seams/database/mock.ts` so `createMeeting` preserves the new fields and `getOwnedMeeting` validates both ids. A nonmatching user id and an unknown meeting id must return the same `NOT_FOUND` seam error. Add a named fault scenario for the new method only if the contract pattern requires one; do not add a general authorization framework to the mock.
+Pin `supabase@2.117.0` as an exact development dependency and commit the lockfile change. Initialize `app/supabase/config.toml` without hosted project identifiers or credentials. This local stack is disposable infrastructure on the developer machine; it is not a Vercel or hosted Supabase change. Add the `20260912_000004_private_meeting_intake.sql` migration from Milestone 1 to that stack with `npm.cmd exec supabase db reset`.
 
-Update `app/src/lib/server/seams/database/adapter.ts` so inserts and meeting-row selects map `user_display_name`, `user_clean_time`, and `user_mind`. Implement `getOwnedMeeting` as a Supabase query on `meetings` filtered by `.eq('id', input.meetingId)` and `.eq('user_id', input.userId)`. Return `NOT_FOUND` for an empty result and avoid a second unfiltered fetch. Extend `app/src/lib/server/seams/database/adapter.spec.ts` to assert the selected columns, both equality filters, the mapped result, input rejection, upstream failure mapping, and indistinguishable not-found behavior.
+Before editing the mock or real adapter, create `app/probes/privateMeetingAccessProbe.mjs` and the npm script `probe:supabase-private-meeting`. The probe obtains local API credentials from `npm.cmd exec supabase status -o json`, creates deterministic owner A, owner B, and one meeting through the real Supabase client, then captures the raw insert/select success, missing valid id, wrong owner, and representative PostgREST failure shapes. It must delete or reset its rows on repeat, redact credentials, and write the capture plus `probedAt`, `environment: 'local-supabase'`, and probe name under `app/src/lib/seams/database/fixtures/`. Do not copy expected JSON into the capture path by hand.
 
-Many test doubles implement `DatabasePort` as object literals. Update them mechanically to include `getOwnedMeeting` with a result appropriate to each test. Do not change their unrelated behavior. The milestone is complete when the database seam contract and adapter suites pass and no TypeScript error reports a stale `DatabasePort` implementation. It satisfies the adapter part of `PRIV-02`, `PRIV-03`, and `PRIV-05`.
+Run the probe and inspect the captured rows before continuing. If Docker, the local Supabase CLI, or the real probe cannot run and no restored hosted test tenant is available, record Milestone 2 as blocked in `Progress` and stop before fixture, mock, contract-test, adapter, or composition claims. Synthetic examples may remain in the plan, but they are not seam fixtures and cannot satisfy this gate.
+
+After a successful capture, update `app/src/lib/seams/database/mock.ts` so `createMeeting` preserves the new fields and `getOwnedMeeting` validates both ids using the captured fixture shapes. A nonmatching user id and an unknown meeting id must return the same `NOT_FOUND` seam error. Add contract assertions showing fixture schema conformance, mock fidelity, all five stored intake values, owner-only lookup, malformed output rejection, and captured failure mapping.
+
+Only after those contract tests pass, update `app/src/lib/server/seams/database/adapter.ts` so inserts and meeting-row selects map `user_display_name`, `user_clean_time`, and `user_mind`. Implement `getOwnedMeeting` as a Supabase query on `meetings` filtered by `.eq('id', input.meetingId)` and `.eq('user_id', input.userId)`. Return `NOT_FOUND` for an empty result and avoid a second unfiltered fetch. Extend `app/src/lib/server/seams/database/adapter.spec.ts` to assert the selected columns, both equality filters, the mapped result, input rejection, upstream failure mapping, and indistinguishable not-found behavior against the captured shapes.
+
+Many test doubles implement `DatabasePort` as object literals. Update them mechanically to include `getOwnedMeeting` with a result appropriate to each test. Do not change their unrelated behavior. The milestone is complete only when the real probe, captured fixtures, database seam contract, mock-fidelity tests, and adapter suites pass in that order and no TypeScript error reports a stale `DatabasePort` implementation. It satisfies the adapter part of `PRIV-02`, `PRIV-03`, and `PRIV-05`.
 
 ### Milestone 3: protect the complete meeting route family without hiding auth outages
 
 Preserve the complete auth seam result in `app/src/hooks.server.ts` until the request path is known. For a meeting route, a successful result supplies `userId`; `UNAUTHORIZED` proceeds as an absent session and receives the generic meeting 404; every other auth error is translated through the existing server error convention before any owner lookup. Unrelated routes keep their current authentication behavior. Do not log the private intake while reporting auth failures.
 
-Create `app/src/lib/server/meeting-access.ts` with a small pure path predicate plus an async access function. The predicate recognizes the page and every current or future child of `/meeting/[id]`, extracts the `id` already parsed by SvelteKit, and leaves unrelated routes alone. The async function requires the successful session identity, calls `locals.seams.database.getOwnedMeeting({ meetingId, userId })`, and either returns the meeting or throws the same generic HTTP 404 for no user and `NOT_FOUND`. The service-role adapter must already have applied both filters.
+Create `app/src/lib/server/meeting-access.ts` with a small pure path predicate plus an async access function. The predicate recognizes the page and every current or future child of `/meeting/[id]`, extracts the `id` already parsed by SvelteKit, and leaves unrelated routes alone. Before database I/O, validate that id with the existing UUID contract in `app/src/lib/seams/uuid/contract.ts`; a malformed value throws the same generic 404 and never reaches Supabase. The async function then requires the successful session identity, calls `locals.seams.database.getOwnedMeeting({ meetingId, userId })`, and either returns the meeting or throws that 404 for no user and `NOT_FOUND`. The service-role adapter must already have applied both filters.
 
 Call the access function before `resolve(event)` and store the returned value as `event.locals.meetingContext`. Extend `App.Locals` in `app/src/app.d.ts` with `meetingContext: MeetingRecord | null`; initialize it to null for nonmeeting routes. Do not duplicate owner checks across `+page.server.ts`, `share`, `user-share`, `crisis`, `close`, and `expand`. Remove `PROBE_USER_ID` fallbacks from the interactive landing, share, and close route code so one authenticated or guest session owns the complete browser flow. Explicit CLI seam probes may continue to supply their own probe id outside the request path.
 
-Create `app/src/lib/server/routes/meeting-access.spec.ts`. Prove that unrelated routes do not query a meeting; a valid owner reaches `resolve`; no user, a missing id, and a wrong owner all return the same 404; `UPSTREAM_UNAVAILABLE`, `CONTRACT_VIOLATION`, and unexpected auth failures retain their service-error behavior without calling owner lookup; and a child route such as `/meeting/<id>/share` is checked before its handler runs. Add or adjust route tests so their test locals include the already-authorized meeting context. Add a landing-action case proving that a request without a durable session cannot create a probe-owned meeting and redirect into a guaranteed 404.
+Create `app/src/lib/server/routes/meeting-access.spec.ts`. Prove that unrelated routes do not query a meeting; a valid owner reaches `resolve`; no user, a malformed id, a missing valid id, and a wrong owner all return the same status and generic body; malformed ids make zero database calls; `UPSTREAM_UNAVAILABLE`, `CONTRACT_VIOLATION`, and unexpected auth failures retain their service-error behavior without calling owner lookup; and a child route such as `/meeting/<id>/share` is checked before its handler runs. Add or adjust route tests so their test locals include the already-authorized meeting context. Add a landing-action case proving that a request without a durable session cannot create a probe-owned meeting and redirect into a guaranteed 404.
 
 This milestone is complete when every current meeting route is covered by the path-level test, no meeting-specific adapter call occurs before `getOwnedMeeting`, and the gate distinguishes absent authentication from broken authentication. It satisfies `PRIV-03` and `PRIV-04`.
 
@@ -181,7 +200,7 @@ This milestone is complete when every current meeting route is covered by the pa
 
 In `app/src/routes/meeting/[id]/+page.server.ts`, read the owner-checked `locals.meetingContext` established in Milestone 3 and map its stored snapshot fields into the existing page-data names so `+page.svelte` does not need an unrelated rewrite. During this compatibility milestone only, a null stored snapshot field may fall back to the matching legacy query value so a meeting created by the old join action still opens. Stored values always win. Profile display name may supply a missing historical `userDisplayName`, absent clean time remains null after the compatibility fallback is removed, stored `userMood` remains authoritative, and stored `userMind` may ultimately fall back to the existing meeting topic. Do not write fallbacks back to the database.
 
-Run crisis detection against the effective server-selected `userMind` and keep listening-only behavior based on the stored boolean. Update `app/src/lib/server/routes/meeting-page-load.spec.ts` to cover complete stored intake, an old join represented by nullable fields plus legacy query values, a historical row with neither, listening-only state, and crisis language. Add a refresh-shaped test by invoking the loader with the same authorized context twice; both calls must return the same user-facing intake and must not append data. Mark every query fallback assertion with the `PRIV-F` deletion target so it cannot become permanent.
+Run crisis detection against the effective server-selected `userMind` and keep listening-only behavior based on the stored boolean. Update `app/src/lib/server/routes/meeting-page-load.spec.ts` to cover complete stored intake, an old join represented by nullable fields plus legacy query values, a historical row with neither, listening-only state, and crisis language. Add a refresh-shaped test by invoking the loader with the same authorized context twice; both calls must return the same user-facing intake and must not append data. Mark every query fallback assertion with the `PRIV-G` deletion target so it cannot become permanent.
 
 This milestone is complete when persisted values are authoritative, old links remain temporarily usable, and access denial remains independently tested. It satisfies the compatibility portion of `PRIV-02` and the crisis portion of `PRIV-06`.
 
@@ -213,14 +232,19 @@ This milestone satisfies `PRIV-06`. The plan is complete when all six requiremen
 
 ## Concrete Steps
 
-Run all commands from `C:\Users\shiva\OneDrive\Documents\ChatGPT\14thstep\app` in PowerShell. Use the repository's installed Node and npm versions; do not install a different package manager or regenerate the lockfile for this work.
+Run all commands from `C:\Users\shiva\OneDrive\Documents\ChatGPT\14thstep\app` in PowerShell. Use the repository's installed Node and npm versions and do not install a different package manager. The only intended dependency change is the exact Supabase CLI development dependency, whose normal npm install updates the lockfile.
 
 After Milestones 1 and 2:
 
+    npm.cmd install --save-dev --save-exact supabase@2.117.0
+    if (-not (Test-Path -LiteralPath supabase/config.toml)) { npm.cmd exec supabase init }
+    npm.cmd exec supabase start
+    npm.cmd exec supabase db reset
+    npm.cmd run probe:supabase-private-meeting
     npm.cmd run test:unit -- --run src/lib/seams/database/contract.test.ts src/lib/server/seams/database/adapter.spec.ts src/lib/core/meeting.spec.ts
     npm.cmd run check
 
-Expect the named suites to pass and `svelte-check` to report zero errors. Existing warnings must be reported honestly; do not silence them as part of this privacy slice.
+Expect the probe to report one owner hit, indistinguishable wrong-owner and missing results, and fresh redacted captures before the named suites pass. Expect `svelte-check` to report zero errors. If the local stack cannot start, record the blocker and stop this dependency chain rather than skipping to authored fixtures. Existing warnings must be reported honestly; do not silence them as part of this privacy slice.
 
 After Milestones 3 through 5:
 
@@ -260,13 +284,15 @@ Review the repository diff from the root:
 
 Expect no whitespace errors, no environment files or credentials, and only files needed for this plan plus current governance updates.
 
+When the real-system checks are complete, `npm.cmd exec supabase stop` may stop the disposable local stack without deleting committed migrations or captures.
+
 ## Validation and Acceptance
 
 Acceptance is behavioral. Submit the intake with a recognizable alias, clean-time phrase, mood, mind text containing no crisis language, and listening disabled. The 303 location must be `/meeting/<uuid>` with no question mark. Loading and refreshing that URL must show the same alias and use the same stored context without creating another meeting or transcript entry.
 
 Repeat with listening enabled. The clean URL must remain the same shape and the room must preserve listening-only behavior after refresh. Repeat with a known crisis phrase accepted by the existing crisis engine. Crisis behavior must be derived from the stored meeting mind text after a clean-URL refresh.
 
-Using two separate mocked sessions, create a meeting as user A. User A must load the page and child endpoints normally. User B, a request with an auth `UNAUTHORIZED` result, and a request for a random meeting id must each receive the same generic 404 response before shares, phase state, participants, generation, or mutation are invoked. Auth infrastructure and contract failures must retain their 5xx service-error mapping and must not invoke the owner lookup. A request without a durable session must never create a meeting under `PROBE_USER_ID`.
+Using two separate mocked sessions, create a meeting as user A. User A must load the page and child endpoints normally. User B, a request with an auth `UNAUTHORIZED` result, a malformed id such as `not-a-uuid`, and a random valid missing id must each receive the same generic 404 response before shares, phase state, participants, generation, or mutation are invoked. The malformed id must make no database call. Auth infrastructure and contract failures must retain their 5xx service-error mapping and must not invoke the owner lookup. A request without a durable session must never create a meeting under `PROBE_USER_ID`.
 
 Inspect browser history and captured redirect headers. No intake answer may appear in a URL. Inspect server logging added or changed by this work. It may log error codes and meeting ids where existing conventions require them, but it must not add name, clean time, mood, or mind text to logs.
 
@@ -321,7 +347,7 @@ The implementation must leave these public shapes available in `app/src/lib/seam
 
 `CreateMeetingInput` in `app/src/lib/core/meeting.ts` accepts the three new strings as optional only during the additive compatibility slices and must require them for all new meetings in the final state. The meeting-access module may choose its internal function names, but the hook must expose one nullable `MeetingRecord` as `App.Locals.meetingContext` and must perform exactly one owner-filtered meeting lookup before route-specific meeting I/O. The hook must keep `UNAUTHORIZED` distinct from all other auth seam errors until it has either returned the generic meeting 404 or preserved the existing service-error response.
 
-No new runtime dependency is needed. Use SvelteKit's existing request hook and HTTP error mechanism, the existing seam result and error codes, Vitest for unit and route tests, and Playwright's configured `app/tests/e2e` directory for the browser story. The server test composition uses the existing seam mocks and a dedicated process environment value passed through `playwright.config.ts`; it is never selected by request data and refuses to run when `VERCEL=1`. Do not use cookies, `localStorage`, `sessionStorage`, encrypted query parameters, or client-side obfuscation to hold the private intake.
+No new runtime dependency is needed. Pin `supabase@2.117.0` as a development-only local probe tool. Use SvelteKit's existing request hook and HTTP error mechanism, the existing seam result and error codes, Vitest for unit and route tests, and Playwright's configured `app/tests/e2e` directory for the browser story. The server test composition uses the captured seam fixtures and a dedicated process environment value passed through `playwright.config.ts`; it is never selected by request data and refuses to run when `VERCEL=1`. Do not use cookies, `localStorage`, `sessionStorage`, encrypted query parameters, or client-side obfuscation to hold the private intake.
 
 The only true cross-plan dependency is this plan before `plans/server-owned-meeting-beats-execplan.md`: the later plan adds another child endpoint that must inherit this ownership gate. The production database restoration in #71 blocks applying the migration and verifying the live site, but it does not block writing the migration or completing the local contract, adapter, route, and browser tests.
 
@@ -329,4 +355,4 @@ The only true cross-plan dependency is this plan before `plans/server-owned-meet
 
 2026-09-12: Created this plan after the repository organization pass exposed privacy epic #78 as a distinct application track. The plan separates locally implementable privacy and ownership work from the blocked production-recovery plan and establishes the access boundary needed by the later server-owned meeting-flow work.
 
-2026-09-13: Revised the plan after PR review to preserve non-authorization auth failures, retire route-level probe identity, stage the clean-URL cutover in a deployable order, use Playwright's configured test directory, and define the server-side mock composition required to test ownership through a built preview server.
+2026-09-13: Revised the plan after PR review to preserve non-authorization auth failures, return the generic 404 for malformed ids, retire route-level probe identity, stage the clean-URL cutover in a deployable order, use Playwright's configured test directory, define the server-side mock composition required by a built preview server, and restore contract-probe-fixture-mock-test-adapter ordering through a disposable local Supabase stack.

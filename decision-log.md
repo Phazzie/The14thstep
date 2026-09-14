@@ -117,7 +117,8 @@
 - Preserved the full auth seam result until the meeting access decision:
   `UNAUTHORIZED` maps to the generic ownership 404, while provider,
   infrastructure, contract, and unexpected auth failures keep their existing
-  service-error status. Retired `PROBE_USER_ID` as an interactive route
+  service-error status. Malformed meeting ids become the same generic 404
+  before a UUID database query. Retired `PROBE_USER_ID` as an interactive route
   identity because a redirect cannot recover that process-local fallback.
 - Staged the private-intake migration through a persisted-first compatibility
   loader, then one clean-URL cutover that removes URL writes and reads together.
@@ -132,3 +133,10 @@
 - Required the generated empty-chair moment to pass the existing minimum
   authenticity and voice-consistency thresholds before persistence, and placed
   that server path before the generic renderer cutover that depends on it.
+- Restored contract-probe-fixture-mock-test-adapter order for both new database
+  tracks. The plans pin a local Supabase CLI and require real local Postgres and
+  PostgREST captures; if that probe cannot run, dependent seam and route work is
+  blocked rather than supported by invented fixtures.
+- Injected phase-transition time from the server clock seam, removed the unused
+  reflection gate, assigned `/room-moment` to generated beat completion, and
+  persisted the user-share id that crisis support must load on every retry.
