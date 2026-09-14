@@ -191,14 +191,15 @@
   states, finished phase, and close-run result; failure applies none of them.
 - New meeting orchestration is enabled only for records created with
   `meeting_protocol_version = 1`. Historical state is never translated into an
-  inferred beat cursor. Completed legacy records remain readable; unexpected
-  active legacy meetings receive a read-only restart path. A database singleton
-  and insert trigger fence creation in `draining` while legacy meetings finish
-  and the version-1 application deploys; activation then accepts only stamped
-  inserts, closing the check-to-deploy race across old application instances.
-- Accepted crisis support sets a monotonic `crisis_resources_visible` flag in
-  the same versioned phase update. The loader derives the one controlled sticky
-  resource payload from that flag after refresh or a lost response.
+  inferred beat cursor. A temporary bridge routes active unversioned meetings
+  through the frozen legacy renderer and version-1 meetings through the beat
+  renderer. The database remains `draining` only while that bridge deploys,
+  then stamped creation reopens while old rooms finish or reach a server-clocked
+  24-hour abandoned state. Rollback uses the same bridge in reverse.
+- Entering a canonical intake- or share-triggered crisis beat sets the monotonic
+  `crisis_resources_visible` flag before provider work. The loader and crisis
+  route derive the controlled sticky resource payload from that flag even when
+  generation fails, every candidate is rejected, or a response is lost.
 - One server-side roster resolver now owns persisted-or-deterministic fallback
   for the page loader, `/next`, `/share`, `/close`, and `/expand`, preserving a
   fallback visitor's voice profile and transcript label when saving seats fails.
@@ -226,6 +227,10 @@
   the candidate character, and its content contains the quoted text. It then
   resolves domain ids to database UUIDs; finalization locks and rechecks the
   origin meeting and speaker relationship before writing.
+- Close finalization locks rows in one invariant order: meeting, close run,
+  deduplicated and sorted origin-share UUIDs, sorted character UUIDs, then sorted
+  callback UUIDs. Concurrent checkpoints with reversed overlapping targets may
+  wait or return the typed stale-version conflict, but cannot reverse lock order.
 - Prompt-rule verification searches every generation builder for worded as
   well as numeric fixed sentence counts, including hyphenated forms such as
   `one-sentence`.
@@ -234,9 +239,10 @@
   participant reload both return that stored canonical profile; incomplete or
   placeholder snapshots fail validation before roster selection.
 - Application rollback first transitions the same database fence from
-  `version_1` to `draining`, then waits for a zero-active-version-1 preflight.
-  It deploys the legacy-compatible application while creation remains closed
-  and returns to `legacy` only after every serving instance is ready.
+  `version_1` to `draining`, deploys a bridge that preserves the beat renderer
+  for existing version-1 rows and supports new legacy rows, then returns the
+  fence to `legacy` and reopens creation. The beat renderer remains until every
+  version-1 row has completed or reached the safe abandoned state.
 - The private-meeting migration denies direct application-table and public-RPC
   access to `PUBLIC`, `anon`, and `authenticated`, including default privileges
   for future objects. The server still applies owner filters because its

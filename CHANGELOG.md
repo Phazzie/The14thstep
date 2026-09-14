@@ -59,12 +59,16 @@ not describe application behavior shipped by this documentation PR.
   meeting completion fields, callbacks, lifecycle targets, finished phase, and
   the canonical close-run result, with slow-holder renewal and full rollback
   acceptance cases.
-- The planned renderer requires protocol-version gating for historical phase
-  JSON and a database `legacy | draining | version_1` creation fence throughout
-  the zero-active-legacy check and renderer deployment.
+- The planned renderer requires immutable protocol routing through a temporary
+  dual-renderer bridge and a database `legacy | draining | version_1` creation
+  fence. `draining` lasts only through bridge deployment; stamped creation then
+  reopens while older rooms finish or reach a server-clocked 24-hour abandoned
+  state. Rollback uses the same bridge in reverse.
 - The plan requires crisis-resource visibility to become a durable monotonic
-  meeting fact and one persisted-or-fallback roster resolver for the page,
-  `/next`, `/share`, `/close`, and `/expand`.
+  meeting fact when a crisis beat begins, before provider work, so a provider
+  or quality failure cannot hide the controlled safety card. It also requires
+  one persisted-or-fallback roster resolver for the page, `/next`, `/share`,
+  `/close`, and `/expand`.
 - The plan requires topic completion to use a narrow beat-keyed ledger. Spoken
   input and a later share-gate pass must contend for one user-gate outcome row,
   so pass and transcript content cannot both own the same beat. Introduction
@@ -85,14 +89,19 @@ not describe application behavior shipped by this documentation PR.
   canonical origin share, speaker, and quoted source content, then resolve from
   domain ids to validated database UUIDs before checkpointing. Finalization must
   lock and recheck those relationships.
+- The close plan requires every finalizer to lock the meeting and run first,
+  then deduplicated origin-share, character, and callback UUIDs in sorted order.
+  Reversed overlapping target arrays must wait or return a typed stale conflict,
+  never deadlock because checkpoint order changed.
 - The plan requires per-callback lifecycle versions. A callback changed by
   another meeting must invalidate the complete close transaction and trigger
   lifecycle-only recomputation under the current token.
 - The prompt-repair slice covers every generation builder in
   `prompt-templates.ts`, the private close-summary builder, and worded fixed
   counts such as `one-sentence`, including the active crosstalk prompt.
-- The rollback plan requires zero active protocol-version-1 meetings before the
-  generic renderer or specialized completion routes may be removed.
+- The rollback plan reopens legacy creation after the symmetric bridge is live,
+  while retaining the generic renderer and specialized completion routes until
+  every version-1 meeting has completed or safely expired as abandoned.
 - Issue #79 is mapped to executable `IDENTITY-A` through `IDENTITY-C` slices in
   its live plan. They specify a uniquely constrained immutable `core_slug`, a
   migration seed, duplicate stop conditions, a real local probe, removal of

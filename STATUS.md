@@ -60,9 +60,11 @@ plan now defines `IDENTITY-A` through `IDENTITY-C`: the uniquely versioned local
 migration and real probe, the read-only adapter conversion, and the final source
 and integration audit. Ambiguous historical duplicates stop migration until a
 separately reviewed data repair exists.
-Promote #81 through its database creation fence: keep meeting creation in
-`draining` while legacy rooms finish and the version-1 renderer deploys, then
-activate stamped version-1 creation only after every serving instance is ready.
+Promote #81 through its database creation fence: use `draining` only while a
+dual-protocol bridge deploys, then activate stamped version-1 creation after
+every serving instance can keep older rooms on the frozen legacy renderer.
+Legacy rooms finish or enter a server-clocked 24-hour abandoned state without
+blocking new joins; rollback uses the same bridge in the opposite direction.
 
 ## Blocked
 
