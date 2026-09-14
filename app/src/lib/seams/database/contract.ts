@@ -1,3 +1,9 @@
+/**
+ * Purpose: Define and validate every value crossing the database seam.
+ * Why: Core and server callers need one runtime-checked persistence vocabulary.
+ * Info flow: Callers provide contract inputs; adapters and mocks return validated records.
+ * Invariants: Meeting outputs include nullable intake snapshots; staged create inputs may omit them.
+ */
 import type {
 	CharacterRole,
 	CharacterStatus,
@@ -22,10 +28,22 @@ export interface MeetingRecord {
 	userId: string;
 	topic: string;
 	userMood: string;
+	userMind: string | null;
+	userDisplayName: string | null;
+	userCleanTime: string | null;
 	listeningOnly: boolean;
 	startedAt: string;
 	endedAt: string | null;
 }
+
+export type CreateMeetingInput = Omit<
+	MeetingRecord,
+	'id' | 'startedAt' | 'endedAt' | 'userMind' | 'userDisplayName' | 'userCleanTime'
+> & {
+	userMind?: string | null;
+	userDisplayName?: string | null;
+	userCleanTime?: string | null;
+};
 
 export interface ShareRecord {
 	id: string;
@@ -122,12 +140,16 @@ export interface GetMeetingCountAfterDateInput {
 	startedAfter: string;
 }
 
+export interface GetOwnedMeetingInput {
+	meetingId: string;
+	userId: string;
+}
+
 export interface DatabasePort {
 	getUserById(userId: string): Promise<SeamResult<UserProfile>>;
 	ensureUserProfile(input: EnsureUserProfileInput): Promise<SeamResult<UserProfile>>;
-	createMeeting(
-		input: Omit<MeetingRecord, 'id' | 'startedAt' | 'endedAt'>
-	): Promise<SeamResult<MeetingRecord>>;
+	createMeeting(input: CreateMeetingInput): Promise<SeamResult<MeetingRecord>>;
+	getOwnedMeeting(input: GetOwnedMeetingInput): Promise<SeamResult<MeetingRecord>>;
 	appendShare(input: Omit<ShareRecord, 'id' | 'createdAt'>): Promise<SeamResult<ShareRecord>>;
 	saveMeetingParticipants(input: {
 		meetingId: string;
@@ -255,20 +277,24 @@ export function validateMeetingRecord(value: unknown): value is MeetingRecord {
 		isNonEmptyString(value.userId) &&
 		isNonEmptyString(value.topic) &&
 		isNonEmptyString(value.userMood) &&
+		isNullableString(value.userMind) &&
+		isNullableString(value.userDisplayName) &&
+		isNullableString(value.userCleanTime) &&
 		typeof value.listeningOnly === 'boolean' &&
 		isNonEmptyString(value.startedAt) &&
 		isNullableString(value.endedAt)
 	);
 }
 
-export function validateCreateMeetingInput(
-	value: unknown
-): value is Omit<MeetingRecord, 'id' | 'startedAt' | 'endedAt'> {
+export function validateCreateMeetingInput(value: unknown): value is CreateMeetingInput {
 	if (!isObject(value)) return false;
 	return (
 		isNonEmptyString(value.userId) &&
 		isNonEmptyString(value.topic) &&
 		isNonEmptyString(value.userMood) &&
+		(value.userMind === undefined || isNullableString(value.userMind)) &&
+		(value.userDisplayName === undefined || isNullableString(value.userDisplayName)) &&
+		(value.userCleanTime === undefined || isNullableString(value.userCleanTime)) &&
 		typeof value.listeningOnly === 'boolean'
 	);
 }
@@ -429,6 +455,12 @@ export function validateUpdateCallbackInput(value: unknown): value is UpdateCall
 	return Object.keys(updates).length > 0;
 }
 
-export function validateGetMeetingCountAfterDateInput(value: unknown): value is GetMeetingCountAfterDateInput {
+export function validateGetMeetingCountAfterDateInput(
+	value: unknown
+): value is GetMeetingCountAfterDateInput {
 	return isObject(value) && isNonEmptyString(value.userId) && isNonEmptyString(value.startedAfter);
+}
+
+export function validateGetOwnedMeetingInput(value: unknown): value is GetOwnedMeetingInput {
+	return isObject(value) && isNonEmptyString(value.meetingId) && isNonEmptyString(value.userId);
 }

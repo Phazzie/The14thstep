@@ -276,3 +276,7 @@
 - Planned Supabase migrations use distinct leading versions in dependency order:
   private intake `20260912000100`, durable core identity `20260912000200`, and
   server-owned meeting beats `20260912000300`.
+
+## 2026-09-14 — publish the bounded privacy checkpoint for review
+
+- Publish the current privacy foundation as a draft PR from current origin/main so partial work is visible and reviewable. Keep its real-probe and integration gates intact; do not treat contract tests as database evidence. Docker remains deferred at the user's request. Normalize the promotion lockfile to the planned additions and preserve existing package records. Follow-up implementation remains tracked by #78, #84 and #85.

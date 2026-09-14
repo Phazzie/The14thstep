@@ -1,3 +1,9 @@
+/**
+ * Purpose: Verify pure meeting workflow behavior against injected seam doubles.
+ * Why: Core orchestration must be regression-tested without real database or model I/O.
+ * Info flow: Literal workflow commands enter core functions; spies and seam results are asserted.
+ * Invariants: Existing callers remain valid and optional intake snapshots cross the seam unchanged.
+ */
 import { describe, expect, it, vi } from 'vitest';
 import { SeamErrorCodes, err, ok } from './seam';
 import {
@@ -44,6 +50,9 @@ function createDeps(overrides: Partial<MeetingWorkflowDeps> = {}): MeetingWorkfl
 				userId: input.userId,
 				topic: input.topic,
 				userMood: input.userMood,
+				userMind: input.userMind ?? null,
+				userDisplayName: input.userDisplayName ?? null,
+				userCleanTime: input.userCleanTime ?? null,
 				listeningOnly: input.listeningOnly,
 				startedAt: '2026-02-16T00:00:00.000Z',
 				endedAt: null
@@ -113,6 +122,9 @@ function createDeps(overrides: Partial<MeetingWorkflowDeps> = {}): MeetingWorkfl
 				userId: 'user-1',
 				topic: 'staying in the room',
 				userMood: 'anxious',
+				userMind: null,
+				userDisplayName: null,
+				userCleanTime: null,
 				listeningOnly: false,
 				startedAt: '2026-02-16T00:00:00.000Z',
 				endedAt: '2026-02-16T01:00:00.000Z'
@@ -223,6 +235,34 @@ describe('meeting workflow', () => {
 			expect(result.value.id).toBe('meeting-1');
 			expect(result.value.topic).toBe('staying in the room');
 		}
+	});
+
+	it('passes optional intake snapshots to the database seam unchanged', async () => {
+		const createMeetingSpy = vi.fn(createDeps().database.createMeeting);
+		const deps = createDeps({
+			database: {
+				...createDeps().database,
+				createMeeting: createMeetingSpy
+			}
+		});
+
+		const input = {
+			userId: 'user-1',
+			topic: 'staying in the room',
+			userMood: 'anxious',
+			userMind: 'I almost left before I came in.',
+			userDisplayName: 'River',
+			userCleanTime: null,
+			listeningOnly: false
+		};
+		const before = structuredClone(input);
+
+		const result = await createMeeting(deps, input);
+
+		expect(result.ok).toBe(true);
+		expect(createMeetingSpy).toHaveBeenCalledOnce();
+		expect(createMeetingSpy).toHaveBeenCalledWith(input);
+		expect(input).toEqual(before);
 	});
 
 	it('adds a share and auto-scores significance when omitted', async () => {
