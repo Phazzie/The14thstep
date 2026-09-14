@@ -111,3 +111,24 @@
 - Superseded the provisional epic mapping created during repository organization: #78 now has `plans/private-meeting-access-execplan.md`, #77 now has `plans/server-owned-meeting-beats-execplan.md`, and #71/#79/#80 remain in the production-recovery and backlog track. Privacy and meeting orchestration have different blockers, acceptance stories, and implementation boundaries, so keeping both inside older broad plans made neither safely executable.
 - Archived the March meeting-restoration plan instead of patching it in place. It records shipped room behavior, but its explicit frontend-owned speaking order, fixed old branch instructions, and ban on a new orchestration endpoint directly conflict with #77. The replacement plan treats that document as historical evidence and makes persisted server beats the execution authority.
 - Ordered #84 and #85 before #81. The server-owned beat endpoint belongs under `/meeting/[id]` and should inherit a single owner check when it is created rather than becoming another unprotected route that needs later repair.
+
+## 2026-09-13
+
+- Preserved the full auth seam result until the meeting access decision:
+  `UNAUTHORIZED` maps to the generic ownership 404, while provider,
+  infrastructure, contract, and unexpected auth failures keep their existing
+  service-error status. Retired `PROBE_USER_ID` as an interactive route
+  identity because a redirect cannot recover that process-local fallback.
+- Staged the private-intake migration through a persisted-first compatibility
+  loader, then one clean-URL cutover that removes URL writes and reads together.
+  Playwright uses an explicit local preview-server seam composition because
+  browser interception cannot mock hook-level database and auth work.
+- Made the canonical beat-owned user share and its stored analysis authoritative
+  under competing payloads. Expansion now derives topic and transcript context
+  from persisted server state rather than browser input.
+- Added a unique, leased close-run claim with checkpoints, idempotent callback
+  keys, and a stored close response so concurrent and repeated closes converge
+  without repeating completion side effects.
+- Required the generated empty-chair moment to pass the existing minimum
+  authenticity and voice-consistency thresholds before persistence, and placed
+  that server path before the generic renderer cutover that depends on it.

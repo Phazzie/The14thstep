@@ -16,10 +16,11 @@ The behavior is visible in two ways. The join redirect contains only `/meeting/<
 - [x] (2026-09-12 13:45Z) Chose one meeting-scoped persistence contract and one centralized route-ownership gate so later meeting endpoints inherit the same protection.
 - [ ] Milestone 1: extend the meeting persistence contract and migration for private intake snapshots.
 - [ ] Milestone 2: implement and verify the mock and Supabase adapter behavior.
-- [ ] Milestone 3: persist intake during join and redirect to a clean meeting URL.
-- [ ] Milestone 4: load persisted intake and preserve refresh and crisis behavior.
-- [ ] Milestone 5: enforce ownership before any meeting page or child endpoint performs meeting-specific I/O.
-- [ ] Milestone 6: prove the complete local user story and update the governing artifacts.
+- [ ] Milestone 3: preserve authentication failures and enforce ownership before meeting-specific I/O.
+- [ ] Milestone 4: make the loader prefer persisted intake while preserving a temporary compatibility read.
+- [ ] Milestone 5: atomically cut over join and loader behavior to clean URLs only.
+- [ ] Milestone 6: provide an explicit local server composition for browser tests.
+- [ ] Milestone 7: prove the complete local user story and update the governing artifacts.
 
 ## Surprises & Discoveries
 
@@ -37,6 +38,15 @@ The behavior is visible in two ways. The join redirect contains only `/meeting/<
 
 - Observation: the common SvelteKit server hook already resolves `event.locals.userId` before route handlers run.
   Evidence: `app/src/hooks.server.ts` builds the seam bundle, calls the auth seam, sets `event.locals.userId`, and then calls `resolve(event)`. This is the narrowest existing place to protect the meeting page and every route nested beneath it.
+
+- Observation: the hook currently collapses every authentication seam failure to `userId = null`, but only `UNAUTHORIZED` means there is no usable session.
+  Evidence: the auth seam also returns infrastructure and contract failures such as `UPSTREAM_UNAVAILABLE` and `CONTRACT_VIOLATION`. Treating those as an anonymous request would turn an outage into the same 404 used to hide meeting existence.
+
+- Observation: the landing action's nonproduction `PROBE_USER_ID` fallback can create a meeting owned by an identity that the redirected GET cannot recover.
+  Evidence: `actions.join` may write the probe id when `locals.userId` is absent, while the following `/meeting/<id>` request resolves authentication again and has no durable probe session. An ownership gate would correctly reject that redirect.
+
+- Observation: Playwright starts a built preview server, so browser request interception cannot supply the server-side owner lookup used by the hook.
+  Evidence: `app/playwright.config.ts` points Playwright at `tests/e2e`; the SvelteKit preview process constructs real server adapters before browser `page.route` handlers can affect them.
 
 ## Decision Log
 
@@ -60,13 +70,29 @@ The behavior is visible in two ways. The join redirect contains only `/meeting/<
   Rationale: identical outward behavior does not reveal whether a guessed meeting id exists or who owns it. Authentication still runs normally on the landing page where a session can be established.
   Date/Author: 2026-09-12 / Codex
 
+- Decision: preserve the full auth seam result until the hook knows whether the request is meeting-scoped.
+  Rationale: `UNAUTHORIZED` represents an absent or invalid session and maps to the generic meeting 404. Infrastructure, provider, contract, and unexpected auth failures retain the repository's existing 5xx service-error mapping and stop before owner lookup.
+  Date/Author: 2026-09-13 / Codex
+
+- Decision: remove `PROBE_USER_ID` as a route-level identity fallback.
+  Rationale: browser navigation needs one durable session identity from join through every meeting request. Dedicated seam probes may keep an explicit probe id, but interactive routes must authenticate or fail normally.
+  Date/Author: 2026-09-13 / Codex
+
+- Decision: stage the clean-URL cutover through backward-compatible contract and loader changes, then remove the URL fallback in the same slice that changes the join redirect.
+  Rationale: this keeps every intermediate commit deployable. The loader can prefer stored fields while old joins still send query values; once new joins persist the full snapshot, one coherent cutover removes both the query write and compatibility read.
+  Date/Author: 2026-09-13 / Codex
+
+- Decision: add a server-only, fixture-backed composition selected explicitly by Playwright's local web server.
+  Rationale: the ownership read runs inside SvelteKit and cannot be mocked from the browser. A dedicated server composition gives the browser story real join, refresh, and cross-session behavior without depending on the unavailable Supabase tenant or exposing a runtime toggle endpoint.
+  Date/Author: 2026-09-13 / Codex
+
 - Decision: finish this plan before adding the server-owned next-beat endpoint in epic #77.
   Rationale: a new endpoint under `/meeting/[id]` should inherit the common protection immediately. Building it first would create another route that has to be secured separately and then migrated.
   Date/Author: 2026-09-12 / Codex
 
 ## Outcomes & Retrospective
 
-Planning is complete; application behavior has not changed yet. The implementation is divided into six small outcomes. The first two establish and prove the persistence seam, the next two remove private data from navigation and restore it from the server, and the fifth protects the full route family. Production deployment and a live Supabase migration remain blocked by epic #71, but contract, adapter, route, and browser tests can proceed locally with mocks.
+Planning is complete; application behavior has not changed yet. The implementation is divided into seven small outcomes. The first two establish and prove a backward-compatible persistence seam. The next three protect the route family, prepare the loader, and make the clean-URL cutover as one deployable transition. The sixth supplies the server-side test composition needed for an honest browser story, and the seventh verifies the full result. Production deployment and a live Supabase migration remain blocked by epic #71, but contract, adapter, route, and browser tests can proceed locally with mocks.
 
 ## Context and Orientation
 
@@ -74,11 +100,13 @@ The landing action is `actions.join` in `app/src/routes/+page.server.ts`. It val
 
 The database boundary is called a seam: a typed interface whose mock and real adapter must behave the same way. Its contract is `app/src/lib/seams/database/contract.ts`, its in-memory implementation is `app/src/lib/seams/database/mock.ts`, and its Supabase implementation is `app/src/lib/server/seams/database/adapter.ts`. Contract fixtures live under `app/src/lib/seams/database/fixtures/`. The initial schema is in `app/supabase/migrations/20260215_000001_init_schema.sql`; new schema work must be a later migration rather than an edit to that historical file.
 
-`app/src/hooks.server.ts` runs for every server request. It creates the real seam implementations, resolves the current user id through the auth seam, and stores both in `event.locals`. The shape of those locals is declared in `app/src/app.d.ts`. A meeting route means the page at `app/src/routes/meeting/[id]/+page.server.ts` or any endpoint below the same directory: `share`, `user-share`, `crisis`, `close`, and `expand`.
+`app/src/hooks.server.ts` runs for every server request. It creates the seam implementations, resolves the current auth result, and stores the successful user id plus the seams in `event.locals`. The shape of those locals is declared in `app/src/app.d.ts`. A meeting route means the page at `app/src/routes/meeting/[id]/+page.server.ts` or any endpoint below the same directory: `share`, `user-share`, `crisis`, `close`, and `expand`. Only an auth `UNAUTHORIZED` result represents an anonymous meeting request; other auth errors must keep their service-error semantics.
 
 The meeting page loader currently reads query parameters, detects crisis language from `mind`, then separately loads shares, phase state, and participants by meeting id. The ownership gate must run before any of those meeting-specific reads. Once the hook accepts a meeting request, the already-loaded meeting context is available in `locals` and the page loader does not need a second meeting lookup.
 
 For this plan, an owner-filtered read means one database query with both `id = meetingId` and `user_id = userId`. A generic 404 means the response status and body do not say whether a meeting was missing, belonged to someone else, or could not be opened because there was no current user.
+
+A server composition is the bundle of seam implementations placed in `event.locals`: real auth and Supabase adapters for ordinary execution, or in-memory implementations for the local browser test. Browser request interception cannot replace that bundle because the server hook runs outside the page. The test composition is therefore selected when Playwright starts its child preview process, before the first request arrives.
 
 ## Requirements
 
@@ -86,15 +114,16 @@ For this plan, an owner-filtered read means one database query with both `id = m
 
 ## Implementation Slices
 
-These are the assignment units for Codex or a subagent. Give one agent one slice, its listed files, and its acceptance command. Do not combine adjacent slices merely because they are in the same milestone. Files that appear in more than one slice are owned sequentially; never assign two writers to them at once.
+These are the assignment units for Codex or a subagent, not automatic merge units. Give one agent one slice, its listed files, and its acceptance command. Files that appear in more than one slice are owned sequentially; never assign two writers to them at once. The main agent integrates `PRIV-A` through `PRIV-C` before promoting the persistence foundation. Later milestone boundaries stay deployable; the final clean-URL transition in `PRIV-F` deliberately joins the two dependent edits that must land together.
 
-- `PRIV-A` extends `MeetingRecord`, `CreateMeetingInput`, validators, and the contract fixtures, and adds migration `20260912_000004_private_meeting_intake.sql`. It stops when the database contract test expresses the new fields; it does not edit an adapter or route.
+- `PRIV-A` extends `MeetingRecord`, validators, and the contract fixtures, gives `CreateMeetingInput` optional compatibility fields, and adds migration `20260912_000004_private_meeting_intake.sql`. It stops when the database contract test expresses the new fields; it does not edit an adapter or route.
 - `PRIV-B` updates only the fixture-backed database mock and its contract expectations for create and owner lookup. It stops when `contract.test.ts` passes against the mock.
 - `PRIV-C` implements the Supabase insert, select, and two-filter owned lookup in `adapter.ts` with focused adapter tests. It stops when the adapter suite proves both filters and indistinguishable not-found results.
-- `PRIV-D` changes the landing join action and its tests to persist intake and emit the exact clean redirect. It does not edit the meeting page.
-- `PRIV-E` changes the meeting loader and its tests to consume an already-authorized meeting context, including historical null fallback, listening-only, crisis, and clean refresh cases. Use a temporary test-local context if `PRIV-F` has not landed yet; do not restore URL reads.
-- `PRIV-F` adds `meeting-access.ts`, the hook wiring, `App.Locals.meetingContext`, and the access tests. It stops when the page and every current child route are proven to pass through the gate.
-- `PRIV-G` updates the Playwright user story, runs the full nonfixture checks, and updates the plan and governance records with actual results. It contains no new privacy architecture.
+- `PRIV-D` adds `meeting-access.ts`, preserves non-authorization auth errors in the hook, adds `App.Locals.meetingContext`, removes route-level `PROBE_USER_ID` fallbacks, and adds focused access tests. It stops when the page and every current child route are proven to pass through the gate with one durable session identity.
+- `PRIV-E` changes the meeting loader and its tests to prefer an already-authorized meeting context, including historical null fallback, listening-only, crisis, and clean refresh cases. It retains URL reads only as an explicitly tested compatibility fallback for meetings created by the old join action.
+- `PRIV-F` makes the three new `CreateMeetingInput` strings required, changes the landing join action to persist them and emit the exact clean redirect, and deletes the loader's compatibility query reads in the same diff. It stops when both normal and listening-only joins survive refresh with no private URL data.
+- `PRIV-G` adds the server-only in-memory auth/database composition selected by Playwright's local web server and its production-disable guard. It stops when server composition tests prove the fixture state is shared across join and meeting requests and cannot activate on Vercel.
+- `PRIV-H` updates the Playwright user story, runs the full nonfixture checks, and updates the plan and governance records with actual results. It contains no new privacy architecture.
 
 Each slice should be reviewable in one focused diff. If a slice uncovers a new contract decision, return that finding to the main agent instead of silently changing later slices.
 
@@ -106,6 +135,10 @@ Do not assume row-level security protects service-role queries. Do not fetch a m
 
 Do not copy authorization checks into every child route. Do not turn a wrong-owner result into a login redirect or a distinct forbidden page that confirms the meeting exists. Do not add private intake values to logs, analytics, error messages, cache keys, or generated route names.
 
+Do not translate an auth provider outage, malformed auth response, or other non-`UNAUTHORIZED` auth error into a generic meeting 404. Do not let an interactive route invent `PROBE_USER_ID`; explicit probe scripts may use that id, but a browser meeting must use the same resolved session identity from join through refresh.
+
+Do not rely on Playwright browser routing to mock server-side auth or database calls. Do not add a public route, query parameter, cookie, or header that switches production into mock mode. The test composition is selected only by the local preview process, must fail closed when `VERCEL=1`, and must not be enabled by application input.
+
 Do not redesign the landing page or meeting UI, alter prompts, implement server-owned beats, provision a live database, rotate credentials, or refresh provider fixtures in this plan. Do not backfill historical meetings with invented names, clean time, or mind text.
 
 ## Plan of Work
@@ -116,7 +149,7 @@ Start with the contract because both the mock and real adapter must agree before
 
     getOwnedMeeting(input: GetOwnedMeetingInput): Promise<SeamResult<MeetingRecord>>;
 
-Extend `CreateMeetingInput` in `app/src/lib/core/meeting.ts` with required nonempty `userDisplayName`, required nonempty `userCleanTime`, and required nonempty `userMind`, then pass them to `database.createMeeting`. They are required for new meetings even though the database columns are nullable for compatibility with historical rows. Preserve the required mood and the boolean listening choice. Keep `topic` unchanged in this slice.
+Extend `CreateMeetingInput` in `app/src/lib/core/meeting.ts` with optional `userDisplayName`, `userCleanTime`, and `userMind` compatibility fields, then pass them to `database.createMeeting`. The temporary optional shape lets the contract, mock, and adapter land without breaking the old join action. `PRIV-F` makes all three nonempty and required in the same slice that updates that caller. Preserve the required mood and the boolean listening choice. Keep `topic` unchanged in this slice.
 
 Create `app/supabase/migrations/20260912_000004_private_meeting_intake.sql`. It adds nullable text columns `user_display_name` and `user_clean_time` to `public.meetings`. Do not alter the historical migration. Use `add column if not exists` so a retry is harmless. Do not make the columns `not null`: old rows cannot supply truthful snapshots, and fake backfill values would violate the purpose of the plan.
 
@@ -132,37 +165,49 @@ Update `app/src/lib/server/seams/database/adapter.ts` so inserts and meeting-row
 
 Many test doubles implement `DatabasePort` as object literals. Update them mechanically to include `getOwnedMeeting` with a result appropriate to each test. Do not change their unrelated behavior. The milestone is complete when the database seam contract and adapter suites pass and no TypeScript error reports a stale `DatabasePort` implementation. It satisfies the adapter part of `PRIV-02`, `PRIV-03`, and `PRIV-05`.
 
-### Milestone 3: make join persist intake and navigate cleanly
+### Milestone 3: protect the complete meeting route family without hiding auth outages
 
-In `app/src/routes/+page.server.ts`, pass `userName`, `cleanTime`, `mood`, `mind`, and `listeningOnly` through `createMeeting`. After success, redirect to `/meeting/${result.value.id}` with no query string. Delete the intake `URLSearchParams` construction entirely.
+Preserve the complete auth seam result in `app/src/hooks.server.ts` until the request path is known. For a meeting route, a successful result supplies `userId`; `UNAUTHORIZED` proceeds as an absent session and receives the generic meeting 404; every other auth error is translated through the existing server error convention before any owner lookup. Unrelated routes keep their current authentication behavior. Do not log the private intake while reporting auth failures.
 
-Update `app/src/lib/server/routes/landing-page-actions.spec.ts` so it proves the workflow receives the private intake and the thrown 303 location is exactly the clean path. Cover a normal join and a listening-only join. Retain existing missing-field, auth, and database-failure cases.
+Create `app/src/lib/server/meeting-access.ts` with a small pure path predicate plus an async access function. The predicate recognizes the page and every current or future child of `/meeting/[id]`, extracts the `id` already parsed by SvelteKit, and leaves unrelated routes alone. The async function requires the successful session identity, calls `locals.seams.database.getOwnedMeeting({ meetingId, userId })`, and either returns the meeting or throws the same generic HTTP 404 for no user and `NOT_FOUND`. The service-role adapter must already have applied both filters.
 
-Update the direct meeting navigation used in `app/e2e/meeting-flow.spec.ts` only after Milestone 4 provides server-loaded context; until then, keep the route tests as the milestone gate. This milestone is complete when the join action test sees no `name`, `cleanTime`, `mood`, `mind`, or `listen` in the redirect. It satisfies `PRIV-01`.
+Call the access function before `resolve(event)` and store the returned value as `event.locals.meetingContext`. Extend `App.Locals` in `app/src/app.d.ts` with `meetingContext: MeetingRecord | null`; initialize it to null for nonmeeting routes. Do not duplicate owner checks across `+page.server.ts`, `share`, `user-share`, `crisis`, `close`, and `expand`. Remove `PROBE_USER_ID` fallbacks from the interactive landing, share, and close route code so one authenticated or guest session owns the complete browser flow. Explicit CLI seam probes may continue to supply their own probe id outside the request path.
 
-### Milestone 4: restore intake from the meeting record
+Create `app/src/lib/server/routes/meeting-access.spec.ts`. Prove that unrelated routes do not query a meeting; a valid owner reaches `resolve`; no user, a missing id, and a wrong owner all return the same 404; `UPSTREAM_UNAVAILABLE`, `CONTRACT_VIOLATION`, and unexpected auth failures retain their service-error behavior without calling owner lookup; and a child route such as `/meeting/<id>/share` is checked before its handler runs. Add or adjust route tests so their test locals include the already-authorized meeting context. Add a landing-action case proving that a request without a durable session cannot create a probe-owned meeting and redirect into a guaranteed 404.
 
-In `app/src/routes/meeting/[id]/+page.server.ts`, remove all reads of intake from `url.searchParams`. Read the owner-checked `locals.meetingContext` established in Milestone 5 and map its stored snapshot fields into the existing page-data names so `+page.svelte` does not need an unrelated rewrite. Use conservative fallbacks only for historical rows: profile display name may supply a missing old `userDisplayName`, absent clean time remains null, stored `userMood` remains authoritative, and stored `userMind` may fall back to the existing meeting topic. Do not invent placeholder private answers and do not write fallbacks back to the database.
+This milestone is complete when every current meeting route is covered by the path-level test, no meeting-specific adapter call occurs before `getOwnedMeeting`, and the gate distinguishes absent authentication from broken authentication. It satisfies `PRIV-03` and `PRIV-04`.
 
-Run crisis detection against the persisted `userMind`, not the URL. Keep listening-only behavior based on the stored boolean. Update `app/src/lib/server/routes/meeting-page-load.spec.ts` to cover complete stored intake, a historical row with nullable snapshot fields, listening-only state, and crisis language. Add a refresh-shaped test by invoking the loader with a clean URL and the same `meetingContext` twice; both calls must return the same user-facing intake and must not append data.
+### Milestone 4: make the loader prefer persisted intake without breaking old joins
 
-Milestones 4 and 5 touch the loader together. It is acceptable to build them in one branch, but keep their assertions separate so a reviewer can see persistence behavior independently from access denial. This milestone satisfies the loader part of `PRIV-02` and the crisis portion of `PRIV-06`.
+In `app/src/routes/meeting/[id]/+page.server.ts`, read the owner-checked `locals.meetingContext` established in Milestone 3 and map its stored snapshot fields into the existing page-data names so `+page.svelte` does not need an unrelated rewrite. During this compatibility milestone only, a null stored snapshot field may fall back to the matching legacy query value so a meeting created by the old join action still opens. Stored values always win. Profile display name may supply a missing historical `userDisplayName`, absent clean time remains null after the compatibility fallback is removed, stored `userMood` remains authoritative, and stored `userMind` may ultimately fall back to the existing meeting topic. Do not write fallbacks back to the database.
 
-### Milestone 5: protect the complete meeting route family
+Run crisis detection against the effective server-selected `userMind` and keep listening-only behavior based on the stored boolean. Update `app/src/lib/server/routes/meeting-page-load.spec.ts` to cover complete stored intake, an old join represented by nullable fields plus legacy query values, a historical row with neither, listening-only state, and crisis language. Add a refresh-shaped test by invoking the loader with the same authorized context twice; both calls must return the same user-facing intake and must not append data. Mark every query fallback assertion with the `PRIV-F` deletion target so it cannot become permanent.
 
-Create `app/src/lib/server/meeting-access.ts` with a small pure path predicate plus an async access function. The predicate recognizes the page and every current or future child of `/meeting/[id]`, extracts the `id` already parsed by SvelteKit, and leaves unrelated routes alone. The async function requires `locals.userId`, calls `locals.seams.database.getOwnedMeeting({ meetingId, userId })`, and either returns the meeting or throws the same generic HTTP 404 for no user and `NOT_FOUND`. Translate infrastructure and contract failures through the existing server error convention rather than disguising an outage as missing content.
+This milestone is complete when persisted values are authoritative, old links remain temporarily usable, and access denial remains independently tested. It satisfies the compatibility portion of `PRIV-02` and the crisis portion of `PRIV-06`.
 
-In `app/src/hooks.server.ts`, call that function after auth resolution and before `resolve(event)` for meeting routes. Store the returned value as `event.locals.meetingContext`. Extend `App.Locals` in `app/src/app.d.ts` with `meetingContext: MeetingRecord | null`; initialize it to null for nonmeeting routes. Do not duplicate owner checks across `+page.server.ts`, `share`, `user-share`, `crisis`, `close`, and `expand`. The hook is the common boundary, so a later `/meeting/[id]/next` route inherits it automatically.
+### Milestone 5: cut over join and loader behavior together
 
-Create `app/src/lib/server/routes/meeting-access.spec.ts`. Prove that unrelated routes do not query a meeting; a valid owner reaches `resolve`; no user, a missing id, and a wrong owner all return the same 404; an adapter outage retains its service-error behavior; and a child route such as `/meeting/<id>/share` is checked before its handler runs. Add or adjust route tests so their test locals include the already-authorized meeting context.
+Make `userDisplayName`, `userCleanTime`, and `userMind` required nonempty fields in `CreateMeetingInput`. In `app/src/routes/+page.server.ts`, pass `userName`, `cleanTime`, `mood`, `mind`, and `listeningOnly` through `createMeeting`. After success, redirect to `/meeting/${result.value.id}` with no query string and delete the intake `URLSearchParams` construction.
 
-This milestone is complete when every current meeting route is covered by the path-level test and no meeting-specific adapter call occurs before `getOwnedMeeting`. It satisfies `PRIV-03` and `PRIV-04`.
+In the same slice, delete every legacy intake read from `app/src/routes/meeting/[id]/+page.server.ts` and remove the compatibility-only route tests from Milestone 4. The loader now derives name, clean time, mood, mind text, listening choice, and crisis input only from the authorized meeting record and truthful historical fallbacks. This combined deletion is the release boundary: do not promote the clean redirect without the persisted loader, and do not remove the legacy read before new joins write the snapshot.
 
-### Milestone 6: prove the complete local story and record the outcome
+Update `app/src/lib/server/routes/landing-page-actions.spec.ts` so it proves the workflow receives the private intake and the thrown 303 location is exactly the clean path. Cover a normal join and a listening-only join. Retain existing missing-field, auth, and database-failure cases. Re-run the loader tests with clean URLs only, including two identical loads of the same stored context.
 
-Update `app/e2e/meeting-flow.spec.ts` so its mocked database/session state creates an owned meeting through the join action and follows the returned clean location. Add assertions that the browser URL contains no intake names or values, refresh preserves the displayed meeting state, and a second browser context cannot open the first context's meeting page or one child endpoint. Keep network providers mocked; this is a privacy and ownership test, not a live Grok or Supabase probe.
+This milestone is complete when the redirect and loader contain no `name`, `cleanTime`, `mood`, `mind`, or `listen` query handling and both join variants survive refresh. It satisfies `PRIV-01` and completes `PRIV-02`.
 
-Run the targeted commands below, then the nonfixture repository gates. Inspect the diff for any newly logged private values, query-string reconstruction, or route-local authorization copies. Update this plan's living sections, `CHANGELOG.md`, and `decision-log.md` with what actually shipped. Update `LESSONS_LEARNED.md` only if implementation produces a reusable lesson, and `DEFERRED.md` only for a real discovered issue that remains outside this plan.
+### Milestone 6: provide an honest server composition for browser tests
+
+Add a server-only composition factory under `app/src/lib/server/testing/` that combines the existing auth and database mocks with shared in-memory meeting state. `app/src/hooks.server.ts` may load it only when the preview process starts with `E2E_MOCK_SEAMS=1`; fail startup if that flag appears with `VERCEL=1`. Do not add an HTTP endpoint or application-controlled value that can switch compositions. The default branch of the factory must continue to construct the real adapters.
+
+Set `E2E_MOCK_SEAMS=1` through the `webServer.env` option in `app/playwright.config.ts`, so the flag belongs to the local child process on every supported shell. The mock auth seam must use the existing guest-session bootstrap and cookie path rather than a magic browser header. Keep state by session and meeting id across the landing action, redirect, page load, refresh, and child requests; isolate tests with unique session and meeting data.
+
+Add a focused server-composition test proving the flag selects the shared fixture bundle locally, the default selects real composition, and `VERCEL=1` plus the flag fails closed. This milestone is complete when a preview-server test can create an owned meeting through the real join action without Supabase and a second browser session resolves to a different owner.
+
+### Milestone 7: prove the complete local story and record the outcome
+
+Update `app/tests/e2e/meeting-flow.spec.ts` so the server-side mocked database/session state creates an owned meeting through the join action and follows the returned clean location. Add assertions that the browser URL contains no intake names or values, refresh preserves the displayed meeting state, and a second browser context cannot open the first context's meeting page or one child endpoint. Keep network providers mocked; this is a privacy and ownership test, not a live Grok or Supabase probe.
+
+Run the targeted commands below, then the nonfixture repository gates. Inspect the diff for any newly logged private values, query-string reconstruction, route-local authorization copies, or mock-composition inputs reachable from an application request. Update this plan's living sections, `CHANGELOG.md`, and `decision-log.md` with what actually shipped. Update `LESSONS_LEARNED.md` only if implementation produces a reusable lesson, and `DEFERRED.md` only for a real discovered issue that remains outside this plan.
 
 This milestone satisfies `PRIV-06`. The plan is complete when all six requirements are demonstrated locally and the only expected full-verification failure is the already-tracked stale-fixture gate from #91.
 
@@ -184,6 +229,14 @@ After Milestones 3 through 5:
     npm.cmd run check
 
 Expect every named privacy and ownership case to pass. The composition verifier must still confirm that real I/O remains under `app/src/lib/server/` and core modules remain pure.
+
+After Milestone 6:
+
+    npm.cmd run test:unit -- --run src/lib/server/server-composition.spec.ts
+    npm.cmd run test:e2e -- --list
+    npm.cmd run verify:composition
+
+Expect the local fixture composition, production-disable guard, and Playwright discovery under `tests/e2e` to pass without contacting Supabase. The production-default composition assertion must still select real adapters when `E2E_MOCK_SEAMS` is absent.
 
 At completion:
 
@@ -213,7 +266,7 @@ Acceptance is behavioral. Submit the intake with a recognizable alias, clean-tim
 
 Repeat with listening enabled. The clean URL must remain the same shape and the room must preserve listening-only behavior after refresh. Repeat with a known crisis phrase accepted by the existing crisis engine. Crisis behavior must be derived from the stored meeting mind text after a clean-URL refresh.
 
-Using two separate mocked sessions, create a meeting as user A. User A must load the page and child endpoints normally. User B, a request with no resolved session, and a request for a random meeting id must each receive the same generic 404 response before shares, phase state, participants, generation, or mutation are invoked.
+Using two separate mocked sessions, create a meeting as user A. User A must load the page and child endpoints normally. User B, a request with an auth `UNAUTHORIZED` result, and a request for a random meeting id must each receive the same generic 404 response before shares, phase state, participants, generation, or mutation are invoked. Auth infrastructure and contract failures must retain their 5xx service-error mapping and must not invoke the owner lookup. A request without a durable session must never create a meeting under `PROBE_USER_ID`.
 
 Inspect browser history and captured redirect headers. No intake answer may appear in a URL. Inspect server logging added or changed by this work. It may log error codes and meeting ids where existing conventions require them, but it must not add name, clean time, mood, or mind text to logs.
 
@@ -225,7 +278,7 @@ The schema migration uses `add column if not exists`, so applying it twice does 
 
 The ownership read is side-effect free. Retrying a denied or successful request cannot change the meeting. The join action may still create a new meeting when a user submits twice, which is existing behavior and outside this slice; a browser refresh of the resulting GET must never create another meeting.
 
-If a milestone fails, keep the additive database contract and adapter changes together until their tests pass. Do not temporarily restore private query parameters as a fallback. Before the live migration is ever applied, rollback is a normal code revert. After a live migration, leave the nullable columns in place during rollback because removing columns can destroy meeting data; revert readers and writers first, then decide on schema cleanup separately.
+If a milestone fails, keep the additive database contract and adapter changes together until their tests pass. The temporary legacy query read exists only between Milestones 4 and 5 and must be deleted before the privacy work is complete; never reintroduce it after the clean-URL cutover. Before the live migration is ever applied, rollback is a normal code revert. After a live migration, leave the nullable columns in place during rollback because removing columns can destroy meeting data; revert readers and writers first, then decide on schema cleanup separately.
 
 ## Artifacts and Notes
 
@@ -240,7 +293,7 @@ The target state is:
     server hook -> owner-filtered meeting read -> locals.meetingContext
     meeting loader and child routes -> run only after that common check
 
-The requirement-to-milestone map is intentionally short: `PRIV-01` is Milestone 3; `PRIV-02` is Milestones 1 through 4; `PRIV-03` and `PRIV-04` are Milestone 5; `PRIV-05` is Milestones 1, 2, and the recovery rules; `PRIV-06` is Milestones 4 through 6.
+The requirement-to-milestone map is intentionally short: `PRIV-01` is Milestone 5; `PRIV-02` is Milestones 1, 2, 4, and 5; `PRIV-03` and `PRIV-04` are Milestone 3; `PRIV-05` is Milestones 1, 2, and the recovery rules; `PRIV-06` is Milestones 4 through 7.
 
 ## Interfaces and Dependencies
 
@@ -266,12 +319,14 @@ The implementation must leave these public shapes available in `app/src/lib/seam
 
     getOwnedMeeting(input: GetOwnedMeetingInput): Promise<SeamResult<MeetingRecord>>;
 
-`CreateMeetingInput` in `app/src/lib/core/meeting.ts` must require the three new string fields for all new meetings. The meeting-access module may choose its internal function names, but the hook must expose one nullable `MeetingRecord` as `App.Locals.meetingContext` and must perform exactly one owner-filtered meeting lookup before route-specific meeting I/O.
+`CreateMeetingInput` in `app/src/lib/core/meeting.ts` accepts the three new strings as optional only during the additive compatibility slices and must require them for all new meetings in the final state. The meeting-access module may choose its internal function names, but the hook must expose one nullable `MeetingRecord` as `App.Locals.meetingContext` and must perform exactly one owner-filtered meeting lookup before route-specific meeting I/O. The hook must keep `UNAUTHORIZED` distinct from all other auth seam errors until it has either returned the generic meeting 404 or preserved the existing service-error response.
 
-No new runtime dependency is needed. Use SvelteKit's existing request hook and HTTP error mechanism, the existing seam result and error codes, Vitest for unit and route tests, and Playwright for the browser story. Do not use cookies, `localStorage`, `sessionStorage`, encrypted query parameters, or client-side obfuscation to hold the private intake.
+No new runtime dependency is needed. Use SvelteKit's existing request hook and HTTP error mechanism, the existing seam result and error codes, Vitest for unit and route tests, and Playwright's configured `app/tests/e2e` directory for the browser story. The server test composition uses the existing seam mocks and a dedicated process environment value passed through `playwright.config.ts`; it is never selected by request data and refuses to run when `VERCEL=1`. Do not use cookies, `localStorage`, `sessionStorage`, encrypted query parameters, or client-side obfuscation to hold the private intake.
 
 The only true cross-plan dependency is this plan before `plans/server-owned-meeting-beats-execplan.md`: the later plan adds another child endpoint that must inherit this ownership gate. The production database restoration in #71 blocks applying the migration and verifying the live site, but it does not block writing the migration or completing the local contract, adapter, route, and browser tests.
 
 ## Revision Note
 
 2026-09-12: Created this plan after the repository organization pass exposed privacy epic #78 as a distinct application track. The plan separates locally implementable privacy and ownership work from the blocked production-recovery plan and establishes the access boundary needed by the later server-owned meeting-flow work.
+
+2026-09-13: Revised the plan after PR review to preserve non-authorization auth failures, retire route-level probe identity, stage the clean-URL cutover in a deployable order, use Playwright's configured test directory, and define the server-side mock composition required to test ownership through a built preview server.

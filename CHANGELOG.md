@@ -25,6 +25,11 @@ All notable changes to this repository are documented in this file.
 - Archived the March meeting-restoration plan. Its shipped experience record
   remains useful, but its frontend-owned speaking order and prohibition on an
   orchestration endpoint conflict with the current server-owned epic.
+- Hardened both new ExecPlans during review: the privacy cutover now preserves
+  auth infrastructure errors, removes route-level probe identity, and defines
+  a server-side Playwright composition; the meeting plan now claims close work
+  durably, derives user and expansion decisions from canonical server state,
+  quality-gates the empty chair, and lands it before the renderer depends on it.
 
 ### Known
 - `verify:fixtures` fails on every branch: seam probe fixtures are past their freshness window and refreshing them is blocked behind the production database outage (#91, #71).

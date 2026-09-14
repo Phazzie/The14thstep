@@ -21,9 +21,9 @@ The empty chair also becomes a fresh generated room moment. It is persisted as p
 - [ ] Milestone 2: add versioned beat and share persistence with idempotent database behavior.
 - [ ] Milestone 3: expose the protected next-beat protocol and prove stable retries.
 - [ ] Milestone 4: make character, user, crisis, topic, and close routes complete only the active beat.
-- [ ] Milestone 5: replace the page's hand-written meeting script with one generic renderer loop.
-- [ ] Milestone 6: prove replay-free refresh through every meeting phase.
-- [ ] Milestone 7: generate, persist, and quality-check the empty-chair moment.
+- [ ] Milestone 5: generate, validate, and persist the empty-chair moment.
+- [ ] Milestone 6: replace the page's hand-written meeting script with one generic renderer loop.
+- [ ] Milestone 7: prove replay-free refresh through every meeting phase.
 
 ## Surprises & Discoveries
 
@@ -47,6 +47,15 @@ The empty chair also becomes a fresh generated room moment. It is persisted as p
 
 - Observation: the selected meeting topic is currently browser state and is sent back as generation input without being persisted through a meeting-topic seam.
   Evidence: `TOPIC_OPTIONS`, `selectedTopic`, and `chooseTopic` live in `+page.svelte`; `DatabasePort` has no operation for recording the choice. A server-owned sequence needs the chosen topic to survive refresh.
+
+- Observation: user-share analysis currently runs on the request body before the database decides which racing request owns the beat.
+  Evidence: `user-share/+server.ts` performs crisis, heavy-disclosure, and significance analysis before `addShare`. If two different payloads race for one beat, the losing request could advance phase state using analysis that does not describe the unique persisted share.
+
+- Observation: the close route has several externally visible side effects before it reaches post-meeting state, but no durable claim or stored close response.
+  Evidence: summary generation, memory extraction, `completeMeeting`, callback scanning, callback lifecycle, and phase persistence can all run again on a repeated request. The meeting contract does not expose a canonical close result that a retry can return.
+
+- Observation: ownership does not make the expansion request's topic and recent transcript trustworthy.
+  Evidence: `expand/+server.ts` verifies the target share belongs to the meeting but builds generation and quality prompts from browser-supplied `topic` and `recentShares`.
 
 ## Decision Log
 
@@ -86,6 +95,22 @@ The empty chair also becomes a fresh generated room moment. It is persisted as p
   Rationale: it is a room moment rather than a character performance. Reusing the shares table gives it ordering, refresh, and beat-id idempotence without adding a second transcript store.
   Date/Author: 2026-09-12 / Codex
 
+- Decision: validate every generated empty-chair candidate before persistence with the same minimum authenticity and voice-consistency scores used for character shares.
+  Rationale: a room moment is still generated text shown to a vulnerable user. A dedicated room-voice validation prompt can return the existing quality schema; a rejected candidate leaves the beat active and cannot enter the transcript.
+  Date/Author: 2026-09-13 / Codex
+
+- Decision: after a user-share insert wins or loses its unique beat id, derive crisis, heavy-disclosure, significance, and phase outcome from the canonical stored share.
+  Rationale: this makes a race converge on one content value and one interpretation. The losing request must never advance the meeting using text that the transcript did not keep.
+  Date/Author: 2026-09-13 / Codex
+
+- Decision: make close a durably claimed, beat-keyed workflow with a stored canonical response.
+  Rationale: the active beat alone does not prevent two requests from running summary, memory, callback, and lifecycle work before either advances phase state. A unique close-run claim lets only its holder run side effects, and a completed record gives all retries the same response.
+  Date/Author: 2026-09-13 / Codex
+
+- Decision: expansion accepts only the target share id and derives topic and recent transcript from owned server state.
+  Rationale: prompt and quality context affect generated output and must follow the same server-authority rule as character shares and close.
+  Date/Author: 2026-09-13 / Codex
+
 - Decision: replace exact sentence ranges in every ritual prompt used by the beat engine with plain guidance such as `brief`, `concise`, and `naturally complete`.
   Rationale: the new engine must not spread a known prompt-rule violation. This is a narrow constraint repair, not a general rewrite of character voice or the style constitution.
   Date/Author: 2026-09-12 / Codex
@@ -94,7 +119,7 @@ The empty chair also becomes a fresh generated room moment. It is persisted as p
 
 Planning is complete; no application code has been implemented. The plan intentionally replaces only the meeting-script portion of the large Svelte page. It preserves the working transcript UI and specialized server seams, creates one durable server answer for each next moment, and makes transcript persistence the authority after a retry or refresh.
 
-The seven milestones are ordered by real dependency. The pure contract comes first. Versioned persistence makes the contract safe under retry. The endpoint proves the server can answer before consumers migrate. Route completion then makes side effects idempotent. Only after those gates pass does the client delete its old sequence. Refresh and empty-chair quality are proven as distinct user-visible outcomes.
+The seven milestones are ordered by real dependency. The pure contract comes first. Versioned persistence makes the contract safe under retry. The endpoint proves the server can answer before consumers migrate. Route completion then makes side effects idempotent. The generated empty-chair path lands before the renderer depends on it. Only after those gates pass does the client delete its old sequence, and the final milestone proves replay-free refresh across the completed flow.
 
 ## Context and Orientation
 
@@ -108,11 +133,15 @@ A beat is one renderer instruction with a stable id. A character-share beat name
 
 Claiming a beat means storing it as the phase state's `activeBeat` before returning it. Completing a beat means validating its id against the active beat, applying its recorded outcome, clearing it, incrementing the cursor, and persisting the next phase state. Compare-and-set means the database update includes the version that was read; if another request changed that row first, the update changes zero rows and the route reloads instead of overwriting the newer state.
 
+A user-share analysis is the stored interpretation of one canonical user entry: whether it indicates crisis, whether it is a heavy disclosure, and its significance score. The first valid analysis written for a beat wins. Requests that raced with different text or model output reload that stored interpretation before they can advance the phase.
+
+Closing needs a stronger claim because it performs several effects before the active beat can clear. A close run is one durable row keyed by meeting and beat. Its claim token is an unguessable value held by the worker allowed to proceed. Its lease is a bounded time during which competing requests wait instead of repeating work. A checkpoint is the validated generated output stored before database mutations; if the worker crashes and the lease expires, a new worker resumes from that checkpoint. The completed row stores the exact response returned to all later retries.
+
 The privacy plan adds a hook-level owner check to every `/meeting/[id]` request. All endpoints in this plan are created below that route and must rely on the common gate. They must never weaken it or add a second inconsistent owner rule.
 
 ## Requirements
 
-`BEAT-01` requires one pure function to return the existing active beat or deterministically choose the next beat from persisted state, meeting context, roster, and transcript facts. `BEAT-02` requires the chosen beat to be persisted before exposure and protected by a versioned compare-and-set write. `BEAT-03` requires one stored generated entry per beat id. `BEAT-04` requires the client to render server beats without hardcoded round or speaker sequencing. `BEAT-05` requires refresh at every user gate and after every generated share to resume without transcript growth. `BEAT-06` requires crisis interruption and recovery to preserve a truthful resume point. `BEAT-07` requires a fresh persisted empty-chair moment that follows all prompt constraints. `BEAT-08` requires the room's topic choice and completion state to survive refresh.
+`BEAT-01` requires one pure function to return the existing active beat or deterministically choose the next beat from persisted state, meeting context, roster, and transcript facts. `BEAT-02` requires the chosen beat to be persisted before exposure and protected by a versioned compare-and-set write. `BEAT-03` requires one canonical stored effect per beat id, including generated transcript entries, user-share interpretation, and the complete close response. `BEAT-04` requires the client to render server beats without hardcoded round or speaker sequencing. `BEAT-05` requires refresh at every user gate and after every generated share to resume without transcript growth. `BEAT-06` requires crisis interruption and recovery to preserve a truthful resume point. `BEAT-07` requires a fresh persisted empty-chair moment that follows all prompt and quality constraints. `BEAT-08` requires the room's topic choice and completion state to survive refresh.
 
 ## Implementation Slices
 
@@ -123,28 +152,33 @@ These are the maximum assignment units for Codex or a subagent. Assign one slice
 - `BEAT-C` adds topic, three-round, closing, and finished selection to the same pure engine after `BEAT-B` passes. It does not touch routes.
 - `BEAT-D` adds completion, deterministic optional branches, listening-only, and crisis resume behavior to the pure engine. It stops at core tests.
 - `BEAT-E` repairs the exact sentence-count instructions in the prompt builders used by this flow after reading `style-constitution.ts`. It owns only `prompt-templates.ts` and its spec.
-- `BEAT-F` adds migration `20260912_000005_server_owned_meeting_beats.sql`, the `beatId` and `empty_chair` contract changes, validators, and fixtures. It does not implement adapter queries.
-- `BEAT-G` implements the mock's versioned phase, beat lookup, unique-retry, and topic behavior with contract tests.
-- `BEAT-H` implements the same behavior in the Supabase adapter with focused version-win, version-conflict, and stored-beat tests.
+- `BEAT-F` adds migration `20260912_000005_server_owned_meeting_beats.sql`, including canonical user-share analysis and the unique close-run ledger, plus the `beatId`, `empty_chair`, and close-result contract changes, validators, and fixtures. It does not implement adapter queries.
+- `BEAT-G` implements the mock's versioned phase, beat lookup, unique-retry, first-analysis-wins, atomic topic, and close-claim behavior with contract tests.
+- `BEAT-H` implements the same behavior in the Supabase adapter with focused version-win, version-conflict, stored-beat, user-analysis race, close-claim winner, in-progress, and completed-result tests.
 - `BEAT-I` creates the empty-request claim behavior in `/next` and its route spec. It returns an existing or newly persisted active beat and has no acknowledgment behavior yet.
 - `BEAT-J` adds room-cue and topic acknowledgments to `/next`, including server topic persistence and version-conflict recovery.
 - `BEAT-K` migrates `share/+server.ts` to derive generation from an active character beat and return an existing beat-owned share on retry.
-- `BEAT-L` migrates `user-share/+server.ts` and then `crisis/+server.ts` to active-beat completion. These two routes are paired because the user-share result creates the crisis transition contract; no other route belongs in this slice.
-- `BEAT-M` migrates `close/+server.ts` to its active close beat and server-loaded transcript context. `expand/+server.ts` receives only compatibility adjustments required by the shared contract.
-- `BEAT-N` replaces the page's named sequence functions with the generic renderer loop after `BEAT-I` through `BEAT-M` pass. It owns `+page.svelte` and its direct component tests; it does not split the file into new components.
-- `BEAT-O` builds the refresh matrix in the route integration suite and Playwright, then removes the resolved replay item from `DEFERRED.md` only if every case passes.
-- `BEAT-P` wires, persists, renders, and tests the generated empty-chair beat. It may touch the already-established branch points but must not reopen round sequencing.
-- `BEAT-Q` runs the full nonfixture verification, performs the final stale-code search, and updates the plan and governance files with actual evidence. It contains no new implementation behavior.
+- `BEAT-L` migrates `user-share/+server.ts` and then `crisis/+server.ts` to active-beat completion, including canonical-share analysis after a unique conflict. These two routes are paired because the user-share result creates the crisis transition contract; no other route belongs in this slice.
+- `BEAT-M` migrates only `close/+server.ts` to the close-run claim and server-loaded transcript context. It stops when concurrent, completed-retry, and expired-lease recovery tests pass.
+- `BEAT-N` makes only `expand/+server.ts` derive its topic and recent shares on the server. It stops when forged client context is rejected and both generated prompts receive canonical context.
+- `BEAT-O` wires, quality-validates, persists, and tests the generated empty-chair beat before any renderer depends on it. It may touch the already-established route branch points but must not reopen round sequencing.
+- `BEAT-P` replaces the page's named sequence functions with the generic renderer loop after `BEAT-I` through `BEAT-O` pass. It owns `+page.svelte` and its direct component tests; it does not split the file into new components.
+- `BEAT-Q` builds the refresh matrix in the route integration suite and `app/tests/e2e`, then removes the resolved replay item from `DEFERRED.md` only if every case passes.
+- `BEAT-R` runs the full nonfixture verification, performs the final stale-code search, and updates the plan and governance files with actual evidence. It contains no new implementation behavior.
 
-The deliberately narrow slices reflect the risk of this migration. `BEAT-N` is the regenerate-over-debug slice: the old orchestration block is deleted and replaced only after the server contract is proven. The rest are contract, adapter, or single-route outcomes that can be reviewed independently.
+The deliberately narrow slices reflect the risk of this migration. `BEAT-P` is the regenerate-over-debug slice: the old orchestration block is deleted and replaced only after the server contract and every beat kind are proven. The rest are contract, adapter, or single-route outcomes that can be reviewed independently.
 
 ## What Not To Do
 
-Do not patch replay guards into `continueFromPersistedPhase` or add more flags to the `runRound*` chain. Do not move those functions into helper files and call that server ownership. They are removed in `BEAT-N`.
+Do not patch replay guards into `continueFromPersistedPhase` or add more flags to the `runRound*` chain. Do not move those functions into helper files and call that server ownership. They are removed in `BEAT-P`.
 
 Do not let the browser select a speaker, phase, interaction type, sequence order, optional branch, or persisted topic. Do not keep a production switch that allows both the old client script and the server beat engine to advance one meeting.
 
-Do not use `Math.random()`, current time, request order, or unstable database row order to choose a beat or id. Do not update unversioned phase state after the compare-and-set contract lands. Do not store a topic separately from completing its active topic beat. Do not treat a second generated string as equivalent to returning the first persisted result.
+Do not use `Math.random()`, current time, request order, or unstable database row order to choose a beat or id. Do not update unversioned phase state after the compare-and-set contract lands. Do not store a topic separately from completing its active topic beat. Do not analyze a losing user-share payload after another payload has become canonical. Do not treat a second generated string as equivalent to returning the first persisted result.
+
+Do not run summary generation, memory extraction, callback scanning, lifecycle mutation, or phase completion before acquiring the unique close claim. Do not return an invented close response while another claim is active, and do not rerun close side effects after a completed result exists.
+
+Do not accept topic, recent transcript, speaker, or other prompt context from the browser for expansion. The request identifies the owned share; the server loads every other input from persisted meeting state.
 
 Do not follow the archived plan's fixed branch, old checkout paths, frontend-owned ordering, or ban on an orchestration endpoint. Do not split the entire large Svelte page before deleting its obsolete orchestration; issue #90 follows this work.
 
@@ -172,15 +206,21 @@ This milestone is complete when the pure suite shows the same input always retur
 
 ### Milestone 2: make beat state and generated entries retry-safe
 
-Create `app/supabase/migrations/20260912_000005_server_owned_meeting_beats.sql`, following the private-intake migration numbered `000004`. Add `phase_version bigint not null default 0` to `public.meetings`. Add nullable `beat_id text` to `public.shares` and a partial unique index on `(meeting_id, beat_id)` where `beat_id is not null`. Replace the `shares_interaction_type_check` constraint with the existing values plus `empty_chair`. Every statement must be safe to retry; constraint replacement should use the same explicit drop-and-add pattern already used by the March roster migration.
+Create `app/supabase/migrations/20260912_000005_server_owned_meeting_beats.sql`, following the private-intake migration numbered `000004`. Add `phase_version bigint not null default 0` to `public.meetings`. Add nullable `beat_id text` and nullable `user_analysis jsonb` to `public.shares`, plus a partial unique index on `(meeting_id, beat_id)` where `beat_id is not null`. `user_analysis` is valid only for user shares and contains canonical `crisis`, `heavy`, and `significanceScore` values. Replace the `shares_interaction_type_check` constraint with the existing values plus `empty_chair`.
 
-In `app/src/lib/seams/database/contract.ts`, add `beatId: string | null` to `ShareRecord` and add `empty_chair` to `ShareInteractionType` in `app/src/lib/core/types.ts`. Extend validators, fixtures, the mock, the adapter, and test doubles. Historical entries use null. New beat-owned entries use the stable id.
+The same migration creates `public.meeting_close_runs` with `meeting_id`, `beat_id`, `status`, a random `claim_token`, `lease_expires_at`, nullable validated `checkpoint`, nullable validated `result`, timestamps, and primary key `(meeting_id, beat_id)`. The checkpoint holds canonical generated outputs, callback candidates, and one `completedAt` value before database mutations begin. Add nullable `close_effect_key` to `callbacks` with a partial unique index for non-null values so a checkpointed candidate is inserted at most once. The controlled close statuses are `running`, `completed`, and `failed`. A first claim inserts `running`; an unexpired running row reports `in_progress`; a completed row returns its stored result; and a failed or expired row may be claimed with a new token. Only the current claim token may checkpoint, complete, or fail the run. Every statement must be safe to retry; constraint replacement should use the same explicit drop-and-add pattern already used by the March roster migration.
+
+In `app/src/lib/seams/database/contract.ts`, add `beatId: string | null` and `userAnalysis: UserShareAnalysis | null` to `ShareRecord`, add nullable `summary` and `notableMoments` to `MeetingRecord`, and add `empty_chair` to `ShareInteractionType` in `app/src/lib/core/types.ts`. Define the `UserShareAnalysis` shape, a validated `MeetingCloseResult` matching the close endpoint's complete response, and a discriminated close-claim result with `acquired`, `in_progress`, and `completed` variants. Adjust the `createMeeting` input type to omit completion-only meeting fields. Extend validators, fixtures, the mock, the adapter, and test doubles. Historical entries and incomplete meetings use null. New beat-owned entries use the stable id.
 
 Add a versioned phase read that returns `{ phaseState: MeetingPhaseState | null, version: number }` and a compare-and-set update accepting `meetingId`, `expectedVersion`, `phaseState`, and an optional meeting patch limited to the validated topic. The Supabase update must filter by both meeting id and `phase_version = expectedVersion`, write the new phase state and version `expectedVersion + 1`, and include the topic in that same row update when completing a topic gate. Report `applied: false` when zero rows changed. Keep existing phase methods only while routes are migrated; remove or delegate them at the end so no route can silently bypass versioning.
 
 Add `getShareByBeatId({ meetingId, beatId })`. It returns `NOT_FOUND` for no entry. Make beat-aware append handling converge on the stored row when the unique index reports that another request already wrote the same beat. The server route must also check for an existing beat entry before calling the model, which handles the ordinary retry without spending generation work twice.
 
-Update contract and adapter tests for version wins, version conflicts, stable existing-share lookup, nullable historical beat ids, unique-conflict recovery, and `empty_chair` mapping with null character id. This milestone is complete when a simulated pair of writers using the same version produces one applied update, one conflict, and one canonical stored beat entry. It satisfies `BEAT-02` and `BEAT-03` at the persistence boundary.
+Add `setUserShareAnalysisIfAbsent({ meetingId, beatId, analysis })`. It updates only a user share whose `user_analysis` is null, writes the same `significanceScore` into the existing score column, then returns the stored analysis whether this request won or lost. This is the interpretation claim: competing analyzers may propose different results, but every completion must use the one analysis the row retained. Contract and adapter validation reject analysis for a character share or invalid scores.
+
+Add `claimMeetingClose({ meetingId, beatId, leaseDurationMs })`, `checkpointMeetingClose({ meetingId, beatId, claimToken, checkpoint })`, `completeMeetingClose({ meetingId, beatId, claimToken, result })`, and `failMeetingClose({ meetingId, beatId, claimToken, errorCode })`, or equivalent names with those semantics. Claim acquisition is the only boundary that authorizes close side effects. Checkpointing validates and preserves model-derived values plus `completedAt` before mutations begin. Completion validates and stores the full canonical response before marking the row completed. `CreateCallbackInput` gains an optional `closeEffectKey`; the close route supplies `<beatId>:callback:<checkpointed-index>`, and the adapter returns the existing callback on its unique conflict. Meeting completion must use the checkpointed `completedAt`, and lifecycle writes set derived status values rather than incrementing counters, so an expired-lease recovery can safely resume without changing an already-applied result. An ordinary retry of a completed beat reads that response and does not call any generator or mutation seam. An unexpired competing claim produces a retryable conflict with `Retry-After`; it does not start a second close. Bound the lease and test lease takeover so a crashed worker does not strand the meeting forever.
+
+Update contract and adapter tests for version wins, version conflicts, stable existing-share lookup, nullable historical beat ids and user analysis, unique-conflict recovery, first-analysis-wins, `empty_chair` mapping with null character id, close-claim contention, completed-result replay, wrong-token rejection, and expired-lease takeover. This milestone is complete when a simulated pair of writers using the same phase version produces one applied update and one conflict, two user-share analyzers converge on one stored interpretation, a simulated pair of close callers produces one claim holder, and every completed retry receives one canonical stored response. It satisfies `BEAT-02` and `BEAT-03` at the persistence boundary.
 
 ### Milestone 3: add the next-beat endpoint
 
@@ -196,21 +236,37 @@ The returned JSON is a `SeamResult<{ beat: MeetingBeat; phaseState: MeetingPhase
 
 Migrate `share/+server.ts` first. Normal meeting calls provide only `beatId` plus transport options needed for SSE. The route loads the active beat, requires kind `character_share`, and derives `characterId`, `interactionType`, phase, selected topic, and sequence position from server state. Ignore no client override silently: reject legacy character or interaction values that disagree so drift is visible during migration. Before generation, call `getShareByBeatId`; if found, stream or return the canonical stored content and finish any still-active matching beat. After new generation passes the existing quality checks, append it with the beat id, complete the beat, and compare-and-set the new phase state. A unique conflict reloads the canonical entry rather than appending or regenerating again.
 
-Migrate `user-share/+server.ts` so it requires an active `user_gate` for introduction or share, accepts the beat id and user text, and derives sequence and phase behavior on the server. Preserve pass and listening-only behavior. Crisis detection still runs before ordinary completion: persist the user's beat-owned share once, enter crisis with the interrupted resume point recorded, and let the crisis route operate on that state.
+Migrate `user-share/+server.ts` so it requires an active `user_gate` for introduction or share, accepts the beat id and user text, and derives sequence and phase behavior on the server. Preserve pass and listening-only behavior. Append the beat-owned content with its deterministic non-crisis baseline score; whether this request inserts or loses a unique conflict, reload `getShareByBeatId` and treat that persisted content as canonical. Derive crisis, heavy-disclosure, and final significance only from that content, then call `setUserShareAnalysisIfAbsent` and use the returned canonical analysis to enter crisis with the interrupted resume point recorded or complete the ordinary gate. A retry after insertion resumes analysis, and a retry after analysis resumes phase completion. If a losing request supplied different text or proposed different analysis, neither can affect the returned flags or phase state.
 
 Migrate `crisis/+server.ts` to require the crisis state's active support beat or materialize it through the same server engine. Repeated crisis requests return the stored response for the crisis beat. Completing support resumes from the saved pre-crisis state without resurrecting the interrupted active beat or replaying earlier shares.
 
-Migrate `close/+server.ts` to require the active `close_meeting` beat. Load the topic and recent shares on the server instead of accepting them as client authority. Repeated close calls return the existing completion result and never append a second closing or run completion side effects twice. Keep `expand/+server.ts` outside sequence advancement; it still inherits the ownership gate and must not change the active beat.
+Migrate `close/+server.ts` so the request contains only the active close beat id. Look up an existing close run before requiring the active beat: return a completed run immediately, return a retryable conflict for an unexpired claim, or acquire/recover the claim. Only the claim holder may load context and run summary generation, memory extraction, callback scanning, meeting completion, callback writes, lifecycle updates, or phase advancement. Load the topic and recent shares on the server instead of accepting them as client authority.
 
-Route tests must cover stale ids, wrong beat kinds, retries before and after persistence, unique conflicts, quality-rejected candidates, pass, heavy share, crisis, close, and adapter outages. Keep the rule that a character result with authenticity below 6 or voice consistency below 6 is not shown; skip or retry according to existing quality behavior without completing the beat with rejected text.
+Refactor callback scanning into candidate discovery and candidate persistence so discovery performs no database write. After all model-derived outputs and callback candidates exist, checkpoint them with one `completedAt` value before the first database mutation. Apply meeting completion with that time, create callbacks with their deterministic `closeEffectKey`, apply idempotent lifecycle status updates, and compare-and-set the close beat to post-meeting. A recovering expired claim reuses the checkpoint and resumes these idempotent mutations; it does not regenerate saved outputs. Finally store the complete endpoint payload in the close run and mark it completed. A later retry returns that exact payload with zero generator, completion, callback-discovery, lifecycle, or phase-write calls. If processing fails before a checkpoint or mutation can complete, mark the claim failed with the seam error and leave it explicitly retryable rather than advancing the beat.
+
+Migrate `expand/+server.ts` so the request contains only `shareId`. Verify that the share belongs to the owned meeting, then load the persisted topic and bounded recent transcript from the database in stable sequence order. Build both the expansion and quality prompts from that canonical server context. Keep expansion outside sequence advancement; it must not change the active beat or accept compatibility context supplied by the browser.
+
+Route tests must cover stale ids, wrong beat kinds, retries before and after persistence, unique conflicts, quality-rejected candidates, pass, heavy share, crisis, close, expansion, and adapter outages. Add a two-request user-share race with different text and prove crisis, heavy, significance, response content, and phase outcome all describe the one stored winner. Add a two-request close race and prove one acquires the claim while the other runs zero side effects; then retry after completion and assert the byte-equivalent canonical result with no calls. Add expired-lease recovery from a checkpoint. For expansion, supply forged topic and transcript fields and prove they are rejected while canonical server-loaded context reaches both prompts. Keep the rule that a character result with authenticity below 6 or voice consistency below 6 is not shown; skip or retry according to existing quality behavior without completing the beat with rejected text.
 
 This milestone is complete when only the server-selected character and interaction can be generated, every persisted generated or user entry carries one beat id, and repeating any completion returns one canonical entry and one advanced state. It satisfies `BEAT-03`, `BEAT-06`, and the server half of `BEAT-04`.
 
-### Milestone 5: replace the browser script with one renderer loop
+### Milestone 5: generate, validate, and persist the empty chair
+
+Add `empty_chair` to `ShareInteractionType` and its database constraint in Milestone 2, then implement the `generated_room_moment` branch using `buildEmptyChairPrompt`. Call the existing Grok seam with a stable internal correlation character id such as `empty-chair-room`. Before persistence, validate every candidate with a new pure `buildRoomMomentQualityValidationPrompt` that returns the existing `QualityValidationResult` schema. For this non-character entry, `voiceConsistency` means consistency with the room voice and style constitution. Accept only candidates for which `passesQualityValidationThresholds` enforces authenticity at least 6, voice consistency at least 6, and the existing therapy, moralizing, generic-language, and emotion-labeling exclusions.
+
+Use the same bounded candidate-retry shape as the existing share path. Persist the first accepted result with `characterId: null`, `isUserShare: false`, `interactionType: 'empty_chair'`, and the active beat id. The client-facing transcript mapper renders this interaction type as a ritual or room entry with no character speaker label. Do not treat null character id as the user for this entry. A retry checks `getShareByBeatId` first and returns the canonical stored text without generation or validation.
+
+The generation prompt must ask for a brief, naturally complete empty-chair moment with no names, therapy language, slogans, forced physical action, explained moral, or exact sentence count. It must omit empty sections rather than render placeholder values. Preserve the style constitution. The hardcoded sentence in `runFreshMeeting` must not survive as a fallback. A generation or validation failure shows the existing recoverable room error, leaves the same beat active, and persists nothing.
+
+Update prompt tests, generated-room route tests, transcript mapping tests, and the integration sequence. The mock response should be clearly written test content rather than `example line` placeholders. Prove first-candidate rejection followed by acceptance, all candidates rejected, provider failure, one generation on successful first completion, zero generation and validation calls when the stored beat is retried, one persisted entry, no speaker label, and the same text after refresh.
+
+This milestone is complete when two newly created meetings may receive different accepted outputs, one meeting always keeps its own first persisted output, rejected output never appears or completes the beat, and no literal production fallback supplies the old sentence. It satisfies `BEAT-07` and closes #83.
+
+### Milestone 6: replace the browser script with one renderer loop
 
 In `app/src/routes/meeting/[id]/+page.svelte`, preserve the existing transcript components, SSE preview, input components, crisis display, and reflection. Delete the orchestration functions `runFreshMeeting`, `runRounds`, `runRoundOne`, `runRoundTwo`, `runRoundThree`, `runClosing`, and `continueFromPersistedPhase`. Delete their speaker-picking, hard-question, round-specific random, and phase-replay helpers once tests prove the server supplies those decisions.
 
-Write one small loop that posts to `/next`, switches on the returned discriminated beat kind, and renders it. `room_cue` maps a controlled cue key to the existing system, action, or ritual presentation, waits for `pauseAfterMs`, then acknowledges that id. `character_share` streams the server-selected beat through `/share`. `generated_room_moment` uses the empty-chair path completed in Milestone 7. `user_gate` presents the corresponding existing control and stops the loop until user input completes it. `close_meeting` invokes `/close`. `finished` leaves reflection visible and stops. Every asynchronous continuation checks one cancellation token and is cancelled on unmount, navigation, or crisis.
+Write one small loop that posts to `/next`, switches on the returned discriminated beat kind, and renders it. `room_cue` maps a controlled cue key to the existing system, action, or ritual presentation, waits for `pauseAfterMs`, then acknowledges that id. `character_share` streams the server-selected beat through `/share`. `generated_room_moment` invokes the validated empty-chair path completed in Milestone 5. `user_gate` presents the corresponding existing control and stops the loop until user input completes it. `close_meeting` invokes `/close`. `finished` leaves reflection visible and stops. Every asynchronous continuation checks one cancellation token and is cancelled on unmount, navigation, or crisis.
 
 The page may own animation and waiting mechanics, but it must not own phase-specific delays or decisions. The `pauseAfterMs` value comes from the beat. The client may clamp an unreasonable value to a documented safe presentation range, but must not substitute a different sequence. It may upsert transcript entries by stored share id; it must not invent persisted sequence order or append a second local copy.
 
@@ -218,25 +274,15 @@ Move `TOPIC_OPTIONS` to the shared pure module and import it for rendering. Topi
 
 Use component tests or route-backed Playwright tests to prove each beat kind renders through the one loop. A source assertion may supplement behavior by rejecting reintroduction of the named `runRound*` and `continueFromPersistedPhase` functions, but behavior tests remain the primary proof. This milestone is complete when the page has no hardcoded speaker order, optional branch selection, round recursion, or phase replay. It satisfies `BEAT-04`.
 
-### Milestone 6: prove replay-free refresh
+### Milestone 7: prove replay-free refresh
 
 Expand `app/src/lib/server/routes/meeting-ritual-phase.integration.spec.ts` or create a focused integration suite that drives the next-beat protocol through every phase using the mock database. At each point after a generated share and at each user gate, snapshot the persisted shares and state, reconstruct the route/page inputs as a refresh would, ask for the next beat, and assert that the share count and prior content are unchanged. Then complete the returned beat and continue.
 
-Add Playwright coverage in `app/e2e/meeting-flow.spec.ts` for at least a mid-round refresh, a refresh while waiting for the user, and a refresh immediately after a generated response. Capture the transcript entry ids before refresh and compare after rehydration. No id may disappear, change content, or appear twice. The next new entry must have the next beat id and sequence order.
+Add Playwright coverage in `app/tests/e2e/meeting-flow.spec.ts` for at least a mid-round refresh, a refresh while waiting for the user, and a refresh immediately after a generated response. Capture the transcript entry ids before refresh and compare after rehydration. No id may disappear, change content, or appear twice. The next new entry must have the next beat id and sequence order.
 
-Exercise crisis during a user gate, refresh during crisis support, complete support, and verify the room resumes from the stored point. Exercise a simulated network retry after the server persisted a share but before the client received the response; the retry must return that stored share and advance once.
+Exercise crisis during a user gate, refresh during crisis support, complete support, and verify the room resumes from the stored point. Exercise a simulated network retry after the server persisted a share but before the client received the response; the retry must return that stored share and advance once. Exercise a close retry after the response is lost and assert that the stored close result returns without any repeated summary, memory, callback, lifecycle, or phase work.
 
 Remove the 2026-03-19 replay-free refresh item from `DEFERRED.md` only after these cases pass. If any phase cannot be proven, keep the item and record the exact phase and state rather than declaring #82 solved. This milestone is complete when refresh alone never calls generation and never increases transcript length. It satisfies `BEAT-05` and `BEAT-06`.
-
-### Milestone 7: generate and persist the empty chair
-
-Add `empty_chair` to `ShareInteractionType` and its database constraint in Milestone 2, then implement the `generated_room_moment` branch using `buildEmptyChairPrompt`. Call the existing Grok seam with a stable internal correlation character id such as `empty-chair-room`; persist the result with `characterId: null`, `isUserShare: false`, `interactionType: 'empty_chair'`, and the active beat id. The client renders this interaction type as a ritual or room entry with no character speaker label. Do not treat null character id as the user for this entry.
-
-The prompt must ask for a brief, naturally complete empty-chair moment with no names, therapy language, slogans, forced physical action, explained moral, or exact sentence count. It must omit empty sections rather than render placeholder values. Preserve the style constitution. The hardcoded sentence in `runFreshMeeting` disappears with that function and must not survive as a fallback. A generation failure should show the existing recoverable room error and leave the beat active for retry; it must not store placeholder prose.
-
-Update prompt tests, share-route tests, transcript mapping tests, and the integration sequence. The mock response should be clearly written test content rather than `example line` placeholders. Verify one generation on first completion, zero generation calls when the stored beat is retried, one persisted entry, no speaker label, and the same text after refresh.
-
-This milestone is complete when two newly created meetings may receive different mocked/provider outputs, one meeting always keeps its own first persisted output, and no literal production fallback supplies the old sentence. It satisfies `BEAT-07` and closes #83.
 
 ## Concrete Steps
 
@@ -260,7 +306,7 @@ Expect the version-conflict and beat-id retry cases to pass. Do not apply the mi
 
 After Milestones 3 and 4:
 
-    npm.cmd run test:unit -- --run src/lib/server/routes/meeting-next-beat.spec.ts src/lib/server/routes/meeting-share.spec.ts src/lib/server/routes/meeting-user-share.spec.ts src/lib/server/routes/meeting-crisis.spec.ts src/lib/server/routes/meeting-close.spec.ts src/lib/server/routes/meeting-ritual-phase.integration.spec.ts
+    npm.cmd run test:unit -- --run src/lib/server/routes/meeting-next-beat.spec.ts src/lib/server/routes/meeting-share.spec.ts src/lib/server/routes/meeting-user-share.spec.ts src/lib/server/routes/meeting-crisis.spec.ts src/lib/server/routes/meeting-close.spec.ts src/lib/server/routes/meeting-expand.spec.ts src/lib/server/routes/meeting-ritual-phase.integration.spec.ts
     npm.cmd run verify:composition
     npm.cmd run check
 
@@ -268,7 +314,7 @@ Expect all next, completion, retry, crisis, and close cases to pass. The composi
 
 After Milestones 5 through 7:
 
-    npm.cmd run test:unit -- --run src/lib/core/meeting-beats.spec.ts src/lib/core/prompt-templates.spec.ts src/lib/server/routes/meeting-ritual-phase.integration.spec.ts
+    npm.cmd run test:unit -- --run src/lib/core/meeting-beats.spec.ts src/lib/core/prompt-templates.spec.ts src/lib/server/routes/meeting-generated-room-moment.spec.ts src/lib/server/routes/meeting-ritual-phase.integration.spec.ts
     npm.cmd run test:e2e
     npm.cmd run lint:verify
     npm.cmd run check
@@ -299,11 +345,13 @@ Start from a new owned meeting created through the clean join flow. Record each 
 
 During each sharing round, refresh after the first character, while waiting for the user, and immediately after submitting the user share. Before and after refresh, transcript ids and content must match exactly. Refresh must not call the model. The next new beat must follow the saved cursor, not the beginning of the round.
 
-For two different meeting ids with the same roster and intake, optional choices may differ. Repeating either meeting from its saved state must not differ. Every selected character must belong to the persisted roster. Every interaction type must match the active beat. No browser-supplied character, phase, sequence order, topic, or interaction override may control server behavior.
+For two different meeting ids with the same roster and intake, optional choices may differ. Repeating either meeting from its saved state must not differ. Every selected character must belong to the persisted roster. Every interaction type must match the active beat. No browser-supplied character, phase, sequence order, topic, recent transcript, or interaction override may control server behavior. Expansion accepts a share id and derives both prompt and quality context from the owned meeting and stored shares.
 
-Trigger crisis language during a user gate. The ordinary loop must stop, one crisis response must persist, and refresh must remain in crisis at the same active support beat. Completing support must resume from the pre-crisis point without replaying earlier beats.
+Trigger crisis language during a user gate. The ordinary loop must stop, one crisis response must persist, and refresh must remain in crisis at the same active support beat. Completing support must resume from the pre-crisis point without replaying earlier beats. Race that payload against different non-crisis text for the same beat and prove every returned flag and state transition describes whichever share the unique beat id preserved.
 
-At the empty-chair beat, the model receives the pure empty-chair prompt once and the transcript stores one null-character `empty_chair` entry. It displays without a person's name, remains identical after refresh, and contains none of the forbidden placeholder or forced-count instructions. If generation fails, the same active beat remains available for retry and no hardcoded replacement appears.
+At the empty-chair beat, the model receives the pure empty-chair prompt and every candidate receives the room-moment quality prompt. The transcript stores one null-character `empty_chair` entry only after authenticity and voice consistency both reach 6 and all existing exclusions pass. It displays without a person's name, remains identical after refresh, and contains none of the forbidden placeholder or forced-count instructions. If generation fails or all candidates are rejected, the same active beat remains available for retry, persistence remains unchanged, and no hardcoded replacement appears.
+
+Race two close requests for the same beat. Exactly one may run summary, memory, callback, completion, lifecycle, and phase effects; the other receives the documented in-progress response. After the winner completes, every retry must return its stored canonical response without invoking those effects. Expire a claimed worker after it has checkpointed model output and prove the recovery path reuses that output and applies callback and meeting mutations at most once.
 
 The final page must feel continuous. The user sees the existing room pacing and one relevant control at a time; no phase label, beat id, cursor, retry status, or orchestration vocabulary is shown in the product UI.
 
@@ -313,7 +361,9 @@ Beat ids are stable functions of persisted inputs. Claiming an already active be
 
 Compare-and-set phase updates never overwrite a newer version. A losing next-beat request reloads and returns the winner's beat. A losing completion request reloads, checks whether its beat already completed, and returns the canonical outcome or a clear stale-beat conflict. Bound retry loops; do not recurse indefinitely under contention.
 
-Apply the migration only after the private-intake migration. Its added columns and index are safe to create twice. If code rollback becomes necessary after a live migration, keep nullable `shares.beat_id`, `meetings.phase_version`, and the expanded interaction constraint in place while reverting application consumers. Removing stored beat ids is destructive and is never the first rollback action.
+Close has a second, durable claim because its work begins before phase completion. The `(meeting_id, beat_id)` close-run row selects one worker, preserves generated checkpoints across lease recovery, and stores the final response. Callback effect keys make candidate creation converge on one row, meeting completion reuses one checkpointed completion time, and lifecycle updates are idempotent assignments. A completed close run is authoritative even after the active beat has cleared.
+
+Apply the migration only after the private-intake migration. Its added columns, tables, constraints, and indexes are safe to create twice. If code rollback becomes necessary after a live migration, keep nullable `shares.beat_id`, `shares.user_analysis`, `meetings.phase_version`, `callbacks.close_effect_key`, `meeting_close_runs`, and the expanded interaction constraint in place while reverting application consumers. Removing stored beat, analysis, or close-result evidence is destructive and is never the first rollback action.
 
 Build the server path additively while the old client sequence still runs only in tests or behind a temporary local switch. Once route and integration tests prove the new path, replace the page orchestration in one coherent slice and delete the switch before merge. Do not ship two production sequence authorities.
 
@@ -333,7 +383,7 @@ The target control flow is:
     route -> persist one beat-owned result -> complete with version check
     refresh -> load stored transcript and active beat -> continue once
 
-The requirement map is: `BEAT-01` is Milestones 1 and 3; `BEAT-02` is Milestones 2 and 3; `BEAT-03` is Milestones 2 and 4; `BEAT-04` is Milestones 4 and 5; `BEAT-05` and `BEAT-06` are Milestone 6; `BEAT-07` is Milestone 7; `BEAT-08` is Milestones 1, 3, and 5.
+The requirement map is: `BEAT-01` is Milestones 1 and 3; `BEAT-02` is Milestones 2 and 3; `BEAT-03` is Milestones 2, 4, and 5; `BEAT-04` is Milestones 4 and 6; `BEAT-05` and `BEAT-06` are Milestone 7; `BEAT-07` is Milestone 5; `BEAT-08` is Milestones 1, 3, and 6.
 
 The March restore plan remains at `archive/plans/restore-virtual-recovery-meeting-execplan-2026-03-19.md`. Its shipped experience target and historical findings are useful evidence. Its frontend ownership rules, fixed branch instructions, old checkout paths, and prohibition on an orchestration endpoint are superseded and must not guide implementation.
 
@@ -358,7 +408,7 @@ The implementation must expose a discriminated `MeetingBeat` union from `app/src
 
 `MeetingPhaseState` must add `beatCursor: number` and `activeBeat: MeetingBeat | null`, with backward-compatible revival for historical JSON. `nextMeetingBeat` and `completeMeetingBeat` live in `app/src/lib/core/meeting-beats.ts` and perform no I/O.
 
-The database seam must provide a versioned phase read, a compare-and-set meeting-state update that can atomically include a validated topic, and `getShareByBeatId`. Exact interface names may follow existing repository naming, but their semantics and tests are fixed by this plan. `ShareRecord.beatId` is nullable for history and required for new beat-owned generated and user transcript entries.
+The database seam must provide a versioned phase read, a compare-and-set meeting-state update that can atomically include a validated topic, `getShareByBeatId`, first-analysis-wins persistence for `UserShareAnalysis`, and the claim, checkpoint, complete, and fail operations for a beat-keyed close run. Exact interface names may follow existing repository naming, but their semantics and tests are fixed by this plan. `ShareRecord.beatId` is nullable for history and required for new beat-owned generated and user transcript entries; `ShareRecord.userAnalysis` is nullable for history and non-user entries. `MeetingRecord` exposes nullable summary and notable moments, `MeetingCloseResult` validates the stored endpoint payload, and close-created callbacks accept an optional unique effect key.
 
 The next-beat route depends on the ownership gate and `locals.meetingContext` from `plans/private-meeting-access-execplan.md`. The meeting-flow plan does not depend on a live provider for contract, mock, route, or browser work. Applying migrations, refreshing provider fixtures, and production verification remain blocked by #71 and #91.
 
@@ -369,3 +419,5 @@ Issue #90 should follow this plan for `+page.svelte`: deleting the old orchestra
 2026-09-12: Created this plan to replace the superseded frontend-owned March meeting plan with the server-owned direction in epic #77. The revision introduces persisted beats and idempotency before client cutover, makes replay-free refresh an acceptance condition, and gives the unused empty-chair prompt a compliant generated and persisted path.
 
 2026-09-13: Tightened topic completion so the selected topic and phase transition are committed in one version-checked meeting-row update. This closes the race where separate writes could pair the losing topic with the winning beat state.
+
+2026-09-13: Revised the plan after PR review to add a durable close claim and canonical response, derive user-share and expansion decisions from persisted server state, quality-gate the generated empty-chair moment, run that path before renderer cutover, and point browser verification at Playwright's configured test directory.
