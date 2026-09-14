@@ -146,9 +146,10 @@
 - Required a leased generation claim before character or room-moment model
   calls and before any SSE text becomes observable. The winner validates and
   persists the candidate first; competitors receive no losing preview text.
-- Made acknowledged room cues durable transcript rows, scoped close callback
-  effect keys by both meeting and beat, and mapped the stored meeting summary
-  into initial page data so refresh reconstructs the same room and reflection.
+- Required a room cue to become a durable transcript row in the same transaction
+  that first exposes its active beat, scoped close callback effect keys by both
+  meeting and beat, and mapped the stored meeting summary into initial page data
+  so refresh can reconstruct the same room and reflection.
 - Required the privacy Playwright suite to set `reuseExistingServer: false`.
   Its server-side auth, database, and Grok mock composition is only trustworthy
   when the suite starts the process that owns the required environment and
@@ -201,11 +202,12 @@
 - One server-side roster resolver now owns persisted-or-deterministic fallback
   for the page loader, `/next`, `/share`, `/close`, and `/expand`, preserving a
   fallback visitor's voice profile and transcript label when saving seats fails.
-- Topic and later share-pass outcomes use a meeting-and-beat-keyed
-  control-completion ledger. Its narrow RPC commits the outcome, phase version,
-  and topic when applicable in one transaction, allowing lost-response retries
-  to return the canonical current beat without recording unspoken transcript
-  content. Introduction completion always persists the canonical intro share.
+- Topic completion uses a narrow meeting-and-beat-keyed ledger whose RPC commits
+  the topic and phase version together. Spoken input and later share-gate pass
+  actions contend for a separate single user-gate outcome row. A pass winner
+  advances without transcript text; a spoken winner atomically owns one share
+  and prevents pass advancement while analysis finishes. Introduction can only
+  take the spoken path.
 - `CharacterShareInteractionType` excludes `room_cue` and `empty_chair` from
   both the character-beat union and its runtime validator. The complete
   `ShareInteractionType` still represents persisted room-owned transcript rows.
@@ -240,15 +242,23 @@
   for future objects. The server still applies owner filters because its
   service-role client bypasses row-level security; local PostgREST probes prove
   both the client denial and the server path.
-- Epic #79 is a hard prerequisite for server-owned meeting persistence. It must
-  seed core characters by migration, give their immutable slug a unique
-  constraint, resolve existing duplicates, and remove lazy inserts from reads
+- Epic #79 is a hard prerequisite for server-owned meeting persistence. Its live
+  plan now assigns `IDENTITY-A` through `IDENTITY-C`: seed core characters by a
+  uniquely versioned migration, give their immutable slug a unique constraint,
+  stop on ambiguous historical duplicates pending a separately reviewed repair,
+  remove lazy inserts from reads, and prove the result on real local Supabase
   before #81 resolves a core slug to a UUID.
 - Callback lifecycle state uses compare-and-set versions. A close checkpoint
   records each expected version; finalization rolls back with a typed stale
   result when another meeting changed a target, then the current token holder
   reloads and replaces only the lifecycle plan before retrying.
-- A stored beat-owned user share with null analysis is recoverable state. The
-  renderer detects it during hydration and sends only its beat id; the route
-  analyzes canonical stored content and uses first-analysis-wins plus the phase
-  compare-and-set to converge with any original request still running.
+- A spoken user-gate outcome whose share has null analysis is recoverable state.
+  The renderer detects it through `/next` and sends only its beat id; the route
+  analyses canonical stored content and uses first-analysis-wins plus the atomic
+  spoken-completion RPC to converge with any original request still running.
+- A room cue must be stored with its active phase before `/next` returns it.
+  Refresh during the pause upserts the same row, derives the remaining wait from
+  canonical `createdAt`, and acknowledges once without replaying the reveal.
+- Planned Supabase migrations use distinct leading versions in dependency order:
+  private intake `20260912000100`, durable core identity `20260912000200`, and
+  server-owned meeting beats `20260912000300`.

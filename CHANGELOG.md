@@ -47,69 +47,73 @@ All notable changes to this repository are documented in this file.
 
 ## 2026-09-14
 
-### Changed
-- Finished the server-owned meeting plan's lost-response contract: character,
-  user-share, crisis-support, room-moment, skip, and close retries resolve their
-  beat-owned terminal evidence before requiring the old beat to remain active.
-- Expanded close finalization into one renewable, token-checked transaction for
+### Planned changes (documentation only)
+
+The entries below are requirements added to unimplemented ExecPlans. They do
+not describe application behavior shipped by this documentation PR.
+
+- The server-owned meeting plan requires character, user-share, crisis-support,
+  room-moment, skip, and close retries to resolve beat-owned terminal evidence
+  before requiring the old beat to remain active.
+- The close plan requires one renewable, token-checked final transaction for
   meeting completion fields, callbacks, lifecycle targets, finished phase, and
-  the canonical close-run result. Added slow-holder renewal and full-rollback
+  the canonical close-run result, with slow-holder renewal and full rollback
   acceptance cases.
-- Version-gated the new renderer so historical mid-round phase JSON is never
-  revived as cursor zero. A database `legacy | draining | version_1` creation
-  fence now remains closed through the zero-active-legacy check and renderer
-  deployment, preventing a stale instance from creating an unreadable meeting.
-- Made crisis-resource visibility a durable monotonic meeting fact committed
-  with accepted support, and required one persisted-or-fallback roster resolver
-  for the page, `/next`, `/share`, `/close`, and `/expand`.
-- Added a beat-keyed control-completion ledger so topic and later share-pass
-  phase changes are replayable after a lost response without fake transcript
-  rows. Introduction passes are invalid because the user's introduction remains
-  a real stored share even in listening-only meetings.
-- Narrowed character beats to character-only interaction values; runtime and
-  static validation reject the room-owned `room_cue` and `empty_chair` values.
-- Required the server-owned meeting implementation plan to establish durable,
-  idempotent database identities for fallback visitors before selecting them,
-  even when saving their meeting-participant associations fails. Keys are
-  meeting-scoped because current visitor domain ids can repeat across meetings
-  started in the same second, and use a nullable unique constraint that an
-  idempotent Supabase upsert can target.
-- Required generated-share insertion, participant-state updates, and generation
-  completion to commit atomically under the current unexpired lease token so an
-  expired worker cannot win after another worker takes over.
-- Required close callback candidates to resolve from domain character ids to
-  validated database UUIDs before checkpointing, with locked revalidation in
-  the final transaction.
-- Expanded the prompt-repair slice and completion audit to cover every
-  generation builder in `prompt-templates.ts` and worded fixed counts such as
-  `one-sentence`, including the active crosstalk prompt.
-- Required generated visitor rows to store and rehydrate a complete immutable
-  narrative profile, including exactly three real voice examples, so successful
-  participant persistence cannot degrade later share prompts.
-- Added a rollback preflight that requires zero active protocol-version-1
-  meetings before removing the generic renderer or specialized completion
-  routes; active rows keep the current deployment and rollback remains blocked.
-- Made #79's unique, migration-seeded core character slug and removal of lazy
-  read-time character creation a prerequisite for server-owned roster work.
-- Closed the private-meeting plan's direct PostgREST bypass by requiring no
-  `anon` or `authenticated` table/RPC privileges, default-deny future grants,
+- The planned renderer requires protocol-version gating for historical phase
+  JSON and a database `legacy | draining | version_1` creation fence throughout
+  the zero-active-legacy check and renderer deployment.
+- The plan requires crisis-resource visibility to become a durable monotonic
+  meeting fact and one persisted-or-fallback roster resolver for the page,
+  `/next`, `/share`, `/close`, and `/expand`.
+- The plan requires topic completion to use a narrow beat-keyed ledger. Spoken
+  input and a later share-gate pass must contend for one user-gate outcome row,
+  so pass and transcript content cannot both own the same beat. Introduction
+  remains a required stored share even in listening-only meetings.
+- The plan requires the transaction that first claims a room-cue beat to store
+  its canonical transcript row before `/next` returns it. Refresh during the
+  pause must reuse that row and its remaining delay without replaying the cue.
+- The plan narrows character beats to character-only interaction values; static
+  and runtime validation must reject room-owned `room_cue` and `empty_chair`.
+- The server-owned meeting plan requires durable, idempotent database identities
+  and complete immutable profiles for fallback visitors before selecting them,
+  including exactly three real voice examples. Visitor keys are meeting-scoped
+  and use a nullable unique constraint suitable for Supabase upsert.
+- The plan requires generated-share insertion, participant-state updates, and
+  generation completion to commit atomically under the current unexpired lease
+  token so an expired worker cannot win after takeover.
+- The close plan requires callback candidates to match the scanned meeting's
+  canonical origin share, speaker, and quoted source content, then resolve from
+  domain ids to validated database UUIDs before checkpointing. Finalization must
+  lock and recheck those relationships.
+- The plan requires per-callback lifecycle versions. A callback changed by
+  another meeting must invalidate the complete close transaction and trigger
+  lifecycle-only recomputation under the current token.
+- The prompt-repair slice covers every generation builder in
+  `prompt-templates.ts`, the private close-summary builder, and worded fixed
+  counts such as `one-sentence`, including the active crosstalk prompt.
+- The rollback plan requires zero active protocol-version-1 meetings before the
+  generic renderer or specialized completion routes may be removed.
+- Issue #79 is mapped to executable `IDENTITY-A` through `IDENTITY-C` slices in
+  its live plan. They specify a uniquely constrained immutable `core_slug`, a
+  migration seed, duplicate stop conditions, a real local probe, removal of
+  lazy read-time creation, and focused acceptance commands before `BEAT-F`.
+- The three planned dependent migrations use distinct Supabase versions:
+  `20260912000100_private_meeting_intake.sql`,
+  `20260912000200_durable_core_character_identity.sql`, and
+  `20260912000300_server_owned_meeting_beats.sql`.
+- The private-meeting plan requires a default-deny PostgREST boundary: no
+  `anon` or `authenticated` table or RPC privileges, default-deny future grants,
   and real local denial probes alongside the server service-role success path.
-- Fenced checkpointed callback lifecycle targets with per-callback versions.
-  A callback changed by another meeting now invalidates the complete close
-  transaction and forces lifecycle-only recomputation under the current token.
-- Required callback candidates to match an eligible canonical origin share in
-  the scanned meeting, that share's speaker, and quoted source content before
-  checkpoint. Close finalization locks and rechecks the origin relationship.
-- Added beat-id-only recovery for a user share that persisted before its
-  analysis or phase update. Refresh hides the completed input and resumes from
-  canonical stored text instead of asking the person to submit it again.
+- The user-share plan requires beat-id-only recovery when a spoken outcome and
+  its share persist before analysis or phase update. Refresh must hide the input
+  and resume from canonical stored text.
 
 
 ## [2026-03-19]
 
 ### Added
 
-- Added the living ExecPlan `plans/restore-virtual-recovery-meeting-execplan.md` for restoring the meeting page from dashboard flow back to the original room-led meeting experience.
+- Added the living ExecPlan now archived at `archive/plans/restore-virtual-recovery-meeting-execplan-2026-03-19.md` for restoring the meeting page from dashboard flow back to the original room-led meeting experience.
 
 ### Changed
 

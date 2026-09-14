@@ -16,6 +16,7 @@ The behavior is visible in two ways. The join redirect contains only `/meeting/<
 - [x] (2026-09-12 13:45Z) Chose one meeting-scoped persistence contract and one centralized route-ownership gate so later meeting endpoints inherit the same protection.
 - [x] (2026-09-14 03:14Z) Integrated PR review findings for auth-error preservation, malformed ids, probe identity, cutover order, server-side auth, database, and Grok browser fixtures, fresh-server ownership, configured test paths, and the required real-system probe stage.
 - [x] (2026-09-14 09:02Z) Closed the direct-PostgREST bypass by adding a default-deny database privilege boundary and an anonymous-key probe to the migration, seam-order, and acceptance requirements.
+- [x] (2026-09-14 09:54Z) Gave the planned migration a distinct fourteen-digit Supabase version prefix so the private, core-identity, and meeting-beat schemas apply in their required order.
 - [ ] Milestone 1: extend the meeting persistence contract and migration for private intake snapshots.
 - [ ] Milestone 2: probe a real local Supabase stack, capture fixtures, then implement the mock, contract tests, and adapter.
 - [ ] Milestone 3: preserve authentication failures and enforce ownership before meeting-specific I/O.
@@ -58,6 +59,9 @@ The behavior is visible in two ways. The join redirect contains only `/meeting/<
 
 - Observation: the server ownership gate does not protect a table that Supabase exposes directly to `anon` or `authenticated` through PostgREST.
   Evidence: the application uses a service-role client in `app/src/lib/server/supabase.ts`, but the initial migration neither enables row-level security nor revokes client-role privileges on `meetings`, `shares`, `meeting_participants`, `callbacks`, and `users`. Anyone holding the public project URL and anon key could bypass SvelteKit routes if the database roles retain their default grants.
+
+- Observation: Supabase treats the leading numeric text before the first underscore as the migration version.
+  Evidence: any two names beginning `20260912_` both have version `20260912`; descriptive counters after that underscore do not make them distinct or order them.
 
 ## Decision Log
 
@@ -113,9 +117,13 @@ The behavior is visible in two ways. The join redirect contains only `/meeting/<
   Rationale: a new endpoint under `/meeting/[id]` should inherit the common protection immediately. Building it first would create another route that has to be secured separately and then migrated.
   Date/Author: 2026-09-12 / Codex
 
+- Decision: name this plan's migration `20260912000100_private_meeting_intake.sql`.
+  Rationale: the fourteen-digit timestamp prefix is a unique Supabase migration version and reserves clear dependency order before `20260912000200_durable_core_character_identity.sql` and `20260912000300_server_owned_meeting_beats.sql`.
+  Date/Author: 2026-09-14 / Codex
+
 ## Outcomes & Retrospective
 
-Planning is complete; application behavior has not changed yet. The implementation is divided into seven small outcomes. The first two establish and prove a backward-compatible persistence seam and a default-deny PostgREST boundary against a disposable real local Supabase stack before deriving fixtures and mocks. The next three protect the route family, prepare the loader, and make the clean-URL cutover as one deployable transition. The sixth supplies the server-side test composition needed for an honest browser story, and the seventh verifies the full result. Production deployment and a hosted Supabase migration remain blocked by epic #71; local progress depends on the real local probe succeeding before the mock, adapter, routes, and browser story continue.
+Planning is complete; application behavior has not changed yet. The implementation is divided into seven small outcomes. The first two establish and prove a backward-compatible persistence seam and a default-deny PostgREST boundary against a disposable real local Supabase stack before deriving fixtures and mocks. The next three protect the route family, prepare the loader, and make the clean-URL cutover as one deployable transition. The sixth supplies the server-side test composition needed for an honest browser story, and the seventh verifies the full result. Its migration has a distinct Supabase timestamp version that sorts before the core-identity and meeting-beat migrations. Production deployment and a hosted Supabase migration remain blocked by epic #71; local progress depends on the real local probe succeeding before the mock, adapter, routes, and browser story continue.
 
 ## Context and Orientation
 
@@ -139,7 +147,7 @@ A server composition is the bundle of seam implementations placed in `event.loca
 
 These are the assignment units for Codex or a subagent, not automatic merge units. Give one agent one slice, its listed files, and its acceptance command. Files that appear in more than one slice are owned sequentially; never assign two writers to them at once. The main agent integrates `PRIV-A` through `PRIV-D` before promoting the persistence foundation. Later milestone boundaries stay deployable; the final clean-URL transition in `PRIV-G` deliberately joins the two dependent edits that must land together.
 
-- `PRIV-A` extends `MeetingRecord` and validators, gives `CreateMeetingInput` optional compatibility fields, and adds migration `20260912_000004_private_meeting_intake.sql`. That migration also enables row-level security without client policies and revokes current and default table, sequence, and function privileges from `PUBLIC`, `anon`, and `authenticated`. It stops at the written contract and probe schema; it does not author fixtures, edit a mock, adapter, or route.
+- `PRIV-A` extends `MeetingRecord` and validators, gives `CreateMeetingInput` optional compatibility fields, and adds migration `20260912000100_private_meeting_intake.sql`. That migration also enables row-level security without client policies and revokes current and default table, sequence, and function privileges from `PUBLIC`, `anon`, and `authenticated`. It stops at the written contract and probe schema; it does not author fixtures, edit a mock, adapter, or route.
 - `PRIV-B` adds the pinned local Supabase CLI/configuration and `probes/privateMeetingAccessProbe.mjs`, runs the migration against that stack, proves service-role access still works, proves anon-key direct table and RPC access is denied, and writes redacted success and failure captures under the database fixtures directory. It stops if no real probe can run and does not hand-author substitute fixture payloads.
 - `PRIV-C` updates only the fixture-backed database mock and adds contract expectations for create and owner lookup from the captured records. It stops when `contract.test.ts` proves schema conformance and mock fidelity.
 - `PRIV-D` implements the Supabase insert, select, and two-filter owned lookup in `adapter.ts` with focused adapter tests. It stops when the adapter suite proves both filters and indistinguishable not-found results against the probed shapes.
@@ -177,7 +185,7 @@ Start with the contract because both the mock and real adapter must agree before
 
 Extend `CreateMeetingInput` in `app/src/lib/core/meeting.ts` with optional `userDisplayName`, `userCleanTime`, and `userMind` compatibility fields, then pass them to `database.createMeeting`. The temporary optional shape lets the contract, mock, and adapter land without breaking the old join action. `PRIV-G` makes all three nonempty and required in the same slice that updates that caller. Preserve the required mood and the boolean listening choice. Keep `topic` unchanged in this slice.
 
-Create `app/supabase/migrations/20260912_000004_private_meeting_intake.sql`. It adds nullable text columns `user_display_name` and `user_clean_time` to `public.meetings`. Do not alter the historical migration. Use `add column if not exists` so a retry is harmless. Do not make the columns `not null`: old rows cannot supply truthful snapshots, and fake backfill values would violate the purpose of the plan.
+Create `app/supabase/migrations/20260912000100_private_meeting_intake.sql`. It adds nullable text columns `user_display_name` and `user_clean_time` to `public.meetings`. The fourteen-digit prefix is the unique Supabase migration version; the later `_private_meeting_intake` text is only the descriptive name. Do not alter the historical migration. Use `add column if not exists` so a retry is harmless. Do not make the columns `not null`: old rows cannot supply truthful snapshots, and fake backfill values would violate the purpose of the plan.
 
 In the same migration, enable row-level security on every current application table in `public`: `characters`, `users`, `meetings`, `meeting_participants`, `shares`, and `callbacks`. Add no `anon` or `authenticated` policies because browser clients do not own database access in this architecture. Explicitly revoke all privileges on current public tables and sequences, and execute on current public functions, from `PUBLIC`, `anon`, and `authenticated`. Set equivalent default-privilege revokes for future tables, sequences, and functions created by the migration owner so later RPCs and tables do not reopen the bypass. The service-role path in `app/src/lib/server/supabase.ts` must retain the access needed by the adapter; prove that behavior rather than weakening the deny boundary with a public policy.
 
@@ -187,7 +195,7 @@ This milestone is complete when the contract and probe schema are reviewable and
 
 ### Milestone 2: probe, capture, mock, test, and adapt the database seam in order
 
-Pin `supabase@2.117.0` as an exact development dependency and commit the lockfile change. Initialize `app/supabase/config.toml` without hosted project identifiers or credentials. This local stack is disposable infrastructure on the developer machine; it is not a Vercel or hosted Supabase change. Add the `20260912_000004_private_meeting_intake.sql` migration from Milestone 1 to that stack with `npm.cmd exec supabase db reset`.
+Pin `supabase@2.117.0` as an exact development dependency and commit the lockfile change. Initialize `app/supabase/config.toml` without hosted project identifiers or credentials. This local stack is disposable infrastructure on the developer machine; it is not a Vercel or hosted Supabase change. Add the `20260912000100_private_meeting_intake.sql` migration from Milestone 1 to that stack with `npm.cmd exec supabase db reset`.
 
 Before editing the mock or real adapter, create `app/probes/privateMeetingAccessProbe.mjs` and the npm script `probe:supabase-private-meeting`. The probe obtains local service-role and anon credentials from `npm.cmd exec supabase status -o json`, creates deterministic owner A, owner B, and one meeting through the real service-role Supabase client, then captures the raw insert/select success, missing valid id, wrong owner, and representative PostgREST failure shapes. With the anon key and no user session, directly request each current application table, attempt a meeting insert/update/delete using known valid ids, and invoke every public RPC introduced by the current migration set. Every request must fail without returning a row or applying a mutation. Repeat the read and write denial with an `authenticated` JWT for owner A; database ownership alone must not create a direct-client path. Finally, repeat the owner-filtered read through the service-role client and prove the server path still succeeds. The probe must delete or reset its rows on repeat, redact credentials and JWTs, and write the capture plus `probedAt`, `environment: 'local-supabase'`, and probe name under `app/src/lib/seams/database/fixtures/`. Do not copy expected JSON into the capture path by hand.
 
@@ -376,3 +384,5 @@ The only true cross-plan dependency is this plan before `plans/server-owned-meet
 2026-09-13: Revised the plan after PR review to preserve non-authorization auth failures, return the generic 404 for malformed ids, retire route-level probe identity, stage the clean-URL cutover in a deployable order, use Playwright's configured test directory, require Playwright to start a fresh non-reused server, include the auth, database, and Grok seam mocks in that preview composition, and restore contract-probe-fixture-mock-test-adapter ordering through a disposable local Supabase stack.
 
 2026-09-14: Closed the direct-database bypass left by a route-only ownership gate. The privacy migration now enables row-level security with no browser policies, revokes current and default table, sequence, and function privileges from public client roles, and requires real anon-key and authenticated-JWT PostgREST denial probes alongside a passing service-role adapter path.
+
+2026-09-14: Renamed the planned privacy migration to `20260912000100_private_meeting_intake.sql`. Supabase uses the leading numeric segment as the migration version, so the earlier date-plus-counter shape would have collided with later same-day plans instead of enforcing dependency order.

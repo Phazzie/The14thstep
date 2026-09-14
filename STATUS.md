@@ -55,7 +55,11 @@ the change everything else gets easier after. Finish #84 and #85 first so the
 new meeting endpoint inherits one ownership gate and a default-deny direct
 database boundary. Finish [#79](https://github.com/Phazzie/The14thstep/issues/79)
 before #81's database-backed slices so every core character slug resolves to
-one migration-seeded UUID instead of a row created by a racing read.
+one migration-seeded UUID instead of a row created by a racing read. Its live
+plan now defines `IDENTITY-A` through `IDENTITY-C`: the uniquely versioned local
+migration and real probe, the read-only adapter conversion, and the final source
+and integration audit. Ambiguous historical duplicates stop migration until a
+separately reviewed data repair exists.
 Promote #81 through its database creation fence: keep meeting creation in
 `draining` while legacy rooms finish and the version-1 renderer deploys, then
 activate stamped version-1 creation only after every serving instance is ready.
