@@ -87,7 +87,7 @@ All notable changes to this repository are documented in this file.
   participant persistence cannot degrade later share prompts.
 - Added a rollback preflight that requires zero active protocol-version-1
   meetings before removing the generic renderer or specialized completion
-  routes; active rows keep the new renderer or the read-only restart path.
+  routes; active rows keep the current deployment and rollback remains blocked.
 
 
 ## [2026-03-19]

@@ -228,5 +228,5 @@
   placeholder snapshots fail validation before roster selection.
 - Application rollback first stops new protocol-version-1 creation, then waits
   for a zero-active-version-1 preflight. Until it passes, active rows keep the
-  beat renderer or receive its read-only restart path and never enter the legacy
-  phase-only renderer.
+  current deployment, use its beat renderer or read-only restart presentation,
+  and never enter the legacy phase-only renderer.
