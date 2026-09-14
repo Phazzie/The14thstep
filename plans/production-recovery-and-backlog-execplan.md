@@ -9,6 +9,8 @@ This document must be maintained in accordance with [PLANS.md](../PLANS.md).
 > 2026 snapshot, not current provider evidence. Start from [STATUS.md](../STATUS.md)
 > and re-verify external state before acting on any operational instruction.
 
+This track also governs [#79](https://github.com/Phazzie/The14thstep/issues/79), the local durable-core-character identity prerequisite for the server-owned meeting plan. That bounded slice may proceed while production recovery is blocked, after the private-meeting plan has established the disposable local Supabase stack. It does not authorize a hosted migration.
+
 ## Purpose / Big Picture
 
 The immediate goal is to make `https://14thstep.com` reliably usable again for real people. After the work in this plan is complete, a guest or member should be able to open the site, start a meeting, and see the meeting continue into actual room behavior instead of failing during authentication or bootstrap. Once production is stable, the same workflow should keep moving forward by landing the smallest safe backlog slices instead of reopening large messy branches.
@@ -32,6 +34,7 @@ This plan also assumes a high-agency implementation style. The executing agent s
 - [x] (2026-03-18 20:45Z) Landed the bounded issue `#10` hardening slice on branch `codex/narrative-context-hardening-2026-03-18` and opened draft PR `#70` (`fix(core): harden narrative context fallback handling`).
 - [x] (2026-03-18 20:50Z) Commented a concrete prompt-surface inventory onto issue `#17`, including grouped runtime surfaces and the smallest safe follow-up slices.
 - [x] (2026-03-18 20:53Z) Opened issue `#71` to track production database backend reprovisioning as the current external blocker.
+- [x] (2026-09-14 09:54Z) Added an executable three-slice plan for #79: a uniquely versioned migration and real local probe, a read-only adapter mapping, and focused identity verification before #81 database work.
 - [ ] Provision or recover a real production database target, apply the existing schema, and update the live Vercel project to use it.
 - [ ] Land the minimum production recovery change or env update, redeploy, and verify both guest and member meeting start on the real public site.
 - [ ] Merge or close PR `#69` after the production recovery decision is made so auth work does not linger as half-finished local state.
@@ -60,6 +63,12 @@ This plan also assumes a high-agency implementation style. The executing agent s
 
 - Observation: The production guest flow surfaces `503` from the server, but the browser-level auth warning is only incidental.
   Evidence: Playwright against the public site reaches `/?/continueGuest`, and `vercel logs` show `responseStatusCode:503` with `[auth.session] unresolved code=UNAUTHORIZED message=No active auth session` on the same POST. The unresolved auth line is expected before bootstrap; the real failure is the `503` during the action.
+
+- Observation: core character reads can create identity rows, and the schema does not make the domain slug unique.
+  Evidence: `loadCharacterMaps` in `app/src/lib/server/seams/database/adapter.ts` queries by name, inserts any missing `CORE_CHARACTERS`, and treats `intro_style` as the domain id. Two cold readers can both insert the same character because `public.characters` has no unique core slug or core-name constraint.
+
+- Observation: the planned private, identity, and beat migrations need different leading numeric versions.
+  Evidence: Supabase parses the digits before the first underscore as the migration version. Descriptive suffixes such as `_000004_` and `_000005_` do not order files that share the same leading date.
 
 ## Decision Log
 
@@ -95,9 +104,17 @@ This plan also assumes a high-agency implementation style. The executing agent s
   Rationale: The site is currently broken for real users, so backlog work should only begin after guest/member start flows are verified live.
   Date/Author: 2026-03-18 / Codex
 
+- Decision: give core characters an explicit immutable `core_slug`, seed them in `20260912000200_durable_core_character_identity.sql`, and make `loadCharacterMaps` read-only.
+  Rationale: memory, callbacks, shares, and participant rows all depend on one stable UUID per domain character. A unique slug and migration-owned seed remove the race; rejecting uninspected historical duplicates avoids inventing a destructive merge policy before the affected rows and foreign-key references can be examined.
+  Date/Author: 2026-09-14 / Codex
+
+- Decision: split #79 into `IDENTITY-A`, `IDENTITY-B`, and `IDENTITY-C` and finish them before `BEAT-F` in the server-owned meeting plan.
+  Rationale: the migration and real local probe must prove the database invariant before the adapter trusts it, while the final slice checks every runtime caller and governance reference without mixing in meeting-beat behavior.
+  Date/Author: 2026-09-14 / Codex
+
 ## Outcomes & Retrospective
 
-This section is not complete yet. The current state is that auth reliability improved materially with PR `#68`, but production still has a backend bootstrap outage because the configured backend no longer exists. The main lesson so far is that project-link drift (`app/.vercel` vs root `.vercel`) and env drift can masquerade as app bugs, and that a resolvable host is not the same thing as a live database. The next contributor should assume that external state is part of the bug until proven otherwise.
+This section is not complete yet. The current state is that auth reliability improved materially with PR `#68`, but production still has a backend bootstrap outage because the configured backend no longer exists. The main lesson so far is that project-link drift (`app/.vercel` vs root `.vercel`) and env drift can masquerade as app bugs, and that a resolvable host is not the same thing as a live database. The mapped #79 prerequisite is now executable locally in three bounded slices; none of that identity behavior has been implemented by this planning change. The next contributor should assume that external state is part of the production bug until proven otherwise.
 
 ## Context and Orientation
 
@@ -121,6 +138,8 @@ The important production facts right now are:
 - The Supabase REST host is dead, and every configured Postgres URL also fails with `Tenant or user not found`.
 
 The phrase "decision-gated promotion" means: prove a change locally, push a small PR, handle review, merge, and only then begin the next slice. This repository already uses that workflow and it should continue.
+
+The six domain core characters are `marcus`, `heather`, `meechie`, `gemini`, `gypsy`, and `chrystal`, defined by `CORE_CHARACTERS` in `app/src/lib/core/characters.ts`. Their database rows currently use UUID primary keys, while application calls use those six slugs. The adapter translates between them through `loadCharacterMaps`; today that read path also inserts missing rows and stores the slug in `intro_style`. Issue #79 replaces that behavior with a nullable `core_slug` column that is populated and uniquely constrained only for core rows. Visitors and historical non-core characters keep `core_slug = null`.
 
 The phrase "subagent" means a separate smaller agent thread used in parallel for bounded work. In this plan, subagents are used for exploration, log collection, and non-overlapping backlog slices; the main agent remains the final integrator.
 
@@ -146,7 +165,13 @@ The Postgres-backed adapter must fully support the methods actually used in the 
 
 After the production path is fixed, redeploy from `main`, then run live browser verification against `https://14thstep.com`. Use one guest flow and one member flow. A valid result is not merely "page loads"; it is: the user reaches `/meeting/<id>`, the room UI appears, and after a brief wait the room begins speaking instead of dying in bootstrap. Before merge, run a final harsh but fair critique on the exact shipped diff and answer: what shortcut would a lazy fix have taken here, and how does the chosen fix avoid that shortcut.
 
-Only after that should backlog mining begin. Each backlog slice must repeat the same discipline: diagnose first, enumerate at least two candidate fixes or approaches, write a harsh but fair critique of the leading option, then implement the smallest root-cause fix that survives critique. The first implementation slice should be issue `#10`, which is bounded and code-oriented: harden narrative-context generator error handling and fallback cache behavior. The second slice should be issue `#17`, but only as an analysis/inventory pass first. That pass should identify every prompt surface and propose a minimal follow-up change list; it should not rewrite all prompt logic in one go. Issues `#7` and `#8` remain product-decision-heavy and should stay deferred unless the restored live behavior provides enough evidence to settle them.
+While production remains blocked by #71, execute the #79 identity prerequisite after the private-meeting plan's first two slices have established `20260912000100_private_meeting_intake.sql`, the pinned local Supabase CLI, and `app/supabase/config.toml`. Keep it separate from application meeting-flow work:
+
+- `IDENTITY-A` owns `app/supabase/migrations/20260912000200_durable_core_character_identity.sql`, `app/probes/coreCharacterIdentityProbe.mjs`, and the corresponding `app/package.json` probe script. It adds nullable `characters.core_slug`, aborts with a clear exception if existing candidate rows are ambiguous or an unknown `tier = 'core'` row cannot be mapped, assigns one of the six known slugs to each unambiguous existing row, inserts every missing core row from the canonical base fields in `CORE_CHARACTERS`, and then adds a unique slug constraint, a case-insensitive unique core-name index, a core-row slug check, and an immutability trigger. It does not delete or silently choose among duplicates and does not edit the adapter. The real local probe proves exactly six seeded rows, one UUID per slug, duplicate rejection, immutable-slug rejection, migration reapplication safety, and zero character writes during representative reads. If preflight finds duplicates in any real target, stop and capture the row ids plus counts of referencing `meeting_participants`, `shares.character_id`, `shares.target_character_id`, and `callbacks.character_id`; write a separately reviewed repair from that evidence before applying this migration there.
+- `IDENTITY-B` owns only `app/src/lib/server/seams/database/adapter.ts` and `app/src/lib/server/seams/database/adapter.spec.ts`. It removes the insert branch from `loadCharacterMaps`, selects `id, core_slug` for the exact six slugs, rejects missing, duplicate, unknown, or non-UUID results as `CONTRACT_VIOLATION`, and maps database UUIDs back through `core_slug`. It must not use `name` or `intro_style` as an identity fallback. Tests prove a cold read performs no insert, all six mappings are stable, a missing seed fails without repair, duplicate fixture rows fail instead of last-row-wins, and share, participant, callback, and lifecycle callers still translate both directions.
+- `IDENTITY-C` owns the focused integration/source audit and the affected entries in this plan, `STATUS.md`, `CHANGELOG.md`, and `decision-log.md`. It runs the real probe again after the adapter change, verifies all character-consuming route and seam tests, searches for lazy core inserts and identity lookups by `intro_style` or core name, and records the exact evidence. It contains no #81 beat, renderer, visitor-profile, or hosted deployment work.
+
+Only after production recovery, except for explicitly unblocked local prerequisites such as #79, should backlog mining begin. Each backlog slice must repeat the same discipline: diagnose first, enumerate at least two candidate fixes or approaches, write a harsh but fair critique of the leading option, then implement the smallest root-cause fix that survives critique. The first implementation slice should be issue `#10`, which is bounded and code-oriented: harden narrative-context generator error handling and fallback cache behavior. The second slice should be issue `#17`, but only as an analysis/inventory pass first. That pass should identify every prompt surface and propose a minimal follow-up change list; it should not rewrite all prompt logic in one go. Issues `#7` and `#8` remain product-decision-heavy and should stay deferred unless the restored live behavior provides enough evidence to settle them.
 
 ## Autonomous Execution, Review, And Quality Gates
 
@@ -173,6 +198,19 @@ After every merge, update this plan's `Progress`, `Surprises & Discoveries`, `De
 ## Concrete Steps
 
 Work from the repository root unless a step explicitly says `app/`.
+
+For #79, first finish the private plan's local database setup, then work from `app/` in PowerShell:
+
+    npm.cmd exec supabase start
+    npm.cmd exec supabase db reset
+    npm.cmd run probe:supabase-core-character-identity
+    npm.cmd run test:unit -- --run src/lib/server/seams/database/adapter.spec.ts
+    npm.cmd run verify:contracts
+    npm.cmd run verify:composition
+    npm.cmd run check
+    rg -n "missingProfiles|\.from\('characters'\).*\.insert|\.eq\('intro_style'|\.in\('name'" src/lib/server/seams/database/adapter.ts
+
+Expect the reset to apply `20260912000100_private_meeting_intake.sql` before `20260912000200_durable_core_character_identity.sql`, the probe to report six unique immutable slugs and no read-time writes, the focused and seam checks to pass, and the source search to return no identity fallback or lazy insert in `loadCharacterMaps`. Do not proceed to `BEAT-F` until `IDENTITY-A` through `IDENTITY-C` are merged. Do not apply the identity migration to a hosted target while #71 prevents inspecting its rows.
 
 First, verify and snapshot the current production state:
 
@@ -261,6 +299,8 @@ The fallback adapter path is accepted only if:
 
 Backlog mining is accepted only if each slice is shipped as its own PR and leaves `main` deployable after merge.
 
+Core character identity #79 is accepted only when the real local Supabase probe and focused adapter tests prove all of the following: the migration versions are unique and ordered private then identity then beats; exactly the six `CORE_CHARACTERS` slugs each resolve to one UUID; core names are case-insensitively unique; an existing slug cannot change; a duplicate or unknown historical core row stops migration rather than being silently merged; `loadCharacterMaps` and every representative character read execute no insert; a missing or duplicate mapping returns `CONTRACT_VIOLATION`; and existing share, participant, callback, and lifecycle adapter behavior still maps domain slugs and database UUIDs consistently. The hosted-data preflight remains required before eventual production application.
+
 No slice is accepted if the only proof is unit tests. Each production-facing slice must include one human-verifiable behavior check or a real runtime log check that demonstrates the user-visible improvement.
 
 ## Idempotence and Recovery
@@ -276,6 +316,8 @@ If the Postgres-backed adapter path is chosen, keep the existing Supabase adapte
 If the direct Postgres path cannot authenticate or the underlying database is unreachable, stop and record that in `Surprises & Discoveries`. At that point the external backend itself is unavailable, and the next step requires either a restored Supabase project or a new production database provisioned by the user.
 
 If review feedback identifies a real wrong-layer fix, do not defend the existing patch out of sunk-cost loyalty. Rewrite or replace it while the slice is still small. This plan explicitly prefers correctness and clean architecture over preserving already-written code.
+
+The identity migration is repeat-safe after success: nullable-column creation, known-row assignment, missing-row inserts, constraints, indexes, and trigger creation use guarded or replacement forms. It deliberately aborts before mutation when candidate identities are ambiguous. Do not delete duplicate character rows or rewrite their foreign keys without first capturing the actual referencing rows and reviewing a deterministic repair; retry the same migration only after that separate repair leaves one candidate per slug.
 
 ## Artifacts and Notes
 
@@ -309,6 +351,8 @@ These short evidence snippets are the current grounding for the plan:
 
 If the Postgres fallback path is used, add exactly one server-side database client dependency to `app/package.json`. Prefer a mature driver that works well in Node 24 and serverless environments. The new transport must still implement the existing `DatabasePort` from `app/src/lib/seams/database/contract.ts`; do not change route code to know or care which backend transport is used.
 
+The #79 migration is `app/supabase/migrations/20260912000200_durable_core_character_identity.sql`. It adds `characters.core_slug text`, constrained to the six current `CORE_CHARACTERS` slugs for seeded rows and null for non-core rows. A unique constraint owns slug identity, a partial unique index on `lower(name)` protects core names, and a trigger rejects changing a non-null slug. `loadCharacterMaps` remains internal to `app/src/lib/server/seams/database/adapter.ts`; it becomes a pure read of the six canonical slug/UUID pairs and returns the existing `SeamResult` error shape without adding a new public `DatabasePort` method.
+
 Subagent routing for autonomous continuation should follow this split:
 
 - Subagent `Aristotle` (explorer): production state collection, Vercel deployment/env/log verification, and precise evidence gathering.
@@ -322,4 +366,8 @@ After production recovery is complete, subagent usage for backlog mining should 
 - One explorer on issue `#17` prompt-surface inventory and recommendation.
 - The main agent keeps integration ownership and merge-readiness checks.
 
-Revision note (2026-03-18 / Codex): Created this plan after confirming that the merged Clerk auth fix is live, the xAI key has been rotated, and the remaining production outage is tied to the stale Supabase project ref still configured in the real `app` Vercel project. Revised the plan the same day to add explicit root-cause review, harsh-critique loops, architecture review gates, red-team review before PRs, and a higher-agency standard for decisive implementation.
+## Revision Note
+
+2026-03-18 / Codex: Created this plan after confirming that the merged Clerk auth fix is live, the xAI key has been rotated, and the remaining production outage is tied to the stale Supabase project ref still configured in the real `app` Vercel project. Revised the plan the same day to add explicit root-cause review, harsh-critique loops, architecture review gates, red-team review before PRs, and a higher-agency standard for decisive implementation.
+
+2026-09-14 / Codex: Added the missing executable #79 prerequisite mapped here by `STATUS.md`. The new `IDENTITY-A` through `IDENTITY-C` slices define the unique migration version, duplicate stop condition, real local probe, read-only adapter conversion, focused acceptance commands, and the exact merge gate before server-owned meeting persistence begins.

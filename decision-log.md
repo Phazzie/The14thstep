@@ -108,3 +108,171 @@
 - Chose to degrade rather than fail when `saveMeetingParticipants` errors: the roster is derived deterministically from the meeting id, so the page keeps the room open on the generated seats. Turning someone away from a meeting over a transient write is the worse outcome.
 - Replaced the repo's twenty-document planning sprawl with `STATUS.md` plus GitHub epics and sub-issues. Projects boards were rejected because agents working through the GitHub MCP connection cannot read them; issues and repo files are the only planning surfaces an agent can actually see.
 - Moved finished history to `archive/` and kept one live execplan per track in `plans/`.
+- Superseded the provisional epic mapping created during repository organization: #78 now has `plans/private-meeting-access-execplan.md`, #77 now has `plans/server-owned-meeting-beats-execplan.md`, and #71/#79/#80 remain in the production-recovery and backlog track. Privacy and meeting orchestration have different blockers, acceptance stories, and implementation boundaries, so keeping both inside older broad plans made neither safely executable.
+- Archived the March meeting-restoration plan instead of patching it in place. It records shipped room behavior, but its explicit frontend-owned speaking order, fixed old branch instructions, and ban on a new orchestration endpoint directly conflict with #77. The replacement plan treats that document as historical evidence and makes persisted server beats the execution authority.
+- Ordered #84 and #85 before #81. The server-owned beat endpoint belongs under `/meeting/[id]` and should inherit a single owner check when it is created rather than becoming another unprotected route that needs later repair.
+
+## 2026-09-13
+
+- Preserved the full auth seam result until the meeting access decision:
+  `UNAUTHORIZED` maps to the generic ownership 404, while provider,
+  infrastructure, contract, and unexpected auth failures keep their existing
+  service-error status. Malformed meeting ids become the same generic 404
+  before a UUID database query. Retired `PROBE_USER_ID` as an interactive route
+  identity because a redirect cannot recover that process-local fallback.
+- Staged the private-intake migration through a persisted-first compatibility
+  loader, then one clean-URL cutover that removes URL writes and reads together.
+  Playwright uses an explicit local preview-server seam composition because
+  browser interception cannot mock hook-level database and auth work.
+- Made the canonical beat-owned user share and its stored analysis authoritative
+  under competing payloads. Expansion now derives topic and transcript context
+  from persisted server state rather than browser input.
+- Added a unique, leased close-run claim with checkpoints, idempotent callback
+  keys, and a stored close response so concurrent and repeated closes converge
+  without repeating completion side effects.
+- Required the generated empty-chair moment to pass the existing minimum
+  authenticity and voice-consistency thresholds before persistence, and placed
+  that server path before the generic renderer cutover that depends on it.
+- Restored contract-probe-fixture-mock-test-adapter order for both new database
+  tracks. The plans pin a local Supabase CLI and require real local Postgres and
+  PostgREST captures; if that probe cannot run, dependent seam and route work is
+  blocked rather than supported by invented fixtures.
+- Injected phase-transition time from the server clock seam, removed the unused
+  reflection gate, assigned `/room-moment` to generated beat completion, and
+  persisted the user-share id that crisis support must load on every retry.
+- Kept `BEAT-L` through `BEAT-Q` as separate implementation assignments on one
+  integration branch and one promotion boundary. Active-beat-only routes cannot
+  reach `main` while the production renderer still sends legacy requests.
+- Required a leased generation claim before character or room-moment model
+  calls and before any SSE text becomes observable. The winner validates and
+  persists the candidate first; competitors receive no losing preview text.
+- Required a room cue to become a durable transcript row in the same transaction
+  that first exposes its active beat, scoped close callback effect keys by both
+  meeting and beat, and mapped the stored meeting summary into initial page data
+  so refresh can reconstruct the same room and reflection.
+- Required the privacy Playwright suite to set `reuseExistingServer: false`.
+  Its server-side auth, database, and Grok mock composition is only trustworthy
+  when the suite starts the process that owns the required environment and
+  shared fixture state.
+- Applied the existing authenticity and voice-consistency thresholds to crisis
+  support and put that route behind the same leased generation claim. Rejected
+  or competing text cannot persist or become visible; total rejection leaves
+  the support beat active.
+- Replaced share-only crisis provenance with a typed source: either the exact
+  owned user-share row or the owner-checked meeting intake. A persisted handled
+  marker prevents stored setup language from reopening crisis after completion.
+- Made close finalization one RPC that writes the finished meeting phase and the
+  completed canonical close response in the same transaction. A recovery can
+  no longer observe an advanced phase with an unfinished close-run row.
+- Included `buildCloseSummaryPrompt` in the sentence-count cleanup and required
+  the preview-process Grok mock to supply deterministic generation and quality
+  results for route-backed refresh tests without a live provider.
+- Added a terminal `quality_rejected` generation result for character shares.
+  It advances the beat without transcript text and survives retry or refresh;
+  crisis support and the empty chair remain retryable instead of being skipped.
+- Shared one meeting-id-and-start-time roster derivation between the page and
+  `/next`, preserving the shipped behavior when participant reads or saves fail.
+- Made beat ids authoritative for completion and round participation an
+  idempotent set, so crosstalk and a scheduled share may validly use one speaker.
+- Required bounded, cancellable `Retry-After` handling for in-progress claims
+  and one recoverable same-beat control after the automatic retry window.
+- Classified transcript rows by `isUserShare` and room interaction before
+  character id, preventing close and expansion prompts from attributing cues or
+  the empty-chair moment to the user.
+
+## 2026-09-14
+
+- A completion retry checks meeting-scoped terminal evidence before requiring
+  its old active beat. If the effect and phase update committed but the response
+  was lost, character, user-share, crisis-support, room-moment, skip, and close
+  routes return the canonical result without regenerating or growing transcript.
+- Close preparation renews a token-checked lease during slow model work. One
+  final RPC applies the checkpointed meeting fields, callbacks, lifecycle target
+  states, finished phase, and close-run result; failure applies none of them.
+- New meeting orchestration is enabled only for records created with
+  `meeting_protocol_version = 1`. Historical state is never translated into an
+  inferred beat cursor. A temporary bridge routes active unversioned meetings
+  through the frozen legacy renderer and version-1 meetings through the beat
+  renderer. The database remains `draining` only while that bridge deploys,
+  then stamped creation reopens while old rooms finish or reach a server-clocked
+  24-hour abandoned state. Rollback uses the same bridge in reverse.
+- Entering a canonical intake- or share-triggered crisis beat sets the monotonic
+  `crisis_resources_visible` flag before provider work. The loader and crisis
+  route derive the controlled sticky resource payload from that flag even when
+  generation fails, every candidate is rejected, or a response is lost.
+- One server-side roster resolver now owns persisted-or-deterministic fallback
+  for the page loader, `/next`, `/share`, `/close`, and `/expand`, preserving a
+  fallback visitor's voice profile and transcript label when saving seats fails.
+- Topic completion uses a narrow meeting-and-beat-keyed ledger whose RPC commits
+  the topic and phase version together. Spoken input and later share-gate pass
+  actions contend for a separate single user-gate outcome row. A pass winner
+  advances without transcript text; a spoken winner atomically owns one share
+  and prevents pass advancement while analysis finishes. Introduction can only
+  take the spoken path.
+- `CharacterShareInteractionType` excludes `room_cue` and `empty_chair` from
+  both the character-beat union and its runtime validator. The complete
+  `ShareInteractionType` still represents persisted room-owned transcript rows.
+- Derived fallback visitors receive stable, idempotent database identities
+  scoped by meeting before the roster resolver may return them. The meeting id
+  prevents equal start-second/slot domain ids from aliasing across rooms, and a
+  nullable named unique constraint supports direct conflict-targeted upsert.
+  Meeting-participant association failure can degrade to those durable seats;
+  identity failure cannot.
+- Accepted generated output enters the shares table only through a transaction
+  fenced by the current unexpired generation token. That transaction also
+  applies participant state, attaches the share to the run, and completes it,
+  so a stale worker writes nothing after lease takeover.
+- Close preparation first validates callback candidates against the exact
+  scanned meeting shares: the origin belongs to that meeting, its speaker is
+  the candidate character, and its content contains the quoted text. It then
+  resolves domain ids to database UUIDs; finalization locks and rechecks the
+  origin meeting and speaker relationship before writing.
+- Close finalization locks rows in one invariant order: meeting, close run,
+  deduplicated and sorted origin-share UUIDs, sorted character UUIDs, then sorted
+  callback UUIDs. Concurrent checkpoints with reversed overlapping targets may
+  wait or return the typed stale-version conflict, but cannot reverse lock order.
+- `last_activity_at` is added nullable, backfilled from durable meeting and share
+  timestamps, given a database-owned timestamp default, and only then made
+  non-null. Existing rows and legacy inserts stay valid before application
+  writers begin updating activity explicitly.
+- Each new meeting-scoped topic, user-gate, generation, and close-run ledger has
+  a foreign key to `meetings(id) ON DELETE CASCADE`. The database probe deletes
+  a populated parent and requires every derived ledger row to disappear.
+- Prompt-rule verification searches every generation builder for worded as
+  well as numeric fixed sentence counts, including hyphenated forms such as
+  `one-sentence`. Optional recent-share, callback, and other prompt sections are
+  omitted with their headings when empty; placeholder prose is not a section.
+- Generated visitor persistence owns a complete immutable profile snapshot,
+  including the required three real voice examples. Identity establishment and
+  participant reload both return that stored canonical profile; incomplete or
+  placeholder snapshots fail validation before roster selection.
+- Application rollback first transitions the same database fence from
+  `version_1` to `draining`, deploys a bridge that preserves the beat renderer
+  for existing version-1 rows and supports new legacy rows, then returns the
+  fence to `legacy` and reopens creation. The beat renderer remains until every
+  version-1 row has completed or reached the safe abandoned state.
+- The private-meeting migration denies direct application-table and public-RPC
+  access to `PUBLIC`, `anon`, and `authenticated`, including default privileges
+  for future objects. The server still applies owner filters because its
+  service-role client bypasses row-level security; local PostgREST probes prove
+  both the client denial and the server path.
+- Epic #79 is a hard prerequisite for server-owned meeting persistence. Its live
+  plan now assigns `IDENTITY-A` through `IDENTITY-C`: seed core characters by a
+  uniquely versioned migration, give their immutable slug a unique constraint,
+  stop on ambiguous historical duplicates pending a separately reviewed repair,
+  remove lazy inserts from reads, and prove the result on real local Supabase
+  before #81 resolves a core slug to a UUID.
+- Callback lifecycle state uses compare-and-set versions. A close checkpoint
+  records each expected version; finalization rolls back with a typed stale
+  result when another meeting changed a target, then the current token holder
+  reloads and replaces only the lifecycle plan before retrying.
+- A spoken user-gate outcome whose share has null analysis is recoverable state.
+  The renderer detects it through `/next` and sends only its beat id; the route
+  analyses canonical stored content and uses first-analysis-wins plus the atomic
+  spoken-completion RPC to converge with any original request still running.
+- A room cue must be stored with its active phase before `/next` returns it.
+  Refresh during the pause upserts the same row, derives the remaining wait from
+  canonical `createdAt`, and acknowledges once without replaying the reveal.
+- Planned Supabase migrations use distinct leading versions in dependency order:
+  private intake `20260912000100`, durable core identity `20260912000200`, and
+  server-owned meeting beats `20260912000300`.

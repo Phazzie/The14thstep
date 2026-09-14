@@ -22,3 +22,6 @@ live document or file it as an issue. Do not leave it as the only copy.
 The `conductor/` directory is a prior planning system whose `plan.md` workflow
 does not govern this checkout. `implementation-reports/` holds completed M13
 and M18 reports that describe earlier code and verification snapshots.
+`plans/restore-virtual-recovery-meeting-execplan-2026-03-19.md` records the
+room-led restoration that shipped in March; its frontend-owned sequencing rules
+were superseded by the server-owned meeting epic in September.
