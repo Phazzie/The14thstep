@@ -88,6 +88,14 @@ All notable changes to this repository are documented in this file.
 - Added a rollback preflight that requires zero active protocol-version-1
   meetings before removing the generic renderer or specialized completion
   routes; active rows keep the current deployment and rollback remains blocked.
+- Made #79's unique, migration-seeded core character slug and removal of lazy
+  read-time character creation a prerequisite for server-owned roster work.
+- Closed the private-meeting plan's direct PostgREST bypass by requiring no
+  `anon` or `authenticated` table/RPC privileges, default-deny future grants,
+  and real local denial probes alongside the server service-role success path.
+- Fenced checkpointed callback lifecycle targets with per-callback versions.
+  A callback changed by another meeting now invalidates the complete close
+  transaction and forces lifecycle-only recomputation under the current token.
 
 
 ## [2026-03-19]

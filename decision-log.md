@@ -230,3 +230,16 @@
   for a zero-active-version-1 preflight. Until it passes, active rows keep the
   current deployment, use its beat renderer or read-only restart presentation,
   and never enter the legacy phase-only renderer.
+- The private-meeting migration denies direct application-table and public-RPC
+  access to `PUBLIC`, `anon`, and `authenticated`, including default privileges
+  for future objects. The server still applies owner filters because its
+  service-role client bypasses row-level security; local PostgREST probes prove
+  both the client denial and the server path.
+- Epic #79 is a hard prerequisite for server-owned meeting persistence. It must
+  seed core characters by migration, give their immutable slug a unique
+  constraint, resolve existing duplicates, and remove lazy inserts from reads
+  before #81 resolves a core slug to a UUID.
+- Callback lifecycle state uses compare-and-set versions. A close checkpoint
+  records each expected version; finalization rolls back with a typed stale
+  result when another meeting changed a target, then the current token holder
+  reloads and replaces only the lifecycle plan before retrying.

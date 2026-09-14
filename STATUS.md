@@ -2,7 +2,7 @@
 
 The one page that says what we are building and where it stands. Read this first.
 
-Last updated: 2026-09-12
+Last updated: 2026-09-14
 
 ## What this app is
 
@@ -52,8 +52,10 @@ the highest value per hour. It is small, and the exposure is happening now.
 
 Start with [#81](https://github.com/Phazzie/The14thstep/issues/81) if you want
 the change everything else gets easier after. Finish #84 and #85 first so the
-new meeting endpoint inherits a single ownership gate instead of creating
-another unprotected route.
+new meeting endpoint inherits one ownership gate and a default-deny direct
+database boundary. Finish [#79](https://github.com/Phazzie/The14thstep/issues/79)
+before #81's database-backed slices so every core character slug resolves to
+one migration-seeded UUID instead of a row created by a racing read.
 
 ## Blocked
 
