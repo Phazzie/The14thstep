@@ -199,10 +199,11 @@
 - One server-side roster resolver now owns persisted-or-deterministic fallback
   for the page loader, `/next`, `/share`, `/close`, and `/expand`, preserving a
   fallback visitor's voice profile and transcript label when saving seats fails.
-- Topic and user-pass outcomes use a meeting-and-beat-keyed control-completion
-  ledger. Its narrow RPC commits the outcome, phase version, and topic when
-  applicable in one transaction, allowing lost-response retries to return the
-  canonical current beat without recording unspoken transcript content.
+- Topic and later share-pass outcomes use a meeting-and-beat-keyed
+  control-completion ledger. Its narrow RPC commits the outcome, phase version,
+  and topic when applicable in one transaction, allowing lost-response retries
+  to return the canonical current beat without recording unspoken transcript
+  content. Introduction completion always persists the canonical intro share.
 - `CharacterShareInteractionType` excludes `room_cue` and `empty_chair` from
   both the character-beat union and its runtime validator. The complete
   `ShareInteractionType` still represents persisted room-owned transcript rows.
@@ -221,3 +222,11 @@
 - Prompt-rule verification searches every generation builder for worded as
   well as numeric fixed sentence counts, including hyphenated forms such as
   `one-sentence`.
+- Generated visitor persistence owns a complete immutable profile snapshot,
+  including the required three real voice examples. Identity establishment and
+  participant reload both return that stored canonical profile; incomplete or
+  placeholder snapshots fail validation before roster selection.
+- Application rollback first stops new protocol-version-1 creation, then waits
+  for a zero-active-version-1 preflight. Until it passes, active rows keep the
+  beat renderer or receive its read-only restart path and never enter the legacy
+  phase-only renderer.

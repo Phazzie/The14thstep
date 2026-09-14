@@ -61,8 +61,10 @@ All notable changes to this repository are documented in this file.
 - Made crisis-resource visibility a durable monotonic meeting fact committed
   with accepted support, and required one persisted-or-fallback roster resolver
   for the page, `/next`, `/share`, `/close`, and `/expand`.
-- Added a beat-keyed control-completion ledger so topic and user-pass phase
-  changes are replayable after a lost response without fake transcript rows.
+- Added a beat-keyed control-completion ledger so topic and later share-pass
+  phase changes are replayable after a lost response without fake transcript
+  rows. Introduction passes are invalid because the user's introduction remains
+  a real stored share even in listening-only meetings.
 - Narrowed character beats to character-only interaction values; runtime and
   static validation reject the room-owned `room_cue` and `empty_chair` values.
 - Required the server-owned meeting implementation plan to establish durable,
@@ -80,6 +82,12 @@ All notable changes to this repository are documented in this file.
 - Expanded the prompt-repair slice and completion audit to cover every
   generation builder in `prompt-templates.ts` and worded fixed counts such as
   `one-sentence`, including the active crosstalk prompt.
+- Required generated visitor rows to store and rehydrate a complete immutable
+  narrative profile, including exactly three real voice examples, so successful
+  participant persistence cannot degrade later share prompts.
+- Added a rollback preflight that requires zero active protocol-version-1
+  meetings before removing the generic renderer or specialized completion
+  routes; active rows keep the new renderer or the read-only restart path.
 
 
 ## [2026-03-19]
