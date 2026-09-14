@@ -231,9 +231,17 @@
   deduplicated and sorted origin-share UUIDs, sorted character UUIDs, then sorted
   callback UUIDs. Concurrent checkpoints with reversed overlapping targets may
   wait or return the typed stale-version conflict, but cannot reverse lock order.
+- `last_activity_at` is added nullable, backfilled from durable meeting and share
+  timestamps, given a database-owned timestamp default, and only then made
+  non-null. Existing rows and legacy inserts stay valid before application
+  writers begin updating activity explicitly.
+- Each new meeting-scoped topic, user-gate, generation, and close-run ledger has
+  a foreign key to `meetings(id) ON DELETE CASCADE`. The database probe deletes
+  a populated parent and requires every derived ledger row to disappear.
 - Prompt-rule verification searches every generation builder for worded as
   well as numeric fixed sentence counts, including hyphenated forms such as
-  `one-sentence`.
+  `one-sentence`. Optional recent-share, callback, and other prompt sections are
+  omitted with their headings when empty; placeholder prose is not a section.
 - Generated visitor persistence owns a complete immutable profile snapshot,
   including the required three real voice examples. Identity establishment and
   participant reload both return that stored canonical profile; incomplete or

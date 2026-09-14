@@ -64,6 +64,9 @@ not describe application behavior shipped by this documentation PR.
   fence. `draining` lasts only through bridge deployment; stamped creation then
   reopens while older rooms finish or reach a server-clocked 24-hour abandoned
   state. Rollback uses the same bridge in reverse.
+- The activity migration is staged as nullable add, durable timestamp backfill,
+  database-owned default, then non-null enforcement so existing rows and the
+  still-deployed legacy meeting creator remain valid during additive rollout.
 - The plan requires crisis-resource visibility to become a durable monotonic
   meeting fact when a crisis beat begins, before provider work, so a provider
   or quality failure cannot hide the controlled safety card. It also requires
@@ -93,12 +96,17 @@ not describe application behavior shipped by this documentation PR.
   then deduplicated origin-share, character, and callback UUIDs in sorted order.
   Reversed overlapping target arrays must wait or return a typed stale conflict,
   never deadlock because checkpoint order changed.
+- Every new meeting-scoped topic, user-gate, generation, and close-run ledger
+  must reference its parent meeting with `ON DELETE CASCADE`; the real database
+  probe must prove parent deletion leaves no checkpoint or ledger orphan.
 - The plan requires per-callback lifecycle versions. A callback changed by
   another meeting must invalidate the complete close transaction and trigger
   lifecycle-only recomputation under the current token.
 - The prompt-repair slice covers every generation builder in
   `prompt-templates.ts`, the private close-summary builder, and worded fixed
-  counts such as `one-sentence`, including the active crosstalk prompt.
+  counts such as `one-sentence`, including the active crosstalk prompt. It also
+  removes empty optional prompt sections entirely instead of emitting `None
+  yet`, `No callbacks referenced`, or equivalent placeholders.
 - The rollback plan reopens legacy creation after the symmetric bridge is live,
   while retaining the generic renderer and specialized completion routes until
   every version-1 meeting has completed or safely expired as abandoned.
