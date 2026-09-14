@@ -74,6 +74,10 @@ The empty chair also becomes a fresh generated room moment. It is persisted as p
   Rationale: the client needs one way to ask what happens next, while existing specialized routes still own generation and their side effects. The protocol avoids a second page-level phase machine.
   Date/Author: 2026-09-12 / Codex
 
+- Decision: persist a selected topic and completion of its active topic beat in the same version-checked meeting-row update.
+  Rationale: two separate writes allow concurrent submissions to leave one request's topic paired with the other request's phase transition. One compare-and-set update makes the winning version authoritative for both values.
+  Date/Author: 2026-09-13 / Codex
+
 - Decision: regenerate the orchestration portion of `+page.svelte` as a small generic beat loop after the server path is proven.
   Rationale: debugging the nested `runRound*` chain would preserve the duplicate source of truth. Transcript rendering, SSE display, crisis presentation, and input components remain valuable; the hand-written sequence functions are the replaceable part.
   Date/Author: 2026-09-12 / Codex
@@ -140,7 +144,7 @@ Do not patch replay guards into `continueFromPersistedPhase` or add more flags t
 
 Do not let the browser select a speaker, phase, interaction type, sequence order, optional branch, or persisted topic. Do not keep a production switch that allows both the old client script and the server beat engine to advance one meeting.
 
-Do not use `Math.random()`, current time, request order, or unstable database row order to choose a beat or id. Do not update unversioned phase state after the compare-and-set contract lands. Do not treat a second generated string as equivalent to returning the first persisted result.
+Do not use `Math.random()`, current time, request order, or unstable database row order to choose a beat or id. Do not update unversioned phase state after the compare-and-set contract lands. Do not store a topic separately from completing its active topic beat. Do not treat a second generated string as equivalent to returning the first persisted result.
 
 Do not follow the archived plan's fixed branch, old checkout paths, frontend-owned ordering, or ban on an orchestration endpoint. Do not split the entire large Svelte page before deleting its obsolete orchestration; issue #90 follows this work.
 
@@ -172,7 +176,7 @@ Create `app/supabase/migrations/20260912_000005_server_owned_meeting_beats.sql`,
 
 In `app/src/lib/seams/database/contract.ts`, add `beatId: string | null` to `ShareRecord` and add `empty_chair` to `ShareInteractionType` in `app/src/lib/core/types.ts`. Extend validators, fixtures, the mock, the adapter, and test doubles. Historical entries use null. New beat-owned entries use the stable id.
 
-Add a versioned phase read that returns `{ phaseState: MeetingPhaseState | null, version: number }` and a compare-and-set update accepting `meetingId`, `expectedVersion`, and `phaseState`. The Supabase update must filter by both meeting id and `phase_version = expectedVersion`, write version `expectedVersion + 1`, and report `applied: false` when zero rows changed. Keep existing phase methods only while routes are migrated; remove or delegate them at the end so no route can silently bypass versioning.
+Add a versioned phase read that returns `{ phaseState: MeetingPhaseState | null, version: number }` and a compare-and-set update accepting `meetingId`, `expectedVersion`, `phaseState`, and an optional meeting patch limited to the validated topic. The Supabase update must filter by both meeting id and `phase_version = expectedVersion`, write the new phase state and version `expectedVersion + 1`, and include the topic in that same row update when completing a topic gate. Report `applied: false` when zero rows changed. Keep existing phase methods only while routes are migrated; remove or delegate them at the end so no route can silently bypass versioning.
 
 Add `getShareByBeatId({ meetingId, beatId })`. It returns `NOT_FOUND` for no entry. Make beat-aware append handling converge on the stored row when the unique index reports that another request already wrote the same beat. The server route must also check for an existing beat entry before calling the model, which handles the ordinary retry without spending generation work twice.
 
@@ -184,7 +188,7 @@ Create `app/src/routes/meeting/[id]/next/+server.ts` and route tests in `app/src
 
 For an empty request, load the versioned phase state, owned meeting context from `locals.meetingContext`, roster, and the compact transcript facts required by `nextMeetingBeat`. If an active beat exists, return it unchanged. If the core chooses a new beat, compare-and-set the new active state before responding. On a version conflict, reload and retry a small bounded number of times; normally the response becomes the beat stored by the competing request. If contention does not settle, return HTTP 409 with a retryable seam error rather than choosing locally.
 
-For a room cue acknowledgment, complete and compare-and-set it, then return the next claimed beat in the same response. For a valid topic acknowledgment, persist the selected topic through a new narrow database method such as `updateMeetingTopic({ meetingId, topic })`, complete the topic beat, and return the next claimed beat. Keep `TOPIC_OPTIONS` in pure shared code so both the page and server validate the same fixed set. If topic persistence succeeds but phase comparison loses a race, reloading must recognize the already selected value and converge safely; document the exact recovery behavior in the tests.
+For a room cue acknowledgment, complete and compare-and-set it, then return the next claimed beat in the same response. For a valid topic acknowledgment, complete the topic beat and pass the validated topic as the optional patch in that same compare-and-set meeting update. Keep `TOPIC_OPTIONS` in pure shared code so both the page and server validate the same fixed set. If two requests submit different valid topics at the same version, only the winner's topic and completed phase may be stored; the loser reloads that canonical result or receives a stale-beat conflict. Prove this exact race in the route and adapter tests. Do not add a standalone topic update.
 
 The returned JSON is a `SeamResult<{ beat: MeetingBeat; phaseState: MeetingPhaseState }>` or the repository's equivalent existing response envelope. It contains no prompt text, private intake, model context, or arbitrary client instructions. This milestone is complete when repeated empty requests return the same id, two simulated claimers converge on one id, completed room cues advance once, a valid topic survives reload, and the ownership test proves the endpoint is gated before phase or transcript reads. It satisfies `BEAT-01`, `BEAT-02`, and `BEAT-08` at the route boundary.
 
@@ -354,7 +358,7 @@ The implementation must expose a discriminated `MeetingBeat` union from `app/src
 
 `MeetingPhaseState` must add `beatCursor: number` and `activeBeat: MeetingBeat | null`, with backward-compatible revival for historical JSON. `nextMeetingBeat` and `completeMeetingBeat` live in `app/src/lib/core/meeting-beats.ts` and perform no I/O.
 
-The database seam must provide a versioned phase read, a compare-and-set phase update, `getShareByBeatId`, and a narrow topic update. Exact interface names may follow existing repository naming, but their semantics and tests are fixed by this plan. `ShareRecord.beatId` is nullable for history and required for new beat-owned generated and user transcript entries.
+The database seam must provide a versioned phase read, a compare-and-set meeting-state update that can atomically include a validated topic, and `getShareByBeatId`. Exact interface names may follow existing repository naming, but their semantics and tests are fixed by this plan. `ShareRecord.beatId` is nullable for history and required for new beat-owned generated and user transcript entries.
 
 The next-beat route depends on the ownership gate and `locals.meetingContext` from `plans/private-meeting-access-execplan.md`. The meeting-flow plan does not depend on a live provider for contract, mock, route, or browser work. Applying migrations, refreshing provider fixtures, and production verification remain blocked by #71 and #91.
 
@@ -363,3 +367,5 @@ Issue #90 should follow this plan for `+page.svelte`: deleting the old orchestra
 ## Revision Note
 
 2026-09-12: Created this plan to replace the superseded frontend-owned March meeting plan with the server-owned direction in epic #77. The revision introduces persisted beats and idempotency before client cutover, makes replay-free refresh an acceptance condition, and gives the unused empty-chair prompt a compliant generated and persisted path.
+
+2026-09-13: Tightened topic completion so the selected topic and phase transition are committed in one version-checked meeting-row update. This closes the race where separate writes could pair the losing topic with the winning beat state.
