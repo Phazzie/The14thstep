@@ -45,6 +45,23 @@ All notable changes to this repository are documented in this file.
 ### Known
 - `verify:fixtures` fails on every branch: seam probe fixtures are past their freshness window and refreshing them is blocked behind the production database outage (#91, #71).
 
+## 2026-09-14
+
+### Changed
+- Finished the server-owned meeting plan's lost-response contract: character,
+  user-share, crisis-support, room-moment, skip, and close retries resolve their
+  beat-owned terminal evidence before requiring the old beat to remain active.
+- Expanded close finalization into one renewable, token-checked transaction for
+  meeting completion fields, callbacks, lifecycle targets, finished phase, and
+  the canonical close-run result. Added slow-holder renewal and full-rollback
+  acceptance cases.
+- Version-gated the new renderer so historical mid-round phase JSON is never
+  revived as cursor zero. Unexpected active legacy meetings remain read-only
+  with a restart path, and deployment requires a zero-active-legacy preflight.
+- Made crisis-resource visibility a durable monotonic meeting fact committed
+  with accepted support, and required one persisted-or-fallback roster resolver
+  for the page, `/next`, `/share`, `/close`, and `/expand`.
+
 
 ## [2026-03-19]
 

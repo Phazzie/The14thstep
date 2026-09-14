@@ -178,3 +178,24 @@
 - Classified transcript rows by `isUserShare` and room interaction before
   character id, preventing close and expansion prompts from attributing cues or
   the empty-chair moment to the user.
+
+## 2026-09-14
+
+- A completion retry checks meeting-scoped terminal evidence before requiring
+  its old active beat. If the effect and phase update committed but the response
+  was lost, character, user-share, crisis-support, room-moment, skip, and close
+  routes return the canonical result without regenerating or growing transcript.
+- Close preparation renews a token-checked lease during slow model work. One
+  final RPC applies the checkpointed meeting fields, callbacks, lifecycle target
+  states, finished phase, and close-run result; failure applies none of them.
+- New meeting orchestration is enabled only for records created with
+  `meeting_protocol_version = 1`. Historical state is never translated into an
+  inferred beat cursor. Completed legacy records remain readable; unexpected
+  active legacy meetings receive a read-only restart path, and cutover waits for
+  a zero-active-legacy preflight.
+- Accepted crisis support sets a monotonic `crisis_resources_visible` flag in
+  the same versioned phase update. The loader derives the one controlled sticky
+  resource payload from that flag after refresh or a lost response.
+- One server-side roster resolver now owns persisted-or-deterministic fallback
+  for the page loader, `/next`, `/share`, `/close`, and `/expand`, preserving a
+  fallback visitor's voice profile and transcript label when saving seats fails.
