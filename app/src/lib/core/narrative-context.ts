@@ -3,8 +3,14 @@ import { EDITORIAL_REALITY_CHECKS, STYLE_CONSTITUTION } from './style-constituti
 
 const MAX_LINE_LENGTH = 220;
 const QUALITY_MIN_SCORE = 6;
+const FALLBACK_CACHE_TTL_MS = 30_000;
 
-const meetingNarrativeContextCache = new Map<string, MeetingNarrativeContext>();
+interface CachedMeetingNarrativeContext {
+	value: MeetingNarrativeContext;
+	expiresAt: number | null;
+}
+
+const meetingNarrativeContextCache = new Map<string, CachedMeetingNarrativeContext>();
 const meetingNarrativeContextInFlight = new Map<string, Promise<MeetingNarrativeContext>>();
 
 export interface MeetingNarrativeContextInput {
@@ -173,18 +179,28 @@ export async function getMeetingNarrativeContext(
 	input: MeetingNarrativeContextInput
 ): Promise<MeetingNarrativeContext> {
 	const cached = meetingNarrativeContextCache.get(input.meetingId);
-	if (cached) return cached;
+	if (cached) {
+		if (cached.expiresAt === null || cached.expiresAt > Date.now()) {
+			return cached.value;
+		}
+		meetingNarrativeContextCache.delete(input.meetingId);
+	}
 
 	const inFlight = meetingNarrativeContextInFlight.get(input.meetingId);
 	if (inFlight) return inFlight;
 
 	const pending = (async () => {
-		const generated = await input.grokAi.generateShare({
-			meetingId: input.meetingId,
-			characterId: 'meeting-narrative-context',
-			prompt: buildNarrativeContextPrompt(input),
-			contextMessages: []
-		});
+		let generated: Awaited<ReturnType<GrokAiPort['generateShare']>>;
+		try {
+			generated = await input.grokAi.generateShare({
+				meetingId: input.meetingId,
+				characterId: 'meeting-narrative-context',
+				prompt: buildNarrativeContextPrompt(input),
+				contextMessages: []
+			});
+		} catch {
+			return fallbackNarrativeContext(input);
+		}
 
 		if (!generated.ok) {
 			return fallbackNarrativeContext(input);
@@ -202,7 +218,10 @@ export async function getMeetingNarrativeContext(
 
 	try {
 		const resolved = await pending;
-		meetingNarrativeContextCache.set(input.meetingId, resolved);
+		meetingNarrativeContextCache.set(input.meetingId, {
+			value: resolved,
+			expiresAt: resolved.source === 'generated' ? null : Date.now() + FALLBACK_CACHE_TTL_MS
+		});
 		return resolved;
 	} finally {
 		meetingNarrativeContextInFlight.delete(input.meetingId);
