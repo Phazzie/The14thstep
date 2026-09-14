@@ -91,7 +91,7 @@ The behavior is visible in two ways. The join redirect contains only `/meeting/<
   Date/Author: 2026-09-13 / Codex
 
 - Decision: add a server-only, fixture-backed composition selected explicitly by Playwright's local web server.
-  Rationale: the ownership read runs inside SvelteKit and cannot be mocked from the browser. A dedicated server composition gives the browser story real join, refresh, and cross-session behavior without depending on the unavailable Supabase tenant or exposing a runtime toggle endpoint.
+  Rationale: the ownership read runs inside SvelteKit and cannot be mocked from the browser. A dedicated server composition gives the browser story real join, refresh, and cross-session behavior without depending on the unavailable Supabase tenant or exposing a runtime toggle endpoint. Playwright must start that server itself rather than reuse whichever process happens to occupy the port.
   Date/Author: 2026-09-13 / Codex
 
 - Decision: add a pinned local Supabase CLI and capture new database fixtures from its real Postgres/PostgREST stack before implementing the mock or adapter.
@@ -151,6 +151,8 @@ Do not copy authorization checks into every child route. Do not turn a wrong-own
 Do not translate an auth provider outage, malformed auth response, or other non-`UNAUTHORIZED` auth error into a generic meeting 404. Do not let an interactive route invent `PROBE_USER_ID`; explicit probe scripts may use that id, but a browser meeting must use the same resolved session identity from join through refresh.
 
 Do not rely on Playwright browser routing to mock server-side auth or database calls. Do not add a public route, query parameter, cookie, or header that switches production into mock mode. The test composition is selected only by the local preview process, must fail closed when `VERCEL=1`, and must not be enabled by application input.
+
+Do not leave `reuseExistingServer` enabled for the mock-backed browser suite. Port availability does not prove that an existing preview was started with the required server composition, so the suite must own and stop its process.
 
 Do not redesign the landing page or meeting UI, alter prompts, implement server-owned beats, provision a hosted database, rotate credentials, or refresh unrelated xAI and legacy provider fixtures in this plan. The new private-meeting database captures from the disposable local stack are required. Do not backfill historical meetings with invented names, clean time, or mind text.
 
@@ -218,9 +220,9 @@ This milestone is complete when the redirect and loader contain no `name`, `clea
 
 Add a server-only composition factory under `app/src/lib/server/testing/` that combines the existing auth and database mocks with shared in-memory meeting state. `app/src/hooks.server.ts` may load it only when the preview process starts with `E2E_MOCK_SEAMS=1`; fail startup if that flag appears with `VERCEL=1`. Do not add an HTTP endpoint or application-controlled value that can switch compositions. The default branch of the factory must continue to construct the real adapters.
 
-Set `E2E_MOCK_SEAMS=1` through the `webServer.env` option in `app/playwright.config.ts`, so the flag belongs to the local child process on every supported shell. The mock auth seam must use the existing guest-session bootstrap and cookie path rather than a magic browser header. Keep state by session and meeting id across the landing action, redirect, page load, refresh, and child requests; isolate tests with unique session and meeting data.
+Set `E2E_MOCK_SEAMS=1` through the `webServer.env` option in `app/playwright.config.ts`, so the flag belongs to the local child process on every supported shell. Set `reuseExistingServer: false` for this mock-backed suite so a process already listening on port 4173 cannot bypass that environment or supply arbitrary state. The mock auth seam must use the existing guest-session bootstrap and cookie path rather than a magic browser header. Keep state by session and meeting id across the landing action, redirect, page load, refresh, and child requests; isolate tests with unique session and meeting data.
 
-Add a focused server-composition test proving the flag selects the shared fixture bundle locally, the default selects real composition, and `VERCEL=1` plus the flag fails closed. This milestone is complete when a preview-server test can create an owned meeting through the real join action without Supabase and a second browser session resolves to a different owner.
+Add a focused server-composition test proving the flag selects the shared fixture bundle locally, the default selects real composition, and `VERCEL=1` plus the flag fails closed. Add a Playwright configuration assertion that server reuse is false. This milestone is complete when a freshly started preview-server test can create an owned meeting through the real join action without Supabase and a second browser session resolves to a different owner.
 
 ### Milestone 7: prove the complete local story and record the outcome
 
@@ -355,4 +357,4 @@ The only true cross-plan dependency is this plan before `plans/server-owned-meet
 
 2026-09-12: Created this plan after the repository organization pass exposed privacy epic #78 as a distinct application track. The plan separates locally implementable privacy and ownership work from the blocked production-recovery plan and establishes the access boundary needed by the later server-owned meeting-flow work.
 
-2026-09-13: Revised the plan after PR review to preserve non-authorization auth failures, return the generic 404 for malformed ids, retire route-level probe identity, stage the clean-URL cutover in a deployable order, use Playwright's configured test directory, define the server-side mock composition required by a built preview server, and restore contract-probe-fixture-mock-test-adapter ordering through a disposable local Supabase stack.
+2026-09-13: Revised the plan after PR review to preserve non-authorization auth failures, return the generic 404 for malformed ids, retire route-level probe identity, stage the clean-URL cutover in a deployable order, use Playwright's configured test directory, require Playwright to start a fresh non-reused server for the mock composition, define the server-side mock composition required by a built preview server, and restore contract-probe-fixture-mock-test-adapter ordering through a disposable local Supabase stack.

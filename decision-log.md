@@ -140,3 +140,15 @@
 - Injected phase-transition time from the server clock seam, removed the unused
   reflection gate, assigned `/room-moment` to generated beat completion, and
   persisted the user-share id that crisis support must load on every retry.
+- Kept `BEAT-L` through `BEAT-Q` as separate implementation assignments on one
+  integration branch and one promotion boundary. Active-beat-only routes cannot
+  reach `main` while the production renderer still sends legacy requests.
+- Required a leased generation claim before character or room-moment model
+  calls and before any SSE text becomes observable. The winner validates and
+  persists the candidate first; competitors receive no losing preview text.
+- Made acknowledged room cues durable transcript rows, scoped close callback
+  effect keys by both meeting and beat, and mapped the stored meeting summary
+  into initial page data so refresh reconstructs the same room and reflection.
+- Required the privacy Playwright suite to set `reuseExistingServer: false`.
+  Its server-side mock composition is only trustworthy when the suite starts
+  the process that owns the required environment and shared fixture state.
