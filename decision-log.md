@@ -166,3 +166,15 @@
 - Included `buildCloseSummaryPrompt` in the sentence-count cleanup and required
   the preview-process Grok mock to supply deterministic generation and quality
   results for route-backed refresh tests without a live provider.
+- Added a terminal `quality_rejected` generation result for character shares.
+  It advances the beat without transcript text and survives retry or refresh;
+  crisis support and the empty chair remain retryable instead of being skipped.
+- Shared one meeting-id-and-start-time roster derivation between the page and
+  `/next`, preserving the shipped behavior when participant reads or saves fail.
+- Made beat ids authoritative for completion and round participation an
+  idempotent set, so crosstalk and a scheduled share may validly use one speaker.
+- Required bounded, cancellable `Retry-After` handling for in-progress claims
+  and one recoverable same-beat control after the automatic retry window.
+- Classified transcript rows by `isUserShare` and room interaction before
+  character id, preventing close and expansion prompts from attributing cues or
+  the empty-chair moment to the user.

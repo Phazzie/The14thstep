@@ -32,12 +32,15 @@ All notable changes to this repository are documented in this file.
   The meeting plan now claims generation and close work durably, quality-gates
   crisis and empty-chair output, represents both intake and share crisis sources
   canonically, atomically commits close phase and result, persists room cues,
-  scopes callback effects by meeting, repairs the close-summary sentence rule,
-  hydrates completed reflection text on refresh, promotes migrated routes with
-  their renderer as one cutover, derives user, crisis, and expansion decisions
-  from canonical server state, injects transition time, and gives every emitted
-  beat a completion path. Both database tracks now probe a real local Supabase
-  stack before capturing fixtures or implementing mocks and adapters.
+  records rejected characters as durable skips, preserves the deterministic
+  roster fallback and valid repeated speakers, retries in-progress claims,
+  labels room-owned transcript entries truthfully in server prompts, scopes
+  callback effects by meeting, repairs the close-summary sentence rule, hydrates
+  completed reflection text on refresh, promotes migrated routes with their
+  renderer as one cutover, derives user, crisis, and expansion decisions from
+  canonical server state, injects transition time, and gives every emitted beat
+  a completion path. Both database tracks now probe a real local Supabase stack
+  before capturing fixtures or implementing mocks and adapters.
 
 ### Known
 - `verify:fixtures` fails on every branch: seam probe fixtures are past their freshness window and refreshing them is blocked behind the production database outage (#91, #71).
