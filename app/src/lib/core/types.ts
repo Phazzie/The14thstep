@@ -18,18 +18,13 @@ export type ShareInteractionType =
 	| 'crosstalk'
 	| 'callback'
 	| 'hard_question'
-	| 'farewell'
-	| 'room_cue'
-	| 'empty_chair';
+	| 'farewell';
 
 /**
  * Interaction values accepted by a character-generation beat.
- * Room-owned transcript entries deliberately remain outside this subtype.
+ * Room-owned beats stay separate until the database seam supports their persistence.
  */
-export type CharacterShareInteractionType = Exclude<
-	ShareInteractionType,
-	'room_cue' | 'empty_chair'
->;
+export type CharacterShareInteractionType = ShareInteractionType;
 
 export type CallbackType =
 	| 'self_deprecation'

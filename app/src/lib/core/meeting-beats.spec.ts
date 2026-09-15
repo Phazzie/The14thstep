@@ -5,7 +5,9 @@
  * Invariants: No I/O, clock, random, persistence, route, or crisis behavior is exercised here.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
+import type { DatabasePort, ShareRecord } from '$lib/seams/database/contract';
+import { validateAppendShareInput } from '$lib/seams/database/contract';
 import {
 	CRISIS_RESOURCES,
 	isCrisisResourcesPayload,
@@ -30,6 +32,30 @@ const base = {
 };
 
 describe('normal meeting beat contract', () => {
+	it('keeps room-owned beat values outside the existing persistence contract', () => {
+		const share = {
+			meetingId: 'meeting-1',
+			characterId: null,
+			isUserShare: false,
+			content: 'The room settles.',
+			interactionType: 'standard',
+			significanceScore: 0,
+			sequenceOrder: 0
+		};
+		expect(validateAppendShareInput(share)).toBe(true);
+		for (const interactionType of ['room_cue', 'empty_chair']) {
+			expect(validateAppendShareInput({ ...share, interactionType })).toBe(false);
+		}
+		expectTypeOf<
+			Extract<
+				Parameters<DatabasePort['appendShare']>[0]['interactionType'],
+				'room_cue' | 'empty_chair'
+			>
+		>().toEqualTypeOf<never>();
+		expectTypeOf<
+			Extract<ShareRecord['interactionType'], 'room_cue' | 'empty_chair'>
+		>().toEqualTypeOf<never>();
+	});
 	it('accepts every non-crisis beat variant with its exact payload', () => {
 		const beats: NormalMeetingBeat[] = [
 			{ ...base, kind: 'character_share', characterId: 'marcus', interactionType: 'standard' },
@@ -87,7 +113,9 @@ describe('normal meeting beat contract', () => {
 
 		expect(isMeetingBeat(crisisBeat)).toBe(true);
 		expect(isMeetingBeat({ ...crisisBeat, responderCharacterId: '' })).toBe(false);
-		expect(isMeetingBeat({ ...crisisBeat, trigger: { source: 'user_share', shareId: '' } })).toBe(false);
+		expect(isMeetingBeat({ ...crisisBeat, trigger: { source: 'user_share', shareId: '' } })).toBe(
+			false
+		);
 	});
 
 	it('exports one structurally valid controlled crisis resource payload', () => {
@@ -129,6 +157,71 @@ function unwrap<T>(result: { ok: true; value: T } | { ok: false }): T {
 }
 
 describe('C03 opening-beat selection', () => {
+	it.each([
+		{ name: 'empty roster', roster: [] },
+		{
+			name: 'duplicate identity',
+			roster: [
+				{ id: 'marcus', seatOrder: 0 },
+				{ id: 'marcus', seatOrder: 1 }
+			]
+		},
+		{
+			name: 'duplicate seat',
+			roster: [
+				{ id: 'marcus', seatOrder: 0 },
+				{ id: 'heather', seatOrder: 0 }
+			]
+		},
+		{
+			name: 'out-of-order seats',
+			roster: [
+				{ id: 'marcus', seatOrder: 1 },
+				{ id: 'heather', seatOrder: 0 }
+			]
+		},
+		{ name: 'missing speaker', roster: [{ id: 'heather', seatOrder: 0 }] }
+	])('rejects $name when replaying a persisted character beat', ({ roster }) => {
+		const input = versionOneOpeningInput();
+		input.phaseState.activeBeat = unwrap(nextMeetingBeat(input));
+		input.roster = roster;
+		expect(nextMeetingBeat(input)).toMatchObject({
+			ok: false,
+			error: { code: 'CONTRACT_VIOLATION' }
+		});
+	});
+
+	it('rejects an empty meeting id before replay', () => {
+		const input = versionOneOpeningInput();
+		input.phaseState.activeBeat = unwrap(nextMeetingBeat(input));
+		input.meetingId = '  ';
+		expect(nextMeetingBeat(input)).toMatchObject({ ok: false, error: { code: 'INPUT_INVALID' } });
+	});
+
+	it('validates the crisis responder on replay and preserves a valid active object', () => {
+		const input = versionOneOpeningInput();
+		const activeBeat = {
+			...base,
+			kind: 'crisis_support' as const,
+			trigger: { source: 'meeting_intake' as const },
+			responderCharacterId: 'heather'
+		};
+		input.phaseState.activeBeat = activeBeat;
+		expect(unwrap(nextMeetingBeat(input))).toBe(activeBeat);
+		input.roster = [{ id: 'marcus', seatOrder: 0 }];
+		expect(nextMeetingBeat(input)).toMatchObject({
+			ok: false,
+			error: { code: 'CONTRACT_VIOLATION' }
+		});
+	});
+
+	it('replays a room cue without requiring a character speaker', () => {
+		const input = versionOneOpeningInput();
+		const activeBeat = { ...base, kind: 'room_cue' as const, cue: 'moment_of_silence' as const };
+		input.phaseState.activeBeat = activeBeat;
+		expect(unwrap(nextMeetingBeat(input))).toBe(activeBeat);
+	});
+
 	it('selects Marcus from the persisted roster with the canonical opening shape and pause', () => {
 		const beat = unwrap(nextMeetingBeat(versionOneOpeningInput()));
 

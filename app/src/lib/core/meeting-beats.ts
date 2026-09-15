@@ -61,9 +61,7 @@ type VersionOneReadyPhaseState = MeetingPhaseState & {
 	intakeCrisisHandled: boolean;
 };
 
-function isVersionOneReadyPhaseState(
-	state: MeetingPhaseState
-): state is VersionOneReadyPhaseState {
+function isVersionOneReadyPhaseState(state: MeetingPhaseState): state is VersionOneReadyPhaseState {
 	const beatCursor = state.beatCursor;
 
 	if (
@@ -88,22 +86,25 @@ function isVersionOneReadyPhaseState(
 function isOrderedRoster(roster: readonly MeetingBeatRosterMember[]): boolean {
 	const ids = new Set<string>();
 
-	return roster.every((member, index) => {
-		const priorSeatOrder = index === 0 ? -1 : (roster[index - 1]?.seatOrder ?? -1);
-		if (
-			!member ||
-			!isNonEmptyString(member.id) ||
-			!Number.isInteger(member.seatOrder) ||
-			member.seatOrder < 0 ||
-			member.seatOrder <= priorSeatOrder ||
-			ids.has(member.id)
-		) {
-			return false;
-		}
+	return (
+		roster.length > 0 &&
+		roster.every((member, index) => {
+			const priorSeatOrder = index === 0 ? -1 : (roster[index - 1]?.seatOrder ?? -1);
+			if (
+				!member ||
+				!isNonEmptyString(member.id) ||
+				!Number.isInteger(member.seatOrder) ||
+				member.seatOrder < 0 ||
+				member.seatOrder <= priorSeatOrder ||
+				ids.has(member.id)
+			) {
+				return false;
+			}
 
-		ids.add(member.id);
-		return true;
-	});
+			ids.add(member.id);
+			return true;
+		})
+	);
 }
 
 /**
@@ -124,8 +125,6 @@ export function nextMeetingBeat(input: NextMeetingBeatInput): SeamResult<Meeting
 		);
 	}
 
-	if (phaseState.activeBeat) return ok(phaseState.activeBeat);
-
 	if (!isNonEmptyString(input.meetingId)) {
 		return err(SeamErrorCodes.INPUT_INVALID, 'Meeting id is required for beat selection');
 	}
@@ -134,12 +133,28 @@ export function nextMeetingBeat(input: NextMeetingBeatInput): SeamResult<Meeting
 		return err(SeamErrorCodes.CONTRACT_VIOLATION, 'Meeting roster must be in unique seat order');
 	}
 
+	const activeBeat = phaseState.activeBeat;
+	if (activeBeat) {
+		const speakerId =
+			activeBeat.kind === 'character_share'
+				? activeBeat.characterId
+				: activeBeat.kind === 'crisis_support'
+					? activeBeat.responderCharacterId
+					: null;
+		if (speakerId !== null && !input.roster.some((member) => member.id === speakerId)) {
+			return err(
+				SeamErrorCodes.CONTRACT_VIOLATION,
+				'Active beat speaker is absent from the persisted meeting roster',
+				{ characterId: speakerId }
+			);
+		}
+		return ok(activeBeat);
+	}
+
 	if (phaseState.currentPhase !== MeetingPhase.OPENING) {
-		return err(
-			SeamErrorCodes.UNEXPECTED,
-			'C03 only selects an opening beat',
-			{ currentPhase: phaseState.currentPhase }
-		);
+		return err(SeamErrorCodes.UNEXPECTED, 'C03 only selects an opening beat', {
+			currentPhase: phaseState.currentPhase
+		});
 	}
 
 	const openingCharacter = input.roster.find((character) => character.id === OPENING_CHARACTER_ID);
