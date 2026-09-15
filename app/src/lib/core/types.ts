@@ -24,7 +24,7 @@ export type ShareInteractionType =
  * Interaction values accepted by a character-generation beat.
  * Room-owned beats stay separate until the database seam supports their persistence.
  */
-export type CharacterShareInteractionType = ShareInteractionType;
+export type CharacterShareInteractionType = Exclude<ShareInteractionType, 'room_cue' | 'empty_chair'>;
 
 export type CallbackType =
 	| 'self_deprecation'
@@ -146,21 +146,21 @@ export type CrisisTrigger = { source: 'user_share'; shareId: string } | { source
  * Controlled crisis resource copy. It is static product content, not generated or browser supplied.
  */
 export interface CrisisResourcesPayload {
-	sticky: true;
-	title: string;
-	lines: readonly string[];
+	readonly sticky: true;
+	readonly title: string;
+	readonly lines: readonly string[];
 }
 
-export const CRISIS_RESOURCES: CrisisResourcesPayload = {
+export const CRISIS_RESOURCES: CrisisResourcesPayload = Object.freeze({
 	sticky: true,
 	title: "If you're in crisis",
-	lines: [
+	lines: Object.freeze([
 		'Call or text 988 - Suicide & Crisis Lifeline',
 		'Text HOME to 741741 - Crisis Text Line',
 		'If you are in immediate danger, call 911.',
 		'You can stay here with us.'
-	]
-};
+	])
+});
 
 export interface BeatBase {
 	id: string;

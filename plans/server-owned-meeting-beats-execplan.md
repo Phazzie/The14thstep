@@ -14,6 +14,8 @@ The empty chair also becomes a fresh generated room moment. It is persisted as p
 
 ## Progress
 
+- [x] (2026-09-15) Completed final PR #96 review follow-up: exclude room-owned interactions independently of future persistence expansion, and freeze the crisis resource object and lines with readonly payload fields. All 276 server tests pass.
+
 - [x] (2026-09-15) Addressed both PR #96 review findings: validate meeting identity and roster before active replay, require active character/crisis responder membership, and keep room-owned values out of the existing database share type. Server tests pass 275/275; type check has zero errors and eight existing warnings.
 
 - [x] (2026-09-12 14:10Z) Read the current phase state machine, meeting page orchestration, share and user-share routes, database phase persistence, prompt builders, tests, and issues #81 through #83.
@@ -215,6 +217,10 @@ The empty chair also becomes a fresh generated room moment. It is persisted as p
   Evidence: `app/src/routes/meeting/[id]/+page.svelte` emits the literal empty-chair line, Marcus's opening share, the `moment_of_silence` cue, then Chrystal's reading. `app/src/lib/core/ritual-orchestration.ts` instead transitions `OPENING -> EMPTY_CHAIR -> INTRODUCTIONS`, while `app/src/routes/meeting/[id]/share/+server.ts` associates `EMPTY_CHAIR` with Chrystal's reading. The plan requires the literal line to become a generated room moment and separately persists cues, but has not fixed their phase/cursor relationship.
 
 ## Decision Log
+
+- Decision: Keep CharacterShareInteractionType explicitly excluding room entries and make CRISIS_RESOURCES immutable at type and runtime boundaries.
+  Rationale: Later persistence expansion must not widen character generation, and one importer must not change crisis copy for subsequent requests.
+  Date/Author: 2026-09-15 / Codex, final PR #96 review.
 
 - Decision: Validate replay context before returning the same persisted beat object, and retain the existing persistence interaction union until the database-backed slice implements room entries.
   Rationale: Replay identity must not bypass roster integrity; the pure-core checkpoint must not promise unsupported database writes.
@@ -978,3 +984,5 @@ Promotion verification: clean dependency extraction with npm ci --ignore-scripts
 The promotion production build also passed. This is a compilation/build result, not a deployed or live meeting verification.
 
 2026-09-15: Addressed both PR #96 review findings with replay-context validation and persistence-type isolation. The 275 server tests and type check pass; eight existing Svelte warnings remain. No Docker, probe, route, or database changes were made. Full CI fixture freshness remains blocked under #91.
+
+2026-09-15: Recorded the final two PR #96 review fixes before merge. The controlled crisis singleton now rejects property replacement and line mutation; the character interaction subtype stays narrow when persistence grows. Validation: 276 server tests passed.

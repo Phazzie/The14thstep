@@ -123,6 +123,16 @@ describe('normal meeting beat contract', () => {
 		expect(CRISIS_RESOURCES.lines).toContain('Call or text 988 - Suicide & Crisis Lifeline');
 		expect(isCrisisResourcesPayload({ ...CRISIS_RESOURCES, sticky: false })).toBe(false);
 	});
+
+	it('prevents an importer from changing crisis resources for later requests', () => {
+		const originalTitle = CRISIS_RESOURCES.title;
+		const originalLines = [...CRISIS_RESOURCES.lines];
+		expect(Reflect.set(CRISIS_RESOURCES, 'title', 'Changed title')).toBe(false);
+		expect(Reflect.set(CRISIS_RESOURCES, 'lines', ['Changed lines'])).toBe(false);
+		expect(Reflect.set(CRISIS_RESOURCES.lines, '0', 'Changed line')).toBe(false);
+		expect(CRISIS_RESOURCES.title).toBe(originalTitle);
+		expect(CRISIS_RESOURCES.lines).toEqual(originalLines);
+	});
 });
 
 const orderedRoster: readonly MeetingBeatRosterMember[] = [

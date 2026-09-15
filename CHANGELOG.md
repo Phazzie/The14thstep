@@ -569,3 +569,4 @@ not describe application behavior shipped by this documentation PR.
 
 ### Fixed
 - PR #96: Active meeting-beat replay now validates meeting identity, roster order, and speaker membership. Room-only beat values no longer widen the database share type before persistence support exists.
+- PR #96 final review: Freeze shared crisis-resource text against cross-request mutation and preserve character-only interaction typing when persistence expands.
