@@ -14,6 +14,10 @@ The empty chair also becomes a fresh generated room moment. It is persisted as p
 
 ## Progress
 
+- [x] (2026-09-15) Completed final PR #96 review follow-up: exclude room-owned interactions independently of future persistence expansion, and freeze the crisis resource object and lines with readonly payload fields. All 276 server tests pass.
+
+- [x] (2026-09-15) Addressed both PR #96 review findings: validate meeting identity and roster before active replay, require active character/crisis responder membership, and keep room-owned values out of the existing database share type. Server tests pass 275/275; type check has zero errors and eight existing warnings.
+
 - [x] (2026-09-12 14:10Z) Read the current phase state machine, meeting page orchestration, share and user-share routes, database phase persistence, prompt builders, tests, and issues #81 through #83.
 - [x] (2026-09-12 14:10Z) Confirmed that the March plan's frontend-owned speaking order conflicts with the current server-owned epic and archived that plan as historical evidence.
 - [x] (2026-09-12 14:10Z) Chose a persisted active-beat contract, stable beat ids, and compare-and-set phase writes so retries and competing requests converge on one answer.
@@ -27,6 +31,8 @@ The empty chair also becomes a fresh generated room moment. It is persisted as p
 - [x] (2026-09-14 09:54Z) Serialized spoken and pass submissions through one user-gate outcome row, moved controlled cue persistence into the transaction that first exposes the cue beat, and gave the planned migration a unique fourteen-digit Supabase version.
 - [x] (2026-09-14 10:17Z) Added deterministic close-lock ordering, a temporary protocol bridge plus inactivity expiry for abandoned meetings, and crisis-resource persistence at crisis entry before generated support.
 - [x] (2026-09-14 10:45Z) Made the activity migration safe for existing rows and legacy creators, required every meeting ledger to cascade with its parent, and expanded prompt repair to omit empty sections instead of emitting placeholders.
+- [x] (2026-09-14 21:35Z) In isolated offline worktree `codex/offline-meeting-beats`, completed C01 and C02: added the runtime-validated non-crisis and crisis-support beat contract, rejected room-owned values from character beats, exported the controlled crisis-resource payload, and added backward-compatible beat fields to phase state. Focused core tests passed 55/55 and `npm run check` had 0 errors with the existing 8 Svelte warnings.
+- [x] (2026-09-14 23:26Z) In the same isolated worktree, completed C03: added pure opening-beat selection that returns a version-1 active beat by object identity, deterministically selects roster member `marcus` at `opening:<cursor>:character_share:marcus` with the shipped 3000ms pause, and rejects unversioned or incompletely initialized state before selection. Focused core tests passed 61/61 and `npm run check` had 0 errors with the same 8 existing Svelte warnings.
 - [ ] Milestone 1: define the pure beat engine and repair the ritual prompt constraints it will use.
 - [ ] Milestone 2: probe and implement versioned beat, share-analysis, and close persistence in seam order.
 - [ ] Milestone 3: expose the protected next-beat protocol and prove stable retries.
@@ -36,6 +42,8 @@ The empty chair also becomes a fresh generated room moment. It is persisted as p
 - [ ] Milestone 7: prove replay-free refresh through every meeting phase.
 
 ## Surprises & Discoveries
+
+- PR #96 review found that active replay bypassed roster validation and widening ShareInteractionType promised database writes the seam rejected. Regression coverage now checks replay with invalid rosters, absent speakers and invalid meeting IDs, plus compile-time/runtime agreement at the append-share boundary.
 
 - Observation: the browser, not the phase machine, owns the meaningful sequence inside every phase.
   Evidence: `app/src/routes/meeting/[id]/+page.svelte` contains `runFreshMeeting`, `runRoundOne`, `runRoundTwo`, `runRoundThree`, `runClosing`, speaker selection, optional crosstalk, hard-question selection, and all phase-specific waits.
@@ -202,7 +210,21 @@ The empty chair also becomes a fresh generated room moment. It is persisted as p
 - Observation: sentence-count cleanup alone does not enforce the repository's empty-section rule.
   Evidence: current prompt builders can emit `Recent shares: None yet.` and `Callbacks referenced: - No callbacks referenced.`. Intake crisis may run before any transcript exists, so those placeholder sections need explicit removal and tests.
 
+- Observation: `main`'s lockfile omitted the optional native `bufferutil@4.1.0` and `utf-8-validate@6.0.6` records required by its already-locked `ws@8.19.0` graph.
+  Evidence: a clean `npm ci` initially returned `EUSAGE`; adding only those two registry-verified package records changed no existing lock entry. The focused core suite and type check then ran locally without Docker or a provider probe.
+
+- Observation: the legacy opening's visible order conflicts with its persisted phase labels.
+  Evidence: `app/src/routes/meeting/[id]/+page.svelte` emits the literal empty-chair line, Marcus's opening share, the `moment_of_silence` cue, then Chrystal's reading. `app/src/lib/core/ritual-orchestration.ts` instead transitions `OPENING -> EMPTY_CHAIR -> INTRODUCTIONS`, while `app/src/routes/meeting/[id]/share/+server.ts` associates `EMPTY_CHAIR` with Chrystal's reading. The plan requires the literal line to become a generated room moment and separately persists cues, but has not fixed their phase/cursor relationship.
+
 ## Decision Log
+
+- Decision: Keep CharacterShareInteractionType explicitly excluding room entries and make CRISIS_RESOURCES immutable at type and runtime boundaries.
+  Rationale: Later persistence expansion must not widen character generation, and one importer must not change crisis copy for subsequent requests.
+  Date/Author: 2026-09-15 / Codex, final PR #96 review.
+
+- Decision: Validate replay context before returning the same persisted beat object, and retain the existing persistence interaction union until the database-backed slice implements room entries.
+  Rationale: Replay identity must not bypass roster integrity; the pure-core checkpoint must not promise unsupported database writes.
+  Date/Author: 2026-09-15 / Codex, PR #96 review.
 
 - Decision: define a beat as one stable, persisted instruction to the renderer rather than another phase.
   Rationale: phases remain useful broad states, but replay recovery needs to know the exact moment within a phase. A beat provides that resume point without replacing the established phase enum.
@@ -215,6 +237,14 @@ The empty chair also becomes a fresh generated room moment. It is persisted as p
 - Decision: persist one `activeBeat` and an integer `beatCursor` inside `MeetingPhaseState`, and add a separate database phase version for compare-and-set writes.
   Rationale: returning an existing active beat makes retries stable. A version filter prevents two server instances from overwriting each other's state; the loser reloads the winner's state instead of inventing a second beat.
   Date/Author: 2026-09-12 / Codex
+
+- Decision: introduce the beat contract in two pure checkpoints, with phase beat fields optional until a protocol-version-1 initializer writes them explicitly.
+  Rationale: C01 can reject malformed normal beat payloads and C02 can add canonical crisis provenance without pretending a historical phase JSON is safe to execute. A later selection slice must gate new execution on the protocol version and explicit initialized fields rather than restarting an old meeting at cursor zero.
+  Date/Author: 2026-09-14 / Codex
+
+- Decision: apply the version-1 readiness gate before returning even an already active beat.
+  Rationale: an unversioned or partial historical phase JSON cannot prove that its active payload belongs to the new protocol. Returning it merely because it looks structurally valid would let legacy state enter the new renderer without a trusted cursor or initialization record.
+  Date/Author: 2026-09-14 / Codex
 
 - Decision: derive every optional choice from the meeting id, phase, cursor, and roster, then persist the resulting beat before returning it.
   Rationale: production behavior needs variety across meetings and repeatability within one meeting. `Math.random()` and browser-local seeded choices do not provide a durable answer after refresh.
@@ -410,9 +440,11 @@ The empty chair also becomes a fresh generated room moment. It is persisted as p
 
 ## Outcomes & Retrospective
 
-Planning is complete; no application code has been implemented. The plan intentionally replaces only the meeting-script portion of the large Svelte page. It preserves the working transcript UI and specialized server seams, creates one durable server answer for each next moment, and makes transcript persistence the authority after a retry or refresh. Its reviewed recovery contracts cover the dangerous boundaries that point-in-time checks missed: creation stays database-fenced throughout deployment, a temporary protocol bridge prevents draining or abandoned meetings from blocking new rooms, the activity column remains compatible with old creators, meeting deletion cascades through every new ledger, callback rows lock in canonical order and must match their transcript origins, controlled crisis resources persist before generation, empty prompt sections disappear rather than announce placeholders, spoken and pass submissions contend for one gate outcome, a spoken share persisted before analysis resumes from its beat id, and a room cue is durable before the renderer may show it. Database-backed work waits for epic #79 to establish one unique, migration-seeded UUID for every core character. The planned beat migration now follows the private and identity migrations with its own Supabase version.
+Planning is complete and the C01-C03 pure-core checkpoint is implemented in PR #96; route and database integration remain unimplemented. The plan intentionally replaces only the meeting-script portion of the large Svelte page. It preserves the working transcript UI and specialized server seams, creates one durable server answer for each next moment, and makes transcript persistence the authority after a retry or refresh. Its reviewed recovery contracts cover the dangerous boundaries that point-in-time checks missed: creation stays database-fenced throughout deployment, a temporary protocol bridge prevents draining or abandoned meetings from blocking new rooms, the activity column remains compatible with old creators, meeting deletion cascades through every new ledger, callback rows lock in canonical order and must match their transcript origins, controlled crisis resources persist before generation, empty prompt sections disappear rather than announce placeholders, spoken and pass submissions contend for one gate outcome, a spoken share persisted before analysis resumes from its beat id, and a room cue is durable before the renderer may show it. Database-backed work waits for epic #79 to establish one unique, migration-seeded UUID for every core character. The planned beat migration now follows the private and identity migrations with its own Supabase version.
 
 The seven milestones are ordered by real dependency. Epic #79's durable core identity is a precondition for database-backed Milestone 2, while the pure Milestone 1 can proceed independently. Versioned persistence makes the contract safe under retry. The endpoint proves the server can answer before consumers migrate. Route completion then makes side effects idempotent. The generated empty-chair path lands before the renderer depends on it. Only after those gates pass does the client delete its old sequence, and the final milestone proves replay-free refresh across the completed flow.
+
+Isolated offline work completed the first three small pure-engine checkpoints. The code now has a tested pure vocabulary for normal beats, typed crisis triggers, controlled resources, compatible phase fields, and deterministic opening selection. It returns a ready active beat unchanged and fails closed when protocol-version-1 readiness is absent; it does not complete a beat, touch a route, create persistence state, change prompt text, or make the production meeting flow live. C04 must first record the opening ritual's generated-moment, cue, and Chrystal-reading phase/cursor order; its current title alone is not a safe license to choose one from the inconsistent legacy implementations.
 
 ## Context and Orientation
 
@@ -938,3 +970,19 @@ Issue #90 should follow this plan for `+page.svelte`: deleting the old orchestra
 2026-09-14: Closed the latest review pass by fixing finalizer lock acquisition to one table order with sorted UUIDs, replacing an indefinite zero-active drain with a temporary immutable-protocol bridge plus server-clocked 24-hour abandonment, and persisting controlled crisis resources when a crisis beat begins so provider or quality failure cannot hide the safety card.
 
 2026-09-14: Staged `last_activity_at` through nullable add, durable backfill, database default, and non-null enforcement so the additive migration remains compatible with existing rows and legacy inserts. Required all four new meeting ledgers to cascade with parent deletion and added a real-probe deletion case. Expanded prompt repair and verification to omit empty recent-share, callback, and other optional sections entirely.
+
+2026-09-14: Recorded isolated offline C01/C02 execution. The pure contract now rejects malformed normal and crisis-support beats, keeps room-owned interactions out of character generation, centralizes controlled crisis resources, and leaves new phase fields optional until trusted version-1 initialization. The lockfile received only the two missing optional native records needed for `npm ci`; no package version changed. This revision intentionally leaves C03 selection, all I/O, prompts, and privacy work untouched.
+
+2026-09-14: Recorded C03 opening selection in the same isolated worktree. The engine returns only version-1-ready active state and otherwise selects Marcus's opening share from the persisted ordered roster with a cursor-derived id and the existing three-second pause. It rejects missing protocol fields before replay, uses no clock or random source, and leaves C04 room/empty-chair selection plus every I/O, prompt, and privacy change untouched.
+
+2026-09-14: Paused before C04 after recording the unresolved opening-ritual ordering conflict. The legacy renderer, phase state machine, and share-route prompt mapping do not agree on where the empty-chair moment, moment-of-silence cue, and Chrystal reading belong. The next slice must settle that phase/cursor sequence in this plan before adding selection branches; it must not treat browser order as an implicit product decision.
+
+2026-09-14 / PR promotion: this clean branch publishes C01/C02 beat contracts and the C03 opening-only selector for review under #77/#81. nextMeetingBeat returns a SeamResult, requires explicit version-1 initialized input, replays an existing active beat, and selects Marcus with the shipped 3000 ms pause from an ordered roster. Other phase selection and completion remain unimplemented. This is an additive pure-core checkpoint, not a route cutover or completed BEAT-A/D milestone. Privacy persists as independent draft PR #95 and remains gated on real database evidence. No Docker or hosted verification was performed.
+
+Promotion verification: clean dependency extraction with npm ci --ignore-scripts --no-audit --no-fund succeeded (665 packages); lifecycle scripts were not tested by that install. The full server Vitest project passed 266 tests in 40 files. Targeted ESLint passed for types.ts, meeting-beats.ts and meeting-beats.spec.ts. npm run check passed with zero errors and the eight existing page warnings. The new code remains unwired; these checks do not establish database persistence or production refresh behavior.
+
+The promotion production build also passed. This is a compilation/build result, not a deployed or live meeting verification.
+
+2026-09-15: Addressed both PR #96 review findings with replay-context validation and persistence-type isolation. The 275 server tests and type check pass; eight existing Svelte warnings remain. No Docker, probe, route, or database changes were made. Full CI fixture freshness remains blocked under #91.
+
+2026-09-15: Recorded the final two PR #96 review fixes before merge. The controlled crisis singleton now rejects property replacement and line mutation; the character interaction subtype stays narrow when persistence grows. Validation: 276 server tests passed.

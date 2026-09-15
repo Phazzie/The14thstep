@@ -276,3 +276,11 @@
 - Planned Supabase migrations use distinct leading versions in dependency order:
   private intake `20260912000100`, durable core identity `20260912000200`, and
   server-owned meeting beats `20260912000300`.
+
+## 2026-09-14 — publish a bounded pure opening checkpoint
+
+- Publish beat contracts and opening selection as an additive tested PR from current origin/main. Keep historical phase fields optional for compatibility, but require explicit protocol 1 and initialized beat fields before selection. This checkpoint does not add completion or later phases; #77/#81 retain those obligations. Publish the independent incomplete privacy foundation as draft PR #95 rather than keeping all work only on local branches.
+
+## 2026-09-15
+
+- PR #96 review: Replay preserves the persisted beat object after validating its meeting and roster. Keep room-owned beat variants separate from the existing database interaction type until the database seam supports those writes.
