@@ -17,6 +17,8 @@ vi.mock('$lib/server/seams/database/adapter', () => ({
 		({
 			getUserById: async () => err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, 'db unavailable'),
 			createMeeting: async () => err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, 'db unavailable'),
+			getOwnedMeeting: async () =>
+				err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, 'db unavailable'),
 			appendShare: async () => err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, 'db unavailable'),
 			getHeavyMemory: async () => err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, 'db unavailable'),
 			getShareById: async () => err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, 'db unavailable'),

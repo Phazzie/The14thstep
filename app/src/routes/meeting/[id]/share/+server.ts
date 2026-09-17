@@ -651,7 +651,7 @@ function createShareStream(
 					meetingCharacters
 				);
 
-				const memoryUserId = locals.userId ?? process.env.PROBE_USER_ID?.trim() ?? null;
+				const memoryUserId = locals.userId ?? null;
 				let heavyMemoryLines: string[] | undefined;
 				let continuityLines: string[] | undefined;
 				let selectedCallbacks: Array<{

@@ -17,6 +17,9 @@ function createUnavailableDatabaseAdapter(message: string): DatabasePort {
 		async createMeeting() {
 			return err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, message);
 		},
+		async getOwnedMeeting() {
+			return err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, message);
+		},
 		async appendShare() {
 			return err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, message);
 		},
@@ -65,11 +68,18 @@ function createUnavailableDatabaseAdapter(message: string): DatabasePort {
 const authAdapter = createAuthAdapter();
 const grokAiAdapter = createGrokAiAdapter();
 
+import { getServerComposition, isE2eMockSeamsEnabled } from '$lib/server/testing/server-composition';
+import type { AuthPort } from '$lib/seams/auth/contract';
+
 function buildSeamBundle(): {
-	auth: ReturnType<typeof createAuthAdapter>;
+	auth: AuthPort;
 	database: DatabasePort;
 	grokAi: GrokAiPort;
 } {
+	if (isE2eMockSeamsEnabled()) {
+		return getServerComposition();
+	}
+
 	let database: DatabasePort;
 	try {
 		database = createDatabaseAdapter();
@@ -86,9 +96,12 @@ function buildSeamBundle(): {
 	};
 }
 
+import { isMeetingRoute, resolveMeetingAccess } from '$lib/server/meeting-access';
+
 export const handle: Handle = async ({ event, resolve }) => {
 	const seams = buildSeamBundle();
 	event.locals.seams = seams;
+	event.locals.meetingContext = null;
 
 	const sessionResult = await seams.auth.getSession(event.request.headers.get('cookie'));
 	if (!sessionResult.ok) {
@@ -98,5 +111,14 @@ export const handle: Handle = async ({ event, resolve }) => {
 	}
 	event.locals.userId = sessionResult.ok ? sessionResult.value.userId : null;
 
+	const pathname = event.url?.pathname ?? (event.request ? new URL(event.request.url).pathname : '');
+	if (isMeetingRoute(pathname)) {
+		const accessResponse = await resolveMeetingAccess(event, seams, sessionResult);
+		if (accessResponse) {
+			return accessResponse;
+		}
+	}
+
 	return resolve(event);
 };
+
