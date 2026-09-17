@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ok, type SeamResult } from '$lib/core/seam';
+import { SeamErrorCodes, err, ok, type SeamResult } from '$lib/core/seam';
 import type { MeetingPhaseState } from '$lib/core/types';
 import type {
 	CallbackRecord,
@@ -43,6 +43,9 @@ function createInMemoryDatabase(
 			userId: 'user-1',
 			topic: 'staying',
 			userMood: 'raw',
+			userMind: null,
+			userDisplayName: null,
+			userCleanTime: null,
 			listeningOnly: false,
 			startedAt: new Date().toISOString(),
 			endedAt: null
@@ -77,9 +80,18 @@ function createInMemoryDatabase(
 				userId: input.userId,
 				topic: input.topic,
 				userMood: input.userMood,
+				userMind: input.userMind ?? null,
+				userDisplayName: input.userDisplayName ?? null,
+				userCleanTime: input.userCleanTime ?? null,
 				listeningOnly: input.listeningOnly
 			};
 			return ok(state.meeting);
+		},
+		async getOwnedMeeting(input) {
+			if (state.meeting.id === input.meetingId && state.meeting.userId === input.userId) {
+				return ok(state.meeting);
+			}
+			return err(SeamErrorCodes.NOT_FOUND, 'Meeting not found');
 		},
 		async saveMeetingParticipants(input) {
 			state.participants = input.participants.map((participant) => ({

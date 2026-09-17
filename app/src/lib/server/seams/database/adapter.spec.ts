@@ -26,6 +26,7 @@ interface MockResponses {
 	userUpdateSingle?: QueryResponse;
 	meetingSingle?: QueryResponse;
 	meetingUpdateSingle?: QueryResponse;
+	meetingMaybeSingle?: QueryResponse;
 	meetingPhaseMaybeSingle?: QueryResponse;
 	meetingPhaseUpdateMaybeSingle?: QueryResponse;
 	meetingCountSelect?: QueryResponse;
@@ -83,6 +84,8 @@ function defaultCharacterRows(): Array<{ id: string; name: string; intro_style: 
 function createHarness(responses: MockResponses = {}) {
 	const meetingInsertSpy = vi.fn();
 	const meetingUpdateSpy = vi.fn();
+	const meetingSelectSpy = vi.fn();
+	const meetingEqSpy = vi.fn();
 	const shareInsertSpy = vi.fn();
 	const userInsertSpy = vi.fn();
 	const userUpdateSpy = vi.fn();
@@ -164,28 +167,50 @@ function createHarness(responses: MockResponses = {}) {
 					insert: (payload: unknown) => {
 						meetingInsertSpy(payload);
 						return {
-							select: () => ({
-								single: async () => meetingSingle
-							})
+							select: (columns?: string) => {
+								meetingSelectSpy(columns);
+								return {
+									single: async () => meetingSingle
+								};
+							}
 						};
 					},
 					update: (payload: unknown) => {
 						meetingUpdateSpy(payload);
 						return {
-							eq: () => ({
-								select: () => ({
-									single: async () => meetingUpdateSingle,
-									maybeSingle: async () => meetingPhaseUpdateMaybeSingle
-								})
-							})
+							eq: (column: string, value: string) => {
+								meetingEqSpy(column, value);
+								return {
+									select: (columns?: string) => {
+										meetingSelectSpy(columns);
+										return {
+											single: async () => meetingUpdateSingle,
+											maybeSingle: async () => meetingPhaseUpdateMaybeSingle
+										};
+									}
+								};
+							}
 						};
 					},
-					select: () => ({
-						eq: () => ({
-							gt: async () => meetingCountSelect,
-							maybeSingle: async () => meetingPhaseMaybeSingle
-						})
-					})
+					select: (columns?: string) => {
+						meetingSelectSpy(columns);
+						return {
+							eq: (firstCol: string, firstVal: string) => {
+								meetingEqSpy(firstCol, firstVal);
+								return {
+									gt: async () => meetingCountSelect,
+									maybeSingle: async () => meetingPhaseMaybeSingle,
+									eq: (secondCol: string, secondVal: string) => {
+										meetingEqSpy(secondCol, secondVal);
+										return {
+											maybeSingle: async () =>
+												responses.meetingMaybeSingle ?? { data: null, error: null, status: 200 }
+										};
+									}
+								};
+							}
+						};
+					}
 				};
 			}
 
@@ -344,19 +369,24 @@ function createHarness(responses: MockResponses = {}) {
 		userUpdateSpy,
 		meetingInsertSpy,
 		meetingUpdateSpy,
+		meetingSelectSpy,
+		meetingEqSpy,
 		shareInsertSpy
 	};
 }
 
 describe('database supabase adapter', () => {
-	it('returns createMeeting success with mapped shape and insert payload', async () => {
-		const { adapter, meetingInsertSpy } = createHarness({
+	it('returns createMeeting success with mapped snapshot fields and insert payload', async () => {
+		const { adapter, meetingInsertSpy, meetingSelectSpy } = createHarness({
 			meetingSingle: {
 				data: {
 					id: '2f5dcf63-cf80-4e09-8e3e-13f93da72cf3',
 					user_id: 'fab8bc65-1f5e-4ef1-8606-ab51921f9a07',
 					topic: 'Staying when I want to leave',
 					user_mood: 'anxious',
+					user_mind: 'Mind Racing',
+					user_display_name: 'Grace',
+					user_clean_time: '18 months',
 					listening_only: false,
 					started_at: '2026-02-15T04:00:00.000Z',
 					ended_at: null
@@ -370,6 +400,9 @@ describe('database supabase adapter', () => {
 			userId: 'fab8bc65-1f5e-4ef1-8606-ab51921f9a07',
 			topic: 'Staying when I want to leave',
 			userMood: 'anxious',
+			userMind: 'Mind Racing',
+			userDisplayName: 'Grace',
+			userCleanTime: '18 months',
 			listeningOnly: false
 		});
 
@@ -377,8 +410,14 @@ describe('database supabase adapter', () => {
 			user_id: 'fab8bc65-1f5e-4ef1-8606-ab51921f9a07',
 			topic: 'Staying when I want to leave',
 			user_mood: 'anxious',
+			user_mind: 'Mind Racing',
+			user_display_name: 'Grace',
+			user_clean_time: '18 months',
 			listening_only: false
 		});
+		expect(meetingSelectSpy).toHaveBeenCalledWith(
+			'id, user_id, topic, user_mood, user_mind, user_display_name, user_clean_time, listening_only, started_at, ended_at'
+		);
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(result.value).toEqual({
@@ -386,10 +425,60 @@ describe('database supabase adapter', () => {
 				userId: 'fab8bc65-1f5e-4ef1-8606-ab51921f9a07',
 				topic: 'Staying when I want to leave',
 				userMood: 'anxious',
+				userMind: 'Mind Racing',
+				userDisplayName: 'Grace',
+				userCleanTime: '18 months',
 				listeningOnly: false,
 				startedAt: '2026-02-15T04:00:00.000Z',
 				endedAt: null
 			});
+		}
+	});
+
+	it('createMeeting defaults optional snapshot fields to null', async () => {
+		const { adapter, meetingInsertSpy } = createHarness({
+			meetingSingle: {
+				data: {
+					id: '2f5dcf63-cf80-4e09-8e3e-13f93da72cf3',
+					user_id: 'fab8bc65-1f5e-4ef1-8606-ab51921f9a07',
+					topic: 'Honesty',
+					user_mood: 'hopeful',
+					user_mind: null,
+					user_display_name: null,
+					user_clean_time: null,
+					listening_only: true,
+					started_at: '2026-02-15T04:00:00.000Z',
+					ended_at: null
+				},
+				error: null,
+				status: 201
+			}
+		});
+
+		const result = await adapter.createMeeting({
+			userId: 'fab8bc65-1f5e-4ef1-8606-ab51921f9a07',
+			topic: 'Honesty',
+			userMood: 'hopeful',
+			userMind: null,
+			userDisplayName: null,
+			userCleanTime: null,
+			listeningOnly: true
+		});
+
+		expect(meetingInsertSpy).toHaveBeenCalledWith({
+			user_id: 'fab8bc65-1f5e-4ef1-8606-ab51921f9a07',
+			topic: 'Honesty',
+			user_mood: 'hopeful',
+			user_mind: null,
+			user_display_name: null,
+			user_clean_time: null,
+			listening_only: true
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value.userMind).toBeNull();
+			expect(result.value.userDisplayName).toBeNull();
+			expect(result.value.userCleanTime).toBeNull();
 		}
 	});
 
@@ -399,6 +488,9 @@ describe('database supabase adapter', () => {
 			userId: '',
 			topic: 'Topic',
 			userMood: 'nervous',
+			userMind: null,
+			userDisplayName: null,
+			userCleanTime: null,
 			listeningOnly: false
 		});
 
@@ -496,6 +588,9 @@ describe('database supabase adapter', () => {
 			userId: 'fab8bc65-1f5e-4ef1-8606-ab51921f9a07',
 			topic: 'Honesty',
 			userMood: 'hopeful',
+			userMind: null,
+			userDisplayName: null,
+			userCleanTime: null,
 			listeningOnly: false
 		});
 
@@ -505,14 +600,17 @@ describe('database supabase adapter', () => {
 		}
 	});
 
-	it('completes meeting by writing summary and endedAt', async () => {
-		const { adapter } = createHarness({
+	it('completes meeting by writing summary and endedAt and selecting all columns', async () => {
+		const { adapter, meetingSelectSpy } = createHarness({
 			meetingUpdateSingle: {
 				data: {
 					id: '2f5dcf63-cf80-4e09-8e3e-13f93da72cf3',
 					user_id: 'fab8bc65-1f5e-4ef1-8606-ab51921f9a07',
 					topic: 'Honesty',
 					user_mood: 'hopeful',
+					user_mind: 'Staying clean',
+					user_display_name: 'Grace',
+					user_clean_time: '18 months',
 					listening_only: false,
 					started_at: '2026-02-15T04:00:00.000Z',
 					ended_at: '2026-02-15T05:00:00.000Z'
@@ -528,9 +626,15 @@ describe('database supabase adapter', () => {
 			notableMoments: { marcus: 'Stayed in his seat.' }
 		});
 
+		expect(meetingSelectSpy).toHaveBeenCalledWith(
+			'id, user_id, topic, user_mood, user_mind, user_display_name, user_clean_time, listening_only, started_at, ended_at'
+		);
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(result.value.endedAt).toBe('2026-02-15T05:00:00.000Z');
+			expect(result.value.userMind).toBe('Staying clean');
+			expect(result.value.userDisplayName).toBe('Grace');
+			expect(result.value.userCleanTime).toBe('18 months');
 		}
 	});
 
@@ -933,5 +1037,225 @@ describe('database supabase adapter', () => {
 			expect(result.error.code).toBe(SeamErrorCodes.CONTRACT_VIOLATION);
 		}
 		expect(shareInsertSpy).not.toHaveBeenCalled();
+	});
+
+	describe('getOwnedMeeting', () => {
+		const validMeetingId = '2f5dcf63-cf80-4e09-8e3e-13f93da72cf3';
+		const validUserId = 'fab8bc65-1f5e-4ef1-8606-ab51921f9a07';
+
+		it('returns meeting when owned by matching user', async () => {
+			const { adapter, meetingSelectSpy, meetingEqSpy } = createHarness({
+				meetingMaybeSingle: {
+					data: {
+						id: validMeetingId,
+						user_id: validUserId,
+						topic: 'Staying grounded',
+						user_mood: 'hopeful',
+						user_mind: 'One day at a time',
+						user_display_name: 'Grace',
+						user_clean_time: '90 days',
+						listening_only: false,
+						started_at: '2026-02-15T04:00:00.000Z',
+						ended_at: null
+					},
+					error: null,
+					status: 200
+				}
+			});
+
+			const result = await adapter.getOwnedMeeting({
+				meetingId: validMeetingId,
+				userId: validUserId
+			});
+
+			expect(meetingSelectSpy).toHaveBeenCalledWith(
+				'id, user_id, topic, user_mood, user_mind, user_display_name, user_clean_time, listening_only, started_at, ended_at'
+			);
+			expect(meetingEqSpy).toHaveBeenCalledWith('id', validMeetingId);
+			expect(meetingEqSpy).toHaveBeenCalledWith('user_id', validUserId);
+			expect(result.ok).toBe(true);
+			if (result.ok) {
+				expect(result.value).toEqual({
+					id: validMeetingId,
+					userId: validUserId,
+					topic: 'Staying grounded',
+					userMood: 'hopeful',
+					userMind: 'One day at a time',
+					userDisplayName: 'Grace',
+					userCleanTime: '90 days',
+					listeningOnly: false,
+					startedAt: '2026-02-15T04:00:00.000Z',
+					endedAt: null
+				});
+			}
+		});
+
+		it('returns NOT_FOUND when meeting exists but owned by different user (wrong user)', async () => {
+			const { adapter, meetingEqSpy } = createHarness({
+				meetingMaybeSingle: {
+					data: null,
+					error: null,
+					status: 200
+				}
+			});
+
+			const result = await adapter.getOwnedMeeting({
+				meetingId: validMeetingId,
+				userId: 'attacker-or-other-user-uuid'
+			});
+
+			expect(meetingEqSpy).toHaveBeenCalledWith('id', validMeetingId);
+			expect(meetingEqSpy).toHaveBeenCalledWith('user_id', 'attacker-or-other-user-uuid');
+			expect(result.ok).toBe(false);
+			if (!result.ok) {
+				expect(result.error.code).toBe(SeamErrorCodes.NOT_FOUND);
+				expect(result.error.message).toBe('Meeting not found');
+				expect(result.error.details).toMatchObject({
+					method: 'getOwnedMeeting',
+					provider: 'supabase'
+				});
+			}
+		});
+
+		it('returns NOT_FOUND when meeting does not exist', async () => {
+			const { adapter } = createHarness({
+				meetingMaybeSingle: {
+					data: null,
+					error: null,
+					status: 200
+				}
+			});
+
+			const result = await adapter.getOwnedMeeting({
+				meetingId: '00000000-0000-0000-0000-000000000000',
+				userId: validUserId
+			});
+
+			expect(result.ok).toBe(false);
+			if (!result.ok) {
+				expect(result.error.code).toBe(SeamErrorCodes.NOT_FOUND);
+				expect(result.error.message).toBe('Meeting not found');
+			}
+		});
+
+		it('produces indistinguishable NOT_FOUND responses for wrong user and non-existent meeting (INV-03)', async () => {
+			const wrongUserHarness = createHarness({ meetingMaybeSingle: { data: null, error: null, status: 200 } });
+			const nonexistentHarness = createHarness({ meetingMaybeSingle: { data: null, error: null, status: 200 } });
+
+			const wrongUserResult = await wrongUserHarness.adapter.getOwnedMeeting({
+				meetingId: validMeetingId,
+				userId: 'wrong-user'
+			});
+			const nonexistentResult = await nonexistentHarness.adapter.getOwnedMeeting({
+				meetingId: 'nonexistent-meeting',
+				userId: validUserId
+			});
+
+			expect(wrongUserResult.ok).toBe(false);
+			expect(nonexistentResult.ok).toBe(false);
+			if (!wrongUserResult.ok && !nonexistentResult.ok) {
+				expect(wrongUserResult.error.code).toBe(nonexistentResult.error.code);
+				expect(wrongUserResult.error.message).toBe(nonexistentResult.error.message);
+				expect(wrongUserResult.error.code).toBe(SeamErrorCodes.NOT_FOUND);
+			}
+		});
+
+		it('rejects invalid inputs with INPUT_INVALID', async () => {
+			const { adapter } = createHarness();
+
+			const emptyMeeting = await adapter.getOwnedMeeting({ meetingId: '', userId: validUserId });
+			expect(emptyMeeting.ok).toBe(false);
+			if (!emptyMeeting.ok) expect(emptyMeeting.error.code).toBe(SeamErrorCodes.INPUT_INVALID);
+
+			const emptyUser = await adapter.getOwnedMeeting({ meetingId: validMeetingId, userId: '' });
+			expect(emptyUser.ok).toBe(false);
+			if (!emptyUser.ok) expect(emptyUser.error.code).toBe(SeamErrorCodes.INPUT_INVALID);
+
+			const nonObject = await adapter.getOwnedMeeting(null as unknown as { meetingId: string; userId: string });
+			expect(nonObject.ok).toBe(false);
+			if (!nonObject.ok) expect(nonObject.error.code).toBe(SeamErrorCodes.INPUT_INVALID);
+		});
+
+		it('maps upstream database network failure to UPSTREAM_UNAVAILABLE', async () => {
+			const { adapter } = createHarness({
+				meetingMaybeSingle: {
+					data: null,
+					error: { message: 'fetch failed' },
+					status: 503
+				}
+			});
+
+			const result = await adapter.getOwnedMeeting({ meetingId: validMeetingId, userId: validUserId });
+			expect(result.ok).toBe(false);
+			if (!result.ok) {
+				expect(result.error.code).toBe(SeamErrorCodes.UPSTREAM_UNAVAILABLE);
+			}
+		});
+
+		it('maps non-network upstream errors to UPSTREAM_ERROR', async () => {
+			const { adapter } = createHarness({
+				meetingMaybeSingle: {
+					data: null,
+					error: { code: '42501', message: 'permission denied for table meetings' },
+					status: 500
+				}
+			});
+
+			const result = await adapter.getOwnedMeeting({ meetingId: validMeetingId, userId: validUserId });
+			expect(result.ok).toBe(false);
+			if (!result.ok) {
+				expect(result.error.code).toBe(SeamErrorCodes.UPSTREAM_ERROR);
+			}
+		});
+
+		it('maps malformed upstream row payload to CONTRACT_VIOLATION', async () => {
+			const { adapter } = createHarness({
+				meetingMaybeSingle: {
+					data: {
+						id: validMeetingId,
+						// missing user_id, topic, user_mood
+						listening_only: false
+					},
+					error: null,
+					status: 200
+				}
+			});
+
+			const result = await adapter.getOwnedMeeting({ meetingId: validMeetingId, userId: validUserId });
+			expect(result.ok).toBe(false);
+			if (!result.ok) {
+				expect(result.error.code).toBe(SeamErrorCodes.CONTRACT_VIOLATION);
+			}
+		});
+
+		it('normalizes missing or undefined snapshot fields to null without contract violation', async () => {
+			const { adapter } = createHarness({
+				meetingMaybeSingle: {
+					data: {
+						id: validMeetingId,
+						user_id: validUserId,
+						topic: 'Honesty',
+						user_mood: 'hopeful',
+						// user_mind, user_display_name, user_clean_time omitted completely
+						listening_only: false,
+						started_at: '2026-02-15T04:00:00.000Z',
+						ended_at: null
+					},
+					error: null,
+					status: 200
+				}
+			});
+
+			const result = await adapter.getOwnedMeeting({ meetingId: validMeetingId, userId: validUserId });
+			expect(result.ok).toBe(true);
+			if (result.ok) {
+				expect(result.value.userMind).toBeNull();
+				expect(result.value.userDisplayName).toBeNull();
+				expect(result.value.userCleanTime).toBeNull();
+				expect(result.value.userMind).not.toBeUndefined();
+				expect(result.value.userDisplayName).not.toBeUndefined();
+				expect(result.value.userCleanTime).not.toBeUndefined();
+			}
+		});
 	});
 });

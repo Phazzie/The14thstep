@@ -6,6 +6,7 @@ import type {
 	DatabasePort,
 	EnsureUserProfileInput,
 	GetMeetingCountAfterDateInput,
+	GetOwnedMeetingInput,
 	MeetingParticipantSeed,
 	MeetingRecord,
 	ShareRecord,
@@ -18,6 +19,7 @@ import {
 	validateCreateCallbackInput,
 	validateEnsureUserProfileInput,
 	validateGetMeetingCountAfterDateInput,
+	validateGetOwnedMeetingInput,
 	validateMeetingParticipant,
 	validateMeetingParticipantSeed,
 	validateAppendShareInput,
@@ -43,6 +45,7 @@ type DatabaseScenario = 'sample' | 'fault';
 type DatabaseMethod =
 	| 'getUserById'
 	| 'createMeeting'
+	| 'getOwnedMeeting'
 	| 'appendShare'
 	| 'saveMeetingParticipants'
 	| 'getMeetingParticipants'
@@ -61,6 +64,7 @@ interface DatabaseMockOptions {
 	fixtures?: {
 		getUserById?: UserProfile;
 		createMeeting?: MeetingRecord;
+		getOwnedMeeting?: MeetingRecord;
 		appendShare?: ShareRecord;
 		meetingParticipants?: MeetingParticipant[];
 		getHeavyMemory?: ShareRecord[];
@@ -102,6 +106,9 @@ export function createDatabaseMock(options: DatabaseMockOptions = {}): DatabaseP
 	const fixtures = {
 		getUserById: (options.fixtures?.getUserById ?? getUserByIdSample) as UserProfile,
 		createMeeting: (options.fixtures?.createMeeting ?? createMeetingSample) as MeetingRecord,
+		getOwnedMeeting: (options.fixtures?.getOwnedMeeting ??
+			options.fixtures?.createMeeting ??
+			createMeetingSample) as MeetingRecord,
 		appendShare: (options.fixtures?.appendShare ?? appendShareSample) as ShareRecord,
 		meetingParticipants: (options.fixtures?.meetingParticipants ??
 			getMeetingParticipantsSample) as MeetingParticipant[],
@@ -156,6 +163,23 @@ export function createDatabaseMock(options: DatabaseMockOptions = {}): DatabaseP
 				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'Fixture violates MeetingRecord');
 			}
 			return ok(fixtures.createMeeting);
+		},
+
+		async getOwnedMeeting(input: GetOwnedMeetingInput) {
+			if (!validateGetOwnedMeetingInput(input)) {
+				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid getOwnedMeeting input');
+			}
+			if (scenarios.getOwnedMeeting === 'fault') {
+				return err(fault.code, fault.message, fault.details);
+			}
+			const meeting = fixtures.getOwnedMeeting;
+			if (!validateMeetingRecord(meeting)) {
+				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'Fixture violates MeetingRecord');
+			}
+			if (meeting.id !== input.meetingId || meeting.userId !== input.userId) {
+				return err(SeamErrorCodes.NOT_FOUND, 'Meeting not found');
+			}
+			return ok({ ...meeting });
 		},
 
 		async appendShare(input) {

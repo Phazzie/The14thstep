@@ -44,7 +44,23 @@ function createDeps(overrides: Partial<MeetingWorkflowDeps> = {}): MeetingWorkfl
 				userId: input.userId,
 				topic: input.topic,
 				userMood: input.userMood,
+				userMind: input.userMind ?? null,
+				userDisplayName: input.userDisplayName ?? null,
+				userCleanTime: input.userCleanTime ?? null,
 				listeningOnly: input.listeningOnly,
+				startedAt: '2026-02-16T00:00:00.000Z',
+				endedAt: null
+			}),
+		getOwnedMeeting: async (input) =>
+			ok<MeetingRecord>({
+				id: input.meetingId,
+				userId: input.userId,
+				topic: 'staying in the room',
+				userMood: 'anxious',
+				userMind: null,
+				userDisplayName: null,
+				userCleanTime: null,
+				listeningOnly: false,
 				startedAt: '2026-02-16T00:00:00.000Z',
 				endedAt: null
 			}),
@@ -113,6 +129,9 @@ function createDeps(overrides: Partial<MeetingWorkflowDeps> = {}): MeetingWorkfl
 				userId: 'user-1',
 				topic: 'staying in the room',
 				userMood: 'anxious',
+				userMind: null,
+				userDisplayName: null,
+				userCleanTime: null,
 				listeningOnly: false,
 				startedAt: '2026-02-16T00:00:00.000Z',
 				endedAt: '2026-02-16T01:00:00.000Z'
@@ -222,6 +241,109 @@ describe('meeting workflow', () => {
 		if (result.ok) {
 			expect(result.value.id).toBe('meeting-1');
 			expect(result.value.topic).toBe('staying in the room');
+			expect(result.value.userMind).toBeNull();
+			expect(result.value.userDisplayName).toBeNull();
+			expect(result.value.userCleanTime).toBeNull();
+		}
+	});
+
+	it('passes through intake snapshot fields when provided', async () => {
+		const createMeetingSpy = vi.fn(async (input: Omit<MeetingRecord, 'id' | 'startedAt' | 'endedAt'>) =>
+			ok<MeetingRecord>({
+				id: 'meeting-custom',
+				...input,
+				startedAt: '2026-02-16T00:00:00.000Z',
+				endedAt: null
+			})
+		);
+
+		const deps = createDeps({
+			database: {
+				...createDeps().database,
+				createMeeting: createMeetingSpy
+			}
+		});
+
+		const result = await createMeeting(deps, {
+			userId: 'user-1',
+			topic: 'staying in the room',
+			userMood: 'anxious',
+			userMind: 'Staying sober when I want to run',
+			userDisplayName: 'Grace',
+			userCleanTime: '19 days',
+			listeningOnly: false
+		});
+
+		expect(result.ok).toBe(true);
+		expect(createMeetingSpy).toHaveBeenCalledWith({
+			userId: 'user-1',
+			topic: 'staying in the room',
+			userMood: 'anxious',
+			userMind: 'Staying sober when I want to run',
+			userDisplayName: 'Grace',
+			userCleanTime: '19 days',
+			listeningOnly: false
+		});
+		if (result.ok) {
+			expect(result.value.userMind).toBe('Staying sober when I want to run');
+			expect(result.value.userDisplayName).toBe('Grace');
+			expect(result.value.userCleanTime).toBe('19 days');
+		}
+	});
+
+	it('coalesces omitted snapshot fields to null', async () => {
+		const createMeetingSpy = vi.fn(async (input: Omit<MeetingRecord, 'id' | 'startedAt' | 'endedAt'>) =>
+			ok<MeetingRecord>({
+				id: 'meeting-coalesce',
+				...input,
+				startedAt: '2026-02-16T00:00:00.000Z',
+				endedAt: null
+			})
+		);
+
+		const deps = createDeps({
+			database: {
+				...createDeps().database,
+				createMeeting: createMeetingSpy
+			}
+		});
+
+		const result = await createMeeting(deps, {
+			userId: 'user-1',
+			topic: 'staying in the room',
+			userMood: 'anxious',
+			listeningOnly: false
+		});
+
+		expect(result.ok).toBe(true);
+		expect(createMeetingSpy).toHaveBeenCalledWith({
+			userId: 'user-1',
+			topic: 'staying in the room',
+			userMood: 'anxious',
+			userMind: null,
+			userDisplayName: null,
+			userCleanTime: null,
+			listeningOnly: false
+		});
+		if (result.ok) {
+			expect(result.value.userMind).toBeNull();
+			expect(result.value.userDisplayName).toBeNull();
+			expect(result.value.userCleanTime).toBeNull();
+		}
+	});
+
+	it('rejects createMeeting when snapshot fields are invalid types', async () => {
+		const result = await createMeeting(createDeps(), {
+			userId: 'user-1',
+			topic: 'staying in the room',
+			userMood: 'anxious',
+			userMind: 123 as unknown as string,
+			listeningOnly: false
+		});
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe(SeamErrorCodes.INPUT_INVALID);
 		}
 	});
 

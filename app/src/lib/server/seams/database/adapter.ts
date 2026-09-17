@@ -5,6 +5,7 @@ import {
 	type CallbackRecord,
 	type DatabasePort,
 	type EnsureUserProfileInput,
+	type GetOwnedMeetingInput,
 	type MeetingParticipantSeed,
 	type MeetingRecord,
 	type ShareRecord,
@@ -14,6 +15,7 @@ import {
 	validateCreateCallbackInput,
 	validateEnsureUserProfileInput,
 	validateGetMeetingCountAfterDateInput,
+	validateGetOwnedMeetingInput,
 	validateMeetingParticipant,
 	validateMeetingParticipantSeed,
 	validateAppendShareInput,
@@ -179,6 +181,9 @@ function mapMeetingRecordRow(row: unknown): MeetingRecord {
 		userId: asString(record.user_id) ?? '',
 		topic: asString(record.topic) ?? '',
 		userMood: asString(record.user_mood) ?? '',
+		userMind: asNullableString(record.user_mind) ?? null,
+		userDisplayName: asNullableString(record.user_display_name) ?? null,
+		userCleanTime: asNullableString(record.user_clean_time) ?? null,
 		listeningOnly: asBoolean(record.listening_only) ?? false,
 		startedAt: asString(record.started_at) ?? '',
 		endedAt: asNullableString(record.ended_at) ?? null
@@ -752,9 +757,14 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 					user_id: input.userId,
 					topic: input.topic,
 					user_mood: input.userMood,
+					user_mind: input.userMind ?? null,
+					user_display_name: input.userDisplayName ?? null,
+					user_clean_time: input.userCleanTime ?? null,
 					listening_only: input.listeningOnly
 				})
-				.select('id, user_id, topic, user_mood, listening_only, started_at, ended_at')
+				.select(
+					'id, user_id, topic, user_mood, user_mind, user_display_name, user_clean_time, listening_only, started_at, ended_at'
+				)
 				.single()) as QueryResponseLike;
 
 			if (response.error) return mapUpstreamError('createMeeting', response);
@@ -762,6 +772,36 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 			const meeting = mapMeetingRecordRow(response.data);
 			if (!validateMeetingRecord(meeting)) {
 				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'createMeeting response violates MeetingRecord');
+			}
+
+			return ok(meeting);
+		},
+
+		async getOwnedMeeting(input: GetOwnedMeetingInput) {
+			if (!validateGetOwnedMeetingInput(input)) {
+				return err(SeamErrorCodes.INPUT_INVALID, 'Invalid getOwnedMeeting input');
+			}
+
+			const response = (await supabase
+				.from('meetings')
+				.select(
+					'id, user_id, topic, user_mood, user_mind, user_display_name, user_clean_time, listening_only, started_at, ended_at'
+				)
+				.eq('id', input.meetingId)
+				.eq('user_id', input.userId)
+				.maybeSingle()) as QueryResponseLike;
+
+			if (response.error) return mapUpstreamError('getOwnedMeeting', response);
+			if (response.data === null) {
+				return err(SeamErrorCodes.NOT_FOUND, 'Meeting not found', {
+					method: 'getOwnedMeeting',
+					provider: 'supabase'
+				});
+			}
+
+			const meeting = mapMeetingRecordRow(response.data);
+			if (!validateMeetingRecord(meeting)) {
+				return err(SeamErrorCodes.CONTRACT_VIOLATION, 'getOwnedMeeting response violates MeetingRecord');
 			}
 
 			return ok(meeting);
@@ -1199,7 +1239,9 @@ export function createDatabaseAdapter(options: DatabaseAdapterOptions = {}): Dat
 					notable_moments: input.notableMoments ?? null
 				})
 				.eq('id', input.meetingId)
-				.select('id, user_id, topic, user_mood, listening_only, started_at, ended_at')
+				.select(
+					'id, user_id, topic, user_mood, user_mind, user_display_name, user_clean_time, listening_only, started_at, ended_at'
+				)
 				.single()) as QueryResponseLike;
 			if (response.error) return mapUpstreamError('completeMeeting', response);
 
