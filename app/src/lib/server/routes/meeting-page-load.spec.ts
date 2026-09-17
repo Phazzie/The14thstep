@@ -152,4 +152,99 @@ describe('meeting page server load', () => {
 			} as never)
 		).rejects.toMatchObject({ status: 404 });
 	});
+
+	it('loads intake snapshot fields from locals.meetingContext on clean URL', async () => {
+		const storedMeeting = {
+			id: 'meeting-123',
+			userId: 'user-1',
+			topic: 'One day at a time',
+			userMood: 'hopeful',
+			userMind: 'Staying for 24 hours',
+			userDisplayName: 'Jordan',
+			userCleanTime: '60 days',
+			listeningOnly: false,
+			startedAt: new Date().toISOString(),
+			endedAt: null
+		};
+
+		const result = await load({
+			params: { id: 'meeting-123' },
+			locals: {
+				userId: 'user-1',
+				meetingContext: storedMeeting,
+				seams: { database: createDatabaseStub() }
+			},
+			url: new URL('http://localhost/meeting/meeting-123')
+		} as never);
+
+		expect((result as { initialUserName: string }).initialUserName).toBe('Jordan');
+		expect((result as { initialCleanTime: string }).initialCleanTime).toBe('60 days');
+		expect((result as { initialMood: string }).initialMood).toBe('hopeful');
+		expect((result as { defaultTopic: string }).defaultTopic).toBe('Staying for 24 hours');
+		expect((result as { listeningOnly: boolean }).listeningOnly).toBe(false);
+		expect((result as { initialCrisisMode: boolean }).initialCrisisMode).toBe(false);
+	});
+
+	it('clean refresh with same meeting context preserves all intake state identically', async () => {
+		const storedMeeting = {
+			id: 'meeting-refresh',
+			userId: 'user-1',
+			topic: 'Staying grounded',
+			userMood: 'calm',
+			userMind: 'Reflecting on step 1',
+			userDisplayName: 'Morgan',
+			userCleanTime: '6 months',
+			listeningOnly: true,
+			startedAt: new Date().toISOString(),
+			endedAt: null
+		};
+
+		const event1 = {
+			params: { id: 'meeting-refresh' },
+			locals: {
+				userId: 'user-1',
+				meetingContext: storedMeeting,
+				seams: { database: createDatabaseStub() }
+			},
+			url: new URL('http://localhost/meeting/meeting-refresh')
+		};
+
+		const load1 = await load(event1 as never);
+		const load2 = await load(event1 as never);
+
+		expect(load1.initialUserName).toBe(load2.initialUserName);
+		expect(load1.initialCleanTime).toBe(load2.initialCleanTime);
+		expect(load1.initialMood).toBe(load2.initialMood);
+		expect(load1.defaultTopic).toBe(load2.defaultTopic);
+		expect(load1.listeningOnly).toBe(load2.listeningOnly);
+		expect(load1.initialCrisisMode).toBe(load2.initialCrisisMode);
+	});
+
+	it('detects crisis mode from stored userMind on clean URL', async () => {
+		const storedMeeting = {
+			id: 'meeting-crisis-clean',
+			userId: 'user-1',
+			topic: 'Crisis topic',
+			userMood: 'desperate',
+			userMind: 'I want to die',
+			userDisplayName: 'Taylor',
+			userCleanTime: '1 day',
+			listeningOnly: false,
+			startedAt: new Date().toISOString(),
+			endedAt: null
+		};
+
+		const result = await load({
+			params: { id: 'meeting-crisis-clean' },
+			locals: {
+				userId: 'user-1',
+				meetingContext: storedMeeting,
+				seams: { database: createDatabaseStub() }
+			},
+			url: new URL('http://localhost/meeting/meeting-crisis-clean')
+		} as never);
+
+		expect((result as { initialCrisisMode: boolean }).initialCrisisMode).toBe(true);
+		expect((result as { shouldTriggerInitialCrisisSupport: boolean }).shouldTriggerInitialCrisisSupport).toBe(true);
+	});
 });

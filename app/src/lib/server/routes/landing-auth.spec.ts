@@ -206,7 +206,7 @@ describe('landing auth route actions', () => {
 				}
 			} as never)
 		).rejects.toSatisfy((error: unknown) => {
-			expectRedirectLike(error, 303, expect.stringContaining('/meeting/meeting-1?'));
+			expectRedirectLike(error, 303, '/meeting/meeting-1');
 			return true;
 		});
 

@@ -139,8 +139,6 @@ export const actions: Actions = {
 		const mind = asTrimmedString(formData.get('mind'));
 		const submittedUserId = asTrimmedString(formData.get('userId'));
 		const listeningOnly = formData.get('listeningOnly') === 'on';
-		const probeUserId = isProductionRuntime() ? '' : process.env.PROBE_USER_ID?.trim() || '';
-		const userId = locals.userId ?? probeUserId;
 
 		const values = {
 			userName,
@@ -151,34 +149,69 @@ export const actions: Actions = {
 			listeningOnly
 		};
 
-		if (!userId) {
-			return fail(400, { message: 'Continue as guest or sign in before starting a meeting.', values });
-		}
 		if (!userName || !cleanTime || !mind || !mood) {
 			return fail(400, { message: 'Name, clean time, mood, and mind are required.', values });
 		}
 
-		const profileLookup = await locals.seams.database.getUserById(userId);
-		if (!profileLookup.ok) {
-			if (profileLookup.error.code === SeamErrorCodes.NOT_FOUND) {
-				const sessionKind = readSessionKindCookie(cookies);
-				const bootstrap = await locals.seams.database.ensureUserProfile({
-					id: userId,
-					displayName: sessionKind === 'guest' ? 'Guest' : 'Member',
+		let effectiveUserId = locals.userId;
+		if (!effectiveUserId) {
+			if (locals.seams?.auth?.signInGuest) {
+				const signInResult = await locals.seams.auth.signInGuest();
+				if (!signInResult.ok) {
+					const status = statusFromSeamCode(signInResult.error.code);
+					return fail(status, {
+						message: "Couldn't start a guest session right now. Try again.",
+						values
+					});
+				}
+
+				setSupabaseSessionCookies(cookies, {
+					access_token: signInResult.value.accessToken,
+					refresh_token: signInResult.value.refreshToken
+				});
+				setSessionKindCookie(cookies, 'guest');
+				effectiveUserId = signInResult.value.userId;
+				locals.userId = effectiveUserId;
+
+				const bootstrap = await ensureProfileBootstrap(locals, {
+					id: effectiveUserId,
+					displayName: 'Guest',
 					cleanTime: null,
-					isAnonymous: sessionKind === 'guest'
+					isAnonymous: true
 				});
 				if (!bootstrap.ok) {
-					return fail(statusFromSeamCode(bootstrap.error.code), {
-						message: 'Unable to start the meeting right now.',
+					clearAllAuthCookies(cookies);
+					return fail(bootstrap.status, {
+						message: bootstrap.authMessage,
 						values
 					});
 				}
 			} else {
-				return fail(statusFromSeamCode(profileLookup.error.code), {
-					message: 'Unable to start the meeting right now.',
-					values
-				});
+				return fail(400, { message: 'Continue as guest or sign in before starting a meeting.', values });
+			}
+		} else {
+			const profileLookup = await locals.seams.database.getUserById(effectiveUserId);
+			if (!profileLookup.ok) {
+				if (profileLookup.error.code === SeamErrorCodes.NOT_FOUND) {
+					const sessionKind = readSessionKindCookie(cookies);
+					const bootstrap = await locals.seams.database.ensureUserProfile({
+						id: effectiveUserId,
+						displayName: sessionKind === 'guest' ? 'Guest' : 'Member',
+						cleanTime: null,
+						isAnonymous: sessionKind === 'guest'
+					});
+					if (!bootstrap.ok) {
+						return fail(statusFromSeamCode(bootstrap.error.code), {
+							message: 'Unable to start the meeting right now.',
+							values
+						});
+					}
+				} else {
+					return fail(statusFromSeamCode(profileLookup.error.code), {
+						message: 'Unable to start the meeting right now.',
+						values
+					});
+				}
 			}
 		}
 
@@ -188,9 +221,12 @@ export const actions: Actions = {
 				grokAi: locals.seams.grokAi
 			},
 			{
-				userId,
+				userId: effectiveUserId,
 				topic: mind,
 				userMood: mood,
+				userMind: mind,
+				userDisplayName: userName,
+				userCleanTime: cleanTime,
 				listeningOnly
 			}
 		);
@@ -204,13 +240,6 @@ export const actions: Actions = {
 			return fail(status, { message, values });
 		}
 
-		const query = new URLSearchParams({
-			name: userName,
-			cleanTime,
-			mood,
-			mind,
-			listen: listeningOnly ? '1' : '0'
-		});
-		throw redirect(303, `/meeting/${result.value.id}?${query.toString()}`);
+		throw redirect(303, `/meeting/${result.value.id}`);
 	}
 };
