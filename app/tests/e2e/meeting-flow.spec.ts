@@ -93,25 +93,24 @@ function sseErrorResponseBody(message: string): string {
 	].join('\n');
 }
 
-/**
- * Answer every character-share request with a share attributed to whichever
- * character the page asked for, so the introductions read as distinct people.
- */
 async function stubCharacterShares(
 	page: Page,
-	meetingId: string,
+	meetingId?: string,
 	options: { currentPhase?: string } = {}
 ) {
 	let sequenceOrder = 0;
-	await page.route(`**/meeting/${meetingId}/share*`, async (route) => {
-		const characterId = new URL(route.request().url()).searchParams.get('characterId') ?? 'marcus';
+	const urlPattern = meetingId ? `**/meeting/${meetingId}/share*` : '**/meeting/*/share*';
+	await page.route(urlPattern, async (route) => {
+		const requestUrl = new URL(route.request().url());
+		const currentMeetingId = meetingId ?? requestUrl.pathname.split('/')[2];
+		const characterId = requestUrl.searchParams.get('characterId') ?? 'marcus';
 		const name = CHARACTER_NAMES[characterId] ?? 'Someone';
 		sequenceOrder += 1;
 		await route.fulfill({
 			status: 200,
 			headers: { 'content-type': 'text/event-stream; charset=utf-8' },
 			body: sseResponseBody({
-				meetingId,
+				meetingId: currentMeetingId,
 				characterId,
 				sequenceOrder,
 				shareId: `share-${sequenceOrder}`,
@@ -124,11 +123,14 @@ async function stubCharacterShares(
 
 async function stubUserShare(
 	page: Page,
-	meetingId: string,
+	meetingId?: string,
 	options: { crisis?: boolean; heavy?: boolean; currentPhase?: string } = {}
 ) {
 	let userShareCount = 0;
-	await page.route(`**/meeting/${meetingId}/user-share`, async (route) => {
+	const urlPattern = meetingId ? `**/meeting/${meetingId}/user-share` : '**/meeting/*/user-share';
+	await page.route(urlPattern, async (route) => {
+		const requestUrl = new URL(route.request().url());
+		const currentMeetingId = meetingId ?? requestUrl.pathname.split('/')[2];
 		const body = route.request().postDataJSON() as { content?: string };
 		userShareCount += 1;
 		await route.fulfill({
@@ -139,7 +141,7 @@ async function stubUserShare(
 				value: {
 					share: {
 						id: `share-user-${userShareCount}`,
-						meetingId,
+						meetingId: currentMeetingId,
 						characterId: null,
 						isUserShare: true,
 						content: body?.content ?? '',
@@ -157,24 +159,53 @@ async function stubUserShare(
 	});
 }
 
-function meetingUrl(meetingId: string, mood: string, mind: string): string {
-	const query = new URLSearchParams({
-		name: 'Tester',
-		cleanTime: '7 days',
-		mood,
-		mind
-	});
-	return `/meeting/${meetingId}?${query.toString()}`;
+async function completeJoinFlow(
+	page: Page,
+	input: { userName: string; cleanTime: string; mood: string; mind: string; listeningOnly?: boolean }
+): Promise<string> {
+	await page.goto('/');
+
+	// Step 1: Name
+	await page.fill('#userName', input.userName);
+	await page.click('button:has-text("Next")');
+
+	// Step 2: Clean Time
+	await page.fill('#cleanTime', input.cleanTime);
+	await page.click('button:has-text("Next")');
+
+	// Step 3: Mood
+	await page.selectOption('#mood', input.mood);
+	await page.click('button:has-text("Next")');
+
+	// Step 4: Mind
+	await page.fill('#mind', input.mind);
+	if (input.listeningOnly) {
+		await page.check('#listeningOnly');
+	}
+
+	await Promise.all([
+		page.waitForURL(/\/meeting\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i),
+		page.click('button:has-text("Join Meeting")')
+	]);
+
+	const currentUrl = new URL(page.url());
+	expect(currentUrl.search).toBe(''); // Verify zero query parameters
+
+	const meetingId = currentUrl.pathname.replace('/meeting/', '').split('/')[0];
+	return meetingId;
 }
 
 test('the room opens itself and then waits for the newcomer to introduce', async ({ page }) => {
 	test.setTimeout(ROOM_LED_TIMEOUT_MS);
-	const meetingId = 'e2e-room-led-opening';
+	await stubCharacterShares(page);
+	await stubUserShare(page);
 
-	await stubCharacterShares(page, meetingId);
-	await stubUserShare(page, meetingId);
-
-	await page.goto(meetingUrl(meetingId, 'hopeful', 'Staying present'));
+	const meetingId = await completeJoinFlow(page, {
+		userName: 'Tester',
+		cleanTime: '7 days',
+		mood: 'hopeful',
+		mind: 'Staying present'
+	});
 
 	// Nobody has clicked anything: the ritual plays on its own.
 	await expect(
@@ -203,12 +234,15 @@ test('the room opens itself and then waits for the newcomer to introduce', async
 
 test('choosing a topic starts the round and the room stops for the user turn', async ({ page }) => {
 	test.setTimeout(ROOM_LED_TIMEOUT_MS);
-	const meetingId = 'e2e-room-led-rounds';
+	await stubCharacterShares(page, undefined, { currentPhase: 'sharing_round_1' });
+	await stubUserShare(page, undefined, { currentPhase: 'sharing_round_1' });
 
-	await stubCharacterShares(page, meetingId, { currentPhase: 'sharing_round_1' });
-	await stubUserShare(page, meetingId, { currentPhase: 'sharing_round_1' });
-
-	await page.goto(meetingUrl(meetingId, 'steady', 'Staying close'));
+	await completeJoinFlow(page, {
+		userName: 'Tester',
+		cleanTime: '7 days',
+		mood: 'steady',
+		mind: 'Staying close'
+	});
 
 	await page.getByRole('button', { name: 'Introduce yourself' }).click({
 		timeout: ROOM_LED_TIMEOUT_MS
@@ -230,16 +264,16 @@ test('choosing a topic starts the round and the room stops for the user turn', a
 
 test('a crisis disclosure stops the meeting and pins the resources', async ({ page }) => {
 	test.setTimeout(ROOM_LED_TIMEOUT_MS);
-	const meetingId = 'e2e-crisis';
-
-	await stubCharacterShares(page, meetingId, { currentPhase: 'sharing_round_1' });
-	await stubUserShare(page, meetingId, {
+	await stubCharacterShares(page, undefined, { currentPhase: 'sharing_round_1' });
+	await stubUserShare(page, undefined, {
 		crisis: true,
 		heavy: true,
 		currentPhase: 'crisis_mode'
 	});
 
-	await page.route(`**/meeting/${meetingId}/crisis`, async (route) => {
+	await page.route('**/meeting/*/crisis', async (route) => {
+		const requestUrl = new URL(route.request().url());
+		const currentMeetingId = requestUrl.pathname.split('/')[2];
 		await route.fulfill({
 			status: 200,
 			contentType: 'application/json',
@@ -249,7 +283,7 @@ test('a crisis disclosure stops the meeting and pins the resources', async ({ pa
 					shares: [
 						{
 							id: 'share-marcus-crisis',
-							meetingId,
+							meetingId: currentMeetingId,
 							characterId: 'marcus',
 							isUserShare: false,
 							content: "I'm right here with you.",
@@ -260,7 +294,7 @@ test('a crisis disclosure stops the meeting and pins the resources', async ({ pa
 						},
 						{
 							id: 'share-heather-crisis',
-							meetingId,
+							meetingId: currentMeetingId,
 							characterId: 'heather',
 							isUserShare: false,
 							content: 'You matter and we are staying with you.',
@@ -285,7 +319,12 @@ test('a crisis disclosure stops the meeting and pins the resources', async ({ pa
 		});
 	});
 
-	await page.goto(meetingUrl(meetingId, 'anxious', 'Trying to hang on'));
+	await completeJoinFlow(page, {
+		userName: 'Tester',
+		cleanTime: '7 days',
+		mood: 'anxious',
+		mind: 'Trying to hang on'
+	});
 
 	await page.getByRole('button', { name: 'Introduce yourself' }).click({
 		timeout: ROOM_LED_TIMEOUT_MS
@@ -302,9 +341,7 @@ test('a crisis disclosure stops the meeting and pins the resources', async ({ pa
 
 test('a failed share stream surfaces the error instead of stalling silently', async ({ page }) => {
 	test.setTimeout(ROOM_LED_TIMEOUT_MS);
-	const meetingId = 'e2e-share-error';
-
-	await page.route(`**/meeting/${meetingId}/share*`, async (route) => {
+	await page.route('**/meeting/*/share*', async (route) => {
 		await route.fulfill({
 			status: 200,
 			headers: { 'content-type': 'text/event-stream; charset=utf-8' },
@@ -312,9 +349,51 @@ test('a failed share stream surfaces the error instead of stalling silently', as
 		});
 	});
 
-	await page.goto(meetingUrl(meetingId, 'tired', 'Just getting through today'));
+	await completeJoinFlow(page, {
+		userName: 'Tester',
+		cleanTime: '7 days',
+		mood: 'tired',
+		mind: 'Just getting through today'
+	});
 
 	await expect(page.getByText('temporary room glitch')).toBeVisible({
 		timeout: ROOM_LED_TIMEOUT_MS
 	});
+});
+
+test('cross-session ownership isolation: clean URL refresh works and second context receives 404', async ({
+	browser,
+	page
+}) => {
+	test.setTimeout(ROOM_LED_TIMEOUT_MS);
+	await stubCharacterShares(page);
+	await stubUserShare(page);
+
+	const meetingId = await completeJoinFlow(page, {
+		userName: 'Tester',
+		cleanTime: '7 days',
+		mood: 'hopeful',
+		mind: 'Staying present'
+	});
+
+	// Refresh the clean URL: displayed meeting state is preserved
+	await page.reload();
+	await expect(page).toHaveURL(`/meeting/${meetingId}`);
+	expect(new URL(page.url()).search).toBe('');
+	await expect(
+		page.getByText("This chair stays empty for everyone who couldn't make it tonight.")
+	).toBeVisible();
+
+	// Second independent browser context has no session cookies for owner
+	const secondContext = await browser.newContext();
+	const secondPage = await secondContext.newPage();
+
+	const response = await secondPage.goto(`/meeting/${meetingId}`);
+	expect(response?.status()).toBe(404);
+
+	// Child endpoint (/share) in second context receives 404 JSON
+	const apiResponse = await secondPage.request.get(`/meeting/${meetingId}/share`);
+	expect(apiResponse.status()).toBe(404);
+
+	await secondContext.close();
 });
