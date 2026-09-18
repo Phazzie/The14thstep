@@ -64,6 +64,7 @@ describe('narrative-context quality parsing', () => {
 describe('getMeetingNarrativeContext', () => {
 	beforeEach(() => {
 		clearMeetingNarrativeContextCache();
+		vi.useRealTimers();
 	});
 
 	it('caches generated narrative context for a meeting', async () => {
@@ -124,5 +125,77 @@ describe('getMeetingNarrativeContext', () => {
 		expect(context.contextLine.toLowerCase()).toContain('undercurrent');
 		expect(context.roomFrame).toContain('folding chairs');
 		expect(context.emotionalUndercurrent).toContain('without pretending to have easy answers');
+	});
+
+	it('falls back gracefully when generateShare throws', async () => {
+		const generateShare = vi.fn(async () => {
+			throw new Error('socket hang up');
+		});
+		const grokAi = createGrokMock(generateShare);
+
+		const context = await getMeetingNarrativeContext({
+			meetingId: 'meeting-throw',
+			topic: 'honesty',
+			userName: 'Lane',
+			userMood: 'raw',
+			recentShares: [],
+			grokAi
+		});
+
+		expect(generateShare).toHaveBeenCalledTimes(1);
+		expect(context.source).toBe('fallback');
+		expect(context.roomFrame).toContain('folding chairs');
+	});
+
+	it('retries fallback context after the fallback cache ttl expires', async () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date('2026-03-18T12:00:00Z'));
+
+		const generateShare = vi
+			.fn<GrokAiPort['generateShare']>()
+			.mockResolvedValueOnce(err(SeamErrorCodes.UPSTREAM_UNAVAILABLE, 'network unavailable'))
+			.mockResolvedValueOnce(
+				ok({
+					shareText: JSON.stringify({
+						roomFrame: 'The coffee is burnt and the room finally settles.',
+						emotionalUndercurrent: 'People sound less armored now that someone went first.'
+					})
+				})
+			);
+		const grokAi = createGrokMock(generateShare);
+
+		const first = await getMeetingNarrativeContext({
+			meetingId: 'meeting-cache-retry',
+			topic: 'honesty',
+			userName: 'Lane',
+			userMood: 'raw',
+			recentShares: [],
+			grokAi
+		});
+		const second = await getMeetingNarrativeContext({
+			meetingId: 'meeting-cache-retry',
+			topic: 'honesty',
+			userName: 'Lane',
+			userMood: 'raw',
+			recentShares: [],
+			grokAi
+		});
+
+		vi.advanceTimersByTime(30_001);
+
+		const third = await getMeetingNarrativeContext({
+			meetingId: 'meeting-cache-retry',
+			topic: 'honesty',
+			userName: 'Lane',
+			userMood: 'raw',
+			recentShares: [],
+			grokAi
+		});
+
+		expect(generateShare).toHaveBeenCalledTimes(2);
+		expect(first.source).toBe('fallback');
+		expect(second.source).toBe('fallback');
+		expect(third.source).toBe('generated');
+		expect(third.roomFrame).toContain('The coffee is burnt');
 	});
 });
