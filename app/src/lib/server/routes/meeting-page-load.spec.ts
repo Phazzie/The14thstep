@@ -211,6 +211,9 @@ describe('meeting page server load', () => {
 
 		const load1 = await load(event1 as never);
 		const load2 = await load(event1 as never);
+		if (!load1 || !load2) {
+			throw new Error('Expected load to return data');
+		}
 
 		expect(load1.initialUserName).toBe(load2.initialUserName);
 		expect(load1.initialCleanTime).toBe(load2.initialCleanTime);

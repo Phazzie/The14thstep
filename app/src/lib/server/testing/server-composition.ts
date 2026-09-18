@@ -1,9 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { SeamErrorCodes, err, ok } from '$lib/core/seam';
 import type { AuthPort } from '$lib/seams/auth/contract';
+import type { MeetingParticipant } from '$lib/core/types';
 import type {
+	CompleteMeetingInput,
 	DatabasePort,
-	MeetingParticipant,
+	MeetingParticipantSeed,
 	MeetingRecord,
 	ShareRecord
 } from '$lib/seams/database/contract';
@@ -58,9 +60,8 @@ export function createServerTestingComposition(): ServerCompositionBundle {
 			const userId = state.sessions.get(token)!;
 			return ok({
 				userId,
-				email: null,
-				sessionKind: 'guest',
-				role: 'authenticated'
+				email: '',
+				expiresAt: new Date(Date.now() + 3600 * 1000).toISOString()
 			});
 		},
 
@@ -168,8 +169,12 @@ export function createServerTestingComposition(): ServerCompositionBundle {
 		},
 
 		async saveMeetingParticipants(input) {
-			state.participants.set(input.meetingId, [...input.participants]);
-			return ok(input.participants);
+			const mapped: MeetingParticipant[] = input.participants.map((p) => ({
+				...p,
+				sharesCount: 0
+			}));
+			state.participants.set(input.meetingId, mapped);
+			return ok(mapped);
 		},
 
 		async getMeetingParticipants(meetingId) {
@@ -186,7 +191,6 @@ export function createServerTestingComposition(): ServerCompositionBundle {
 				content: input.content,
 				interactionType: input.interactionType,
 				significanceScore: input.significanceScore ?? 1,
-				heavyTopicTags: [],
 				sequenceOrder: input.sequenceOrder,
 				createdAt: new Date().toISOString()
 			};
@@ -216,8 +220,8 @@ export function createServerTestingComposition(): ServerCompositionBundle {
 			return ok(undefined);
 		},
 
-		async completeMeeting(meetingId) {
-			const meeting = state.meetings.get(meetingId);
+		async completeMeeting(input) {
+			const meeting = state.meetings.get(input.meetingId);
 			if (!meeting) return err(SeamErrorCodes.NOT_FOUND, 'Meeting not found');
 			meeting.endedAt = new Date().toISOString();
 			return ok({ ...meeting });
@@ -231,8 +235,21 @@ export function createServerTestingComposition(): ServerCompositionBundle {
 			return ok([]);
 		},
 
-		async markCallbackReferenced() {
-			return ok(undefined);
+		async markCallbackReferenced(callbackId) {
+			return ok({
+				id: callbackId,
+				meetingId: 'mock-meeting',
+				characterId: 'marcus',
+				originShareId: 'mock-share',
+				originalText: 'mock',
+				callbackType: 'room_meta',
+				scope: 'room',
+				potentialScore: 1,
+				timesReferenced: 1,
+				lastReferencedAt: new Date().toISOString(),
+				status: 'active',
+				parentCallbackId: null
+			});
 		},
 
 		async updateCallback() {
