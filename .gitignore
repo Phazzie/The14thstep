@@ -33,3 +33,5 @@ app/supabase/.temp/
 **/*.pyc
 .vercel
 app/node_modules.winbak.*/
+.agents/
+

@@ -89,6 +89,9 @@ function createInMemoryDatabase(userId: string): { state: InMemoryState; databas
 				userId: input.userId,
 				topic: input.topic,
 				userMood: input.userMood,
+				userMind: input.userMind ?? null,
+				userDisplayName: input.userDisplayName ?? null,
+				userCleanTime: input.userCleanTime ?? null,
 				listeningOnly: input.listeningOnly,
 				startedAt: isoNow(state.ids.meeting * 1000),
 				endedAt: null
@@ -102,6 +105,14 @@ function createInMemoryDatabase(userId: string): { state: InMemoryState; databas
 				user.lastMeetingAt = meeting.startedAt;
 			}
 
+			return ok(meeting);
+		},
+
+		async getOwnedMeeting(input) {
+			const meeting = state.meetings.find(
+				(entry) => entry.id === input.meetingId && entry.userId === input.userId
+			);
+			if (!meeting) return err(SeamErrorCodes.NOT_FOUND, 'Meeting not found');
 			return ok(meeting);
 		},
 

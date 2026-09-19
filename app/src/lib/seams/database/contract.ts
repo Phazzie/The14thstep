@@ -22,6 +22,9 @@ export interface MeetingRecord {
 	userId: string;
 	topic: string;
 	userMood: string;
+	userMind: string | null;
+	userDisplayName: string | null;
+	userCleanTime: string | null;
 	listeningOnly: boolean;
 	startedAt: string;
 	endedAt: string | null;
@@ -122,12 +125,18 @@ export interface GetMeetingCountAfterDateInput {
 	startedAfter: string;
 }
 
+export interface GetOwnedMeetingInput {
+	meetingId: string;
+	userId: string;
+}
+
 export interface DatabasePort {
 	getUserById(userId: string): Promise<SeamResult<UserProfile>>;
 	ensureUserProfile(input: EnsureUserProfileInput): Promise<SeamResult<UserProfile>>;
 	createMeeting(
 		input: Omit<MeetingRecord, 'id' | 'startedAt' | 'endedAt'>
 	): Promise<SeamResult<MeetingRecord>>;
+	getOwnedMeeting(input: GetOwnedMeetingInput): Promise<SeamResult<MeetingRecord>>;
 	appendShare(input: Omit<ShareRecord, 'id' | 'createdAt'>): Promise<SeamResult<ShareRecord>>;
 	saveMeetingParticipants(input: {
 		meetingId: string;
@@ -255,6 +264,9 @@ export function validateMeetingRecord(value: unknown): value is MeetingRecord {
 		isNonEmptyString(value.userId) &&
 		isNonEmptyString(value.topic) &&
 		isNonEmptyString(value.userMood) &&
+		isNullableString(value.userMind) &&
+		isNullableString(value.userDisplayName) &&
+		isNullableString(value.userCleanTime) &&
 		typeof value.listeningOnly === 'boolean' &&
 		isNonEmptyString(value.startedAt) &&
 		isNullableString(value.endedAt)
@@ -269,8 +281,16 @@ export function validateCreateMeetingInput(
 		isNonEmptyString(value.userId) &&
 		isNonEmptyString(value.topic) &&
 		isNonEmptyString(value.userMood) &&
+		isNullableString(value.userMind) &&
+		isNullableString(value.userDisplayName) &&
+		isNullableString(value.userCleanTime) &&
 		typeof value.listeningOnly === 'boolean'
 	);
+}
+
+export function validateGetOwnedMeetingInput(value: unknown): value is GetOwnedMeetingInput {
+	if (!isObject(value)) return false;
+	return isNonEmptyString(value.meetingId) && isNonEmptyString(value.userId);
 }
 
 export function validateShareRecord(value: unknown): value is ShareRecord {

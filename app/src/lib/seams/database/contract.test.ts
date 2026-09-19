@@ -6,6 +6,7 @@ import {
 	validateCompleteMeetingInput,
 	validateCreateCallbackInput,
 	validateGetMeetingCountAfterDateInput,
+	validateGetOwnedMeetingInput,
 	validateAppendShareInput,
 	validateEnsureUserProfileInput,
 	validateMeetingParticipant,
@@ -35,6 +36,14 @@ describe('database seam contract', () => {
 	it('validates fixture shapes', () => {
 		expect(validateUserProfile(getUserByIdSample)).toBe(true);
 		expect(validateMeetingRecord(createMeetingSample)).toBe(true);
+		expect(
+			validateGetOwnedMeetingInput({
+				meetingId: '2f5dcf63-cf80-4e09-8e3e-13f93da72cf3',
+				userId: 'fab8bc65-1f5e-4ef1-8606-ab51921f9a07'
+			})
+		).toBe(true);
+		expect(validateGetOwnedMeetingInput({})).toBe(false);
+		expect(validateGetOwnedMeetingInput({ meetingId: '', userId: 'valid-user' })).toBe(false);
 		expect(validateShareRecord(appendShareSample)).toBe(true);
 		expect(validateShareRecord(getShareByIdSample)).toBe(true);
 		expect(validateCallbackRecord(createCallbackSample)).toBe(true);
@@ -99,11 +108,32 @@ describe('database seam contract', () => {
 			userId: 'fab8bc65-1f5e-4ef1-8606-ab51921f9a07',
 			topic: 'Staying when I want to leave',
 			userMood: 'anxious',
+			userMind: 'Staying sober when I want to run',
+			userDisplayName: 'trap',
+			userCleanTime: '19 days',
 			listeningOnly: false
 		});
 		expect(createdMeeting.ok).toBe(true);
 		if (createdMeeting.ok) {
 			expect(createdMeeting.value).toEqual(createMeetingSample);
+		}
+
+		const ownedMeeting = await mock.getOwnedMeeting({
+			meetingId: '2f5dcf63-cf80-4e09-8e3e-13f93da72cf3',
+			userId: 'fab8bc65-1f5e-4ef1-8606-ab51921f9a07'
+		});
+		expect(ownedMeeting.ok).toBe(true);
+		if (ownedMeeting.ok) {
+			expect(ownedMeeting.value).toEqual(createMeetingSample);
+		}
+
+		const wrongUser = await mock.getOwnedMeeting({
+			meetingId: '2f5dcf63-cf80-4e09-8e3e-13f93da72cf3',
+			userId: 'wrong-user-id'
+		});
+		expect(wrongUser.ok).toBe(false);
+		if (!wrongUser.ok) {
+			expect(wrongUser.error.code).toBe(SeamErrorCodes.NOT_FOUND);
 		}
 
 		const ensuredProfile = await mock.ensureUserProfile({
@@ -230,7 +260,8 @@ describe('database seam contract', () => {
 	it('mock can surface fault scenario per method', async () => {
 		const mock = createDatabaseMock({
 			scenarios: {
-				getHeavyMemory: 'fault'
+				getHeavyMemory: 'fault',
+				getOwnedMeeting: 'fault'
 			}
 		});
 
@@ -239,6 +270,16 @@ describe('database seam contract', () => {
 		if (!result.ok) {
 			expect(result.error.code).toBe((faultFixture as { code: string }).code);
 			expect(result.error.message).toBe((faultFixture as { message: string }).message);
+		}
+
+		const ownedResult = await mock.getOwnedMeeting({
+			meetingId: '2f5dcf63-cf80-4e09-8e3e-13f93da72cf3',
+			userId: 'fab8bc65-1f5e-4ef1-8606-ab51921f9a07'
+		});
+		expect(ownedResult.ok).toBe(false);
+		if (!ownedResult.ok) {
+			expect(ownedResult.error.code).toBe((faultFixture as { code: string }).code);
+			expect(ownedResult.error.message).toBe((faultFixture as { message: string }).message);
 		}
 	});
 

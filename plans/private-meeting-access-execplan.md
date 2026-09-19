@@ -12,6 +12,10 @@ The behavior is visible in two ways. The join redirect contains only `/meeting/<
 
 ## Progress
 
+- [x] (2026-09-19) Audited PR #97 head `6e7f26f`: CI contracts, core, and composition pass; lint, fixtures, and e2e fail. No inline review threads were returned.
+- [x] (2026-09-19) Removed four unused declarations; local lint passes. All 394 server-project tests pass across 44 files.
+- [ ] (2026-09-19) Corrected two browser-test inputs (`steady` and `tired`) to available mood options; browser verification remains pending because local Chromium installation timed out. CI previously failed both tests while selecting nonexistent mood options.
+- [ ] (2026-09-19) Required real-system privacy probes and fixture recapture remain blocked on configured application credentials; existing #71, #84, #85, and #91 track the unfinished work. No merge or deployment is verified.
 - [x] (2026-09-12 13:45Z) Read the current landing action, meeting loader and child routes, authentication hook, database contract, mock, Supabase adapter, schema, and relevant tests.
 - [x] (2026-09-12 13:45Z) Chose one meeting-scoped persistence contract and one centralized route-ownership gate so later meeting endpoints inherit the same protection.
 - [x] (2026-09-14 03:14Z) Integrated PR review findings for auth-error preservation, malformed ids, probe identity, cutover order, server-side auth, database, and Grok browser fixtures, fresh-server ownership, configured test paths, and the required real-system probe stage.
@@ -27,6 +31,8 @@ The behavior is visible in two ways. The join redirect contains only `/meeting/<
 
 ## Surprises & Discoveries
 
+- Observation (2026-09-19): the two failing browser stories never reached their meeting assertions. Verify run 35384501689 timed out selecting mood options absent from `SetupFlow.svelte`. Use actual UI values while preserving every downstream assertion.
+- Observation (2026-09-19): server-only verification can run independently of the unavailable local browser. `npm run test:unit -- --run --project server` passes 394 tests; this does not establish browser or live-service success.
 - Observation: all five intake values are deliberately placed in the meeting URL today.
   Evidence: `app/src/routes/+page.server.ts` builds `URLSearchParams` containing `name`, `cleanTime`, `mood`, `mind`, and `listen`, then redirects to that query string. `app/src/routes/meeting/[id]/+page.server.ts` reads those values back from `url.searchParams`.
 
@@ -65,6 +71,9 @@ The behavior is visible in two ways. The join redirect contains only `/meeting/<
 
 ## Decision Log
 
+- Decision: repair the existing lint and browser-input failures as a bounded verification slice, without changing seam fixtures, production behavior, or acceptance gates.
+  Rationale: these failures are independently evidenced and can be repaired while credential-dependent privacy proof remains blocked. User authorization permits merging ready PRs, not treating incomplete proof as success.
+  Date/Author: 2026-09-19 / Codex
 - Decision: store meeting-specific display name, clean time, mood, mind text, and listening choice on the meeting record.
   Rationale: these values must survive refresh without a URL, browser storage, or dependence on a later profile edit. The existing meeting row already owns mood, mind, and listening choice.
   Date/Author: 2026-09-12 / Codex
@@ -122,6 +131,8 @@ The behavior is visible in two ways. The join redirect contains only `/meeting/<
   Date/Author: 2026-09-14 / Codex
 
 ## Outcomes & Retrospective
+
+2026-09-19 checkpoint: PR #97 contains implementation but has not demonstrated the complete privacy story. Lint repairs and 394 passing server tests are verified locally; corrected browser inputs await execution. The earlier planning-only assessment below records the original state, not the current branch. Finish the real-system probe, captured fixtures, full browser story, and current-head checks before declaring any implementation milestone complete or merging. The user-provided database has been bootstrapped separately; its hosted baseline must be reconciled with the repository migration history before any CLI push. A database bootstrap does not establish app runtime connectivity.
 
 Planning is complete; application behavior has not changed yet. The implementation is divided into seven small outcomes. The first two establish and prove a backward-compatible persistence seam and a default-deny PostgREST boundary against a disposable real local Supabase stack before deriving fixtures and mocks. The next three protect the route family, prepare the loader, and make the clean-URL cutover as one deployable transition. The sixth supplies the server-side test composition needed for an honest browser story, and the seventh verifies the full result. Its migration has a distinct Supabase timestamp version that sorts before the core-identity and meeting-beat migrations. Production deployment and a hosted Supabase migration remain blocked by epic #71; local progress depends on the real local probe succeeding before the mock, adapter, routes, and browser story continue.
 

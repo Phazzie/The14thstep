@@ -10,6 +10,9 @@ export interface CreateMeetingInput {
 	userId: string;
 	topic: string;
 	userMood: string;
+	userMind?: string | null;
+	userDisplayName?: string | null;
+	userCleanTime?: string | null;
 	listeningOnly: boolean;
 }
 
@@ -57,6 +60,10 @@ function isNonEmptyString(value: unknown): value is string {
 	return typeof value === 'string' && value.trim().length > 0;
 }
 
+function isNullableString(value: unknown): value is string | null {
+	return value === null || typeof value === 'string';
+}
+
 function normalize(text: string): string {
 	return text.toLowerCase();
 }
@@ -98,7 +105,14 @@ export async function createMeeting(
 	deps: MeetingWorkflowDeps,
 	input: CreateMeetingInput
 ): Promise<SeamResult<MeetingRecord>> {
-	if (!isNonEmptyString(input.userId) || !isNonEmptyString(input.topic) || !isNonEmptyString(input.userMood)) {
+	if (
+		!isNonEmptyString(input.userId) ||
+		!isNonEmptyString(input.topic) ||
+		!isNonEmptyString(input.userMood) ||
+		(input.userMind !== undefined && !isNullableString(input.userMind)) ||
+		(input.userDisplayName !== undefined && !isNullableString(input.userDisplayName)) ||
+		(input.userCleanTime !== undefined && !isNullableString(input.userCleanTime))
+	) {
 		return err(SeamErrorCodes.INPUT_INVALID, 'Invalid createMeeting input');
 	}
 
@@ -106,6 +120,9 @@ export async function createMeeting(
 		userId: input.userId,
 		topic: input.topic,
 		userMood: input.userMood,
+		userMind: input.userMind ?? null,
+		userDisplayName: input.userDisplayName ?? null,
+		userCleanTime: input.userCleanTime ?? null,
 		listeningOnly: input.listeningOnly
 	});
 }

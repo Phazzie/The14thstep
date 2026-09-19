@@ -1,5 +1,5 @@
 import type { AuthPort } from '$lib/seams/auth/contract';
-import type { DatabasePort } from '$lib/seams/database/contract';
+import type { DatabasePort, MeetingRecord } from '$lib/seams/database/contract';
 import type { GrokAiPort } from '$lib/seams/grok-ai/contract';
 
 // See https://svelte.dev/docs/kit/types#app.d.ts
@@ -14,6 +14,7 @@ declare global {
 				grokAi: GrokAiPort;
 			};
 			userId: string | null;
+			meetingContext: MeetingRecord | null;
 		}
 		// interface PageData {}
 		// interface PageState {}

@@ -128,4 +128,80 @@ describe('landing page actions', () => {
 			}
 		});
 	});
+
+	it('proves the workflow receives private intake and redirects to exact clean path', async () => {
+		const createMeetingMock = vi.mocked(createMeeting);
+		createMeetingMock.mockReset();
+		createMeetingMock.mockResolvedValue({
+			ok: true,
+			value: { id: 'meeting-456' } as never
+		});
+
+		await expect(
+			joinWith(
+				{
+					userName: 'Lane',
+					cleanTime: '22 days',
+					mood: 'anxious',
+					mind: 'Trying not to spiral'
+				},
+				{ userId: 'user-123' }
+			)
+		).rejects.toMatchObject({
+			status: 303,
+			location: '/meeting/meeting-456'
+		});
+
+		expect(createMeetingMock).toHaveBeenCalledWith(
+			expect.anything(),
+			expect.objectContaining({
+				userId: 'user-123',
+				topic: 'Trying not to spiral',
+				userMood: 'anxious',
+				userMind: 'Trying not to spiral',
+				userDisplayName: 'Lane',
+				userCleanTime: '22 days',
+				listeningOnly: false
+			})
+		);
+	});
+
+	it('handles listening-only join and redirects to clean path', async () => {
+		const createMeetingMock = vi.mocked(createMeeting);
+		createMeetingMock.mockReset();
+		createMeetingMock.mockResolvedValue({
+			ok: true,
+			value: { id: 'meeting-789' } as never
+		});
+
+		await expect(
+			joinWith(
+				{
+					userName: 'Sam',
+					cleanTime: '1 year',
+					mood: 'peaceful',
+					mind: 'Grateful to be here',
+					listeningOnly: 'on'
+				},
+				{ userId: 'user-123' }
+			)
+		).rejects.toMatchObject({
+			status: 303,
+			location: '/meeting/meeting-789'
+		});
+
+		expect(createMeetingMock).toHaveBeenCalledWith(
+			expect.anything(),
+			expect.objectContaining({
+				userId: 'user-123',
+				topic: 'Grateful to be here',
+				userMood: 'peaceful',
+				userMind: 'Grateful to be here',
+				userDisplayName: 'Sam',
+				userCleanTime: '1 year',
+				listeningOnly: true
+			})
+		);
+	});
 });
+

@@ -9,6 +9,9 @@ export default defineConfig({
 		command: 'npm run build && npm run preview -- --host 127.0.0.1 --port 4173',
 		port: 4173,
 		timeout: 300000,
-		reuseExistingServer: !process.env.CI
+		reuseExistingServer: false,
+		env: {
+			E2E_MOCK_SEAMS: '1'
+		}
 	}
 });

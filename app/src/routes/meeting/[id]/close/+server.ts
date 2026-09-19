@@ -360,7 +360,7 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 
 	if (scanResult.ok) {
 		callbackScan = scanResult.value;
-		const userId = locals.userId ?? process.env.PROBE_USER_ID?.trim() ?? null;
+		const userId = locals.userId ?? null;
 		if (userId) {
 			const presentCharacterIds = Array.from(
 				new Set(
