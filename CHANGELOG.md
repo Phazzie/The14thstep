@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-19 — PR #97 verification repairs
+
+- Removed unused declarations blocking lint and corrected two browser-story mood inputs to choices actually offered by the setup form. Existing meeting and privacy assertions remain in place; browser and live-service verification are still pending.
+
 All notable changes to this repository are documented in this file.
 
 ## 2026-09-12

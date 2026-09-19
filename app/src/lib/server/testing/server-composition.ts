@@ -3,9 +3,7 @@ import { SeamErrorCodes, err, ok } from '$lib/core/seam';
 import type { AuthPort } from '$lib/seams/auth/contract';
 import type { MeetingParticipant } from '$lib/core/types';
 import type {
-	CompleteMeetingInput,
 	DatabasePort,
-	MeetingParticipantSeed,
 	MeetingRecord,
 	ShareRecord
 } from '$lib/seams/database/contract';

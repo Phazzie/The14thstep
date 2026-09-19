@@ -200,7 +200,7 @@ test('the room opens itself and then waits for the newcomer to introduce', async
 	await stubCharacterShares(page);
 	await stubUserShare(page);
 
-	const meetingId = await completeJoinFlow(page, {
+	await completeJoinFlow(page, {
 		userName: 'Tester',
 		cleanTime: '7 days',
 		mood: 'hopeful',
@@ -240,7 +240,7 @@ test('choosing a topic starts the round and the room stops for the user turn', a
 	await completeJoinFlow(page, {
 		userName: 'Tester',
 		cleanTime: '7 days',
-		mood: 'steady',
+		mood: 'hopeful',
 		mind: 'Staying close'
 	});
 
@@ -352,7 +352,7 @@ test('a failed share stream surfaces the error instead of stalling silently', as
 	await completeJoinFlow(page, {
 		userName: 'Tester',
 		cleanTime: '7 days',
-		mood: 'tired',
+		mood: 'burned out',
 		mind: 'Just getting through today'
 	});
 

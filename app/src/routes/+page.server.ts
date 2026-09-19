@@ -46,10 +46,6 @@ function noticeFromQuery(url: URL): { authNotice: string | null; authNoticeKind:
 	return { authNotice: null, authNoticeKind: null };
 }
 
-function isProductionRuntime(env: NodeJS.ProcessEnv = process.env): boolean {
-	return (env.NODE_ENV ?? '').trim() === 'production' || (env.VERCEL_ENV ?? '').trim() === 'production';
-}
-
 async function ensureProfileBootstrap(
 	locals: App.Locals,
 	input: { id: string; displayName: string; cleanTime?: string | null; isAnonymous: boolean }
