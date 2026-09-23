@@ -28,7 +28,7 @@
 		"test:unit": "vitest"
 	},
 	"dependencies": {
-		"@clerk/backend": "^3.0.1",
+		"@clerk/backend": "^3.2.3",
 		"@clerk/clerk-js": "^6.0.0",
 		"@supabase/supabase-js": "^2.95.3"
 	},
