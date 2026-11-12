@@ -1,0 +1,245 @@
+# Origin CI via Depot. Port of .github/workflows/verify.yml plus the pull-request review.
+# Map and secrets: docs/origin-ci.md
+name: Verify
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint_and_typecheck:
+    runs-on: depot-ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Pin npm
+        run: npm install -g npm@11.6.2
+
+      - name: Print Toolchain
+        run: node -v && npm -v
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint:verify
+
+      - name: Typecheck
+        run: npm run check
+
+  fixtures:
+    runs-on: depot-ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Pin npm
+        run: npm install -g npm@11.6.2
+
+      - name: Print Toolchain
+        run: node -v && npm -v
+
+      - name: Install
+        run: npm ci
+
+      - name: Verify Fixtures
+        run: npm run verify:fixtures
+
+  contracts:
+    runs-on: depot-ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Pin npm
+        run: npm install -g npm@11.6.2
+
+      - name: Print Toolchain
+        run: node -v && npm -v
+
+      - name: Install
+        run: npm ci
+
+      - name: Verify Contracts
+        run: npm run verify:contracts
+
+  core:
+    runs-on: depot-ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Pin npm
+        run: npm install -g npm@11.6.2
+
+      - name: Print Toolchain
+        run: node -v && npm -v
+
+      - name: Install
+        run: npm ci
+
+      - name: Verify Core
+        run: npm run verify:core
+
+  composition:
+    runs-on: depot-ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Pin npm
+        run: npm install -g npm@11.6.2
+
+      - name: Print Toolchain
+        run: node -v && npm -v
+
+      - name: Install
+        run: npm ci
+
+      - name: Verify Composition
+        run: npm run verify:composition
+
+  e2e:
+    runs-on: depot-ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Pin npm
+        run: npm install -g npm@11.6.2
+
+      - name: Print Toolchain
+        run: node -v && npm -v
+
+      - name: Install
+        run: npm ci
+
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E
+        run: npm run test:e2e
+
+      - name: Upload Playwright Artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts
+          path: |
+            app/playwright-report
+            app/test-results
+          if-no-files-found: ignore
+
+  ai-review:
+    if: github.event_name == 'pull_request'
+    runs-on: depot-ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Review script checks
+        run: node --test scripts/ai-review.test.mjs
+
+      - name: Grok review
+        env:
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+        run: node scripts/ai-review.mjs
+
+  verify:
+    runs-on: depot-ubuntu-24.04
+    needs:
+      - lint_and_typecheck
+      - fixtures
+      - contracts
+      - core
+      - composition
+      - e2e
+    steps:
+      - name: Verification Complete
+        run: echo "All verification jobs passed."

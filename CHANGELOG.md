@@ -2,6 +2,15 @@
 
 All notable changes to this repository are documented in this file.
 
+## 2026-11-12
+
+### Added
+- Depot CI for Cursor Origin: `.depot/workflows/ci.yml` runs the verify lanes on `depot-ubuntu-24.04` for pull requests and pushes to `main`, and `.depot/workflows/seam-freshness.yml` runs the daily freshness check. `scripts/ai-review.mjs` posts a Grok review with `origin pr comment` and skips when `XAI_API_KEY` or the `origin` CLI is missing. `docs/origin-ci.md` maps each GitHub workflow to its Depot equivalent.
+
+### Known
+- `verify:fixtures` still fails on every branch. Seam probe fixtures are past their freshness window, and refreshing them is blocked behind the production database outage (#91, #71). The new fixtures job carries that same failure.
+- `.github/workflows/ci-triage-review-comments.yml` is GitHub-only and has no Depot equivalent.
+
 ## 2026-09-12
 
 ### Fixed
