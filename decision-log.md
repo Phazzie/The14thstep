@@ -284,3 +284,9 @@
 ## 2026-09-15
 
 - PR #96 review: Replay preserves the persisted beat object after validating its meeting and roster. Keep room-owned beat variants separate from the existing database interaction type until the database seam supports those writes.
+
+## 2026-11-12
+
+- GitHub Actions is billing-locked for this account, so CI moves to Cursor Origin through Depot. Workflows live in `.depot/workflows/` and use GitHub Actions syntax on `depot-ubuntu-24.04`. `.github/workflows/` stays until the repository is detached. The map, including secrets to re-enter, is `docs/origin-ci.md`.
+- The verify lanes keep their existing commands and the `verify` aggregate gate. Pushes to `codex/**` are not ported. The scheduled seam freshness check is ported because Depot supports `on.schedule`, with `npm ci` and Node 24 so the install matches the lockfile and the verify toolchain.
+- Review-comment triage stays GitHub-only. It reads the GitHub API with `GITHUB_TOKEN`. The replacement review is `scripts/ai-review.mjs`: Grok via `XAI_API_KEY`, one Origin comment, exit 0 when the key or the `origin` CLI is missing. `XAI_API_KEY` is the Depot secret to add. It was never a GitHub Actions secret here.

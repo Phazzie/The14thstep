@@ -1,3 +1,5 @@
+# Retained while GitHub still hosts the repo. After detach, Origin runs .depot/workflows/seam-freshness.yml.
+# See docs/origin-ci.md.
 name: Continuous Seam Freshness Check
 
 on:

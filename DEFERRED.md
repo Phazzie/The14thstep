@@ -10,3 +10,4 @@ Format:
 - `2026-03-19` — Newcomer-specific spoken welcome before topic selection is still partly local UI text; making that fully room-led would require either an additional persisted intro/topic subphase or a richer topic-selection contract.
 - `2026-03-19` — The meeting page still emits Svelte 5 `state_referenced_locally` warnings from its intentional initial-snapshot setup; fixing that cleanly needs a focused rune-state cleanup pass rather than another ad hoc initialization rewrite.
 - `2026-09-12` — Seam probe fixtures are past their 30-day freshness window on every branch, so `verify:fixtures` fails repo-wide. Refreshing them needs live probes against the xAI and Supabase backends, which are unavailable until the production database is restored.
+- `2026-11-12` — Depot CI includes that same `fixtures` job, and the daily seam-freshness workflow can also go red for the stale captures. Both stay red until #91. The fixture files were not rewritten to force a pass.

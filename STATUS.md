@@ -2,7 +2,7 @@
 
 The one page that says what we are building and where it stands. Read this first.
 
-Last updated: 2026-09-14
+Last updated: 2026-11-12
 
 ## What this app is
 
@@ -17,6 +17,11 @@ Writing quality is not decoration here. It is the product.
 
 The room-led meeting flow is on `main` and green. The app cannot serve anyone,
 because the Supabase tenant behind production is gone.
+
+GitHub Actions is billing-locked for this account. CI for the detached
+repository is Depot, via `.depot/workflows/`, mapped in `docs/origin-ci.md`.
+The GitHub workflow files stay until detach. `verify:fixtures` is still the
+expected red lane.
 
 Those are independent. Work on the room needs nobody's permission. Production
 needs a new database, which needs a human with account access.

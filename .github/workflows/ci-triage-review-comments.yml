@@ -1,3 +1,5 @@
+# GitHub-only. Not ported to Depot: it reads GitHub review comments with GITHUB_TOKEN.
+# See docs/origin-ci.md.
 name: CI Triage Review Comments (Starter)
 
 on:

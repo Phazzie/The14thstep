@@ -1,0 +1,36 @@
+# Origin CI via Depot. Port of .github/workflows/seam-freshness.yml.
+# Depot supports on.schedule. The schedule starts after this file is on the default branch.
+# Map: docs/origin-ci.md
+name: Continuous Seam Freshness Check
+
+on:
+  schedule:
+    # Every day at midnight UTC. Depot evaluates cron in UTC.
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  check_freshness:
+    name: Check Seam Fixture Freshness
+    runs-on: depot-ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: tools/seam-cli/package-lock.json
+
+      - name: Pin npm
+        run: npm install -g npm@11.6.2
+
+      - name: Install Tools
+        working-directory: tools/seam-cli
+        run: npm ci
+
+      - name: Verify Freshness
+        run: node tools/seam-cli/index.js freshness

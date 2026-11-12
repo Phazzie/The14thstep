@@ -2,6 +2,8 @@
 
 Scope: apply these rules for work under `.github/`.
 
+Origin CI lives in `.depot/workflows/` and is mapped in `docs/origin-ci.md`. Keep these GitHub workflows until the repository is detached. Do not treat them as the live signal while GitHub Actions is billing-locked. The review-comment triage workflow stays GitHub-only.
+
 ## Workflow design rules
 
 - Prefer parallel CI jobs for faster signal when checks are independent.
