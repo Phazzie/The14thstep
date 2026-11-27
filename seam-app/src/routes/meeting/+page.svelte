@@ -228,18 +228,18 @@
 						{/each}
 					</fieldset>
 					<div class="buttons">
-						<button type="button" class="btn" disabled={!topicChoice} onclick={() => respond(null, topicChoice)}>Hand it back</button>
-						<button type="button" class="btn ghost" onclick={() => respond(null)}>Let Marcus pick</button>
+						<button type="button" class="btn" disabled={!topicChoice} onclick={() => void respond(null, topicChoice)}>Hand it back</button>
+						<button type="button" class="btn ghost" onclick={() => void respond(null)}>Let Marcus pick</button>
 					</div>
 				{:else}
 					<label class="sr-only" for="say">{beat.turn === 'intro' ? 'Introduce yourself' : 'What you want to say'}</label>
 					<textarea id="say" class="lined hand" rows={beat.turn === 'intro' ? 2 : 4} bind:value={draft} maxlength="1200"
 						placeholder={beat.turn === 'intro' ? '' : 'say it however it comes out'}></textarea>
 					<div class="buttons">
-						<button type="button" class="btn" disabled={!draft.trim()} onclick={() => respond(draft)}>
+						<button type="button" class="btn" disabled={!draft.trim()} onclick={() => void respond(draft)}>
 							{beat.turn === 'intro' ? 'Say it' : 'Share it'}
 						</button>
-						<button type="button" class="btn ghost" onclick={() => respond(null)}>
+						<button type="button" class="btn ghost" onclick={() => void respond(null)}>
 							{beat.turn === 'intro' ? 'Just my name' : 'Pass'}
 						</button>
 					</div>

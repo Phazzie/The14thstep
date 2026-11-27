@@ -1,11 +1,12 @@
 <script lang="ts">
 	import type { MeetingState } from '$lib/contracts/meeting';
+	import { PASS_TEXT } from '$lib/client/runner';
 
 	let { meeting, onFresh }: { meeting: MeetingState; onFresh: () => void } = $props();
 
 	const started = $derived(new Date(meeting.startedAt));
 	const heard = $derived(meeting.transcript.filter((e) => e.kind === 'share').length);
-	const yours = $derived(meeting.transcript.filter((e) => e.kind === 'user' && !e.text.startsWith("I'll pass")).length);
+	const yours = $derived(meeting.transcript.filter((e) => e.kind === 'user' && e.text !== PASS_TEXT).length);
 	const taped = $derived(meeting.transcript.some((e) => e.source === 'tape'));
 	const when = $derived(
 		started.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })

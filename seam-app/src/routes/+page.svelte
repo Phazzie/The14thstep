@@ -74,7 +74,7 @@
 		<p class="slipno">No. <span class="redno">— — — — —</span></p>
 	</header>
 
-	<form onsubmit={signIn} novalidate>
+	<form onsubmit={(event) => void signIn(event)} novalidate>
 		<div class="row">
 			<label for="name">Name</label>
 			<input id="name" class="line hand" bind:value={name} maxlength="40" autocomplete="nickname" placeholder="what the room calls you" />

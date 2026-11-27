@@ -21,7 +21,7 @@ const CRISIS_PATTERNS: readonly RegExp[] = [
 	/\bbetter off without me\b/,
 	/\bnot (?:to )?wake up\b/,
 	/\bno reason to (?:live|stay)\b/,
-	/\bdon(?:'|’)?t want to be here anymore\b/
+	/\bdon['’]?t want to be here anymore\b/
 ];
 
 export function detectCrisis(text: string): boolean {
