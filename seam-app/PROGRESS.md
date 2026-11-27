@@ -80,3 +80,7 @@
 - 13:13 Vercel builds READY (production-target deploy from the API and the branch preview). Tried to
   make a bypass secret to open the preview from here; that was refused, so I didn't.
 - 13:15 Screenshot round 3 after the last change: signed slip, minutes, phone + laptop all clean.
+- 20:41 Trizzy added `XAI_API_KEY` (production target only). Redeployed production from the branch
+  head (de8511e), READY at https://the14thstep-slip.vercel.app (still behind Vercel login). Branch
+  previews still have no key. Live Grok not verified from here (sandbox can't reach vercel.app).
+  Still not merged: SonarCloud reliability gate red, issue list unreadable from here.
