@@ -13,3 +13,11 @@ Things that failed silently or lied. Check before every deploy.
    the house tape plays; the slip says "(tape)" and the minutes header says so, so it can't lie.
 4. **2026-11-27, `npm install` crashed** with `Cannot read properties of null (reading 'edgesOut')`
    (an npm arborist bug). Fixed with `legacy-peer-deps=true` in `.npmrc`; `npm ci` is clean.
+5. **2026-11-27, a deploy made through the API landed on "production".** The new project had no
+   production deploy yet, so Vercel promoted the first one. It is still behind Vercel login
+   (protection covers every deployment), so nothing went public. Later pushes are normal previews.
+6. **2026-11-27, SonarCloud's site is unreachable from the sandbox.** The gate failed with no
+   issue list I could read, so fixes were aimed at the most likely rule (promise-returning event
+   handlers) and the known duplication (verbatim ports from `app/`).
+7. **2026-11-27, the live preview can't be opened from here.** `*.vercel.app` is blocked by the
+   sandbox, and making a bypass secret was refused. Trizzy has to be the one to click the link.
