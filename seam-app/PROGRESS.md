@@ -41,6 +41,8 @@
 - **Add `XAI_API_KEY` to the Vercel project `the14thstep-slip`** (all environments). The key on
   the old project is production-only and I can't read secrets. Until then every voice is the
   house tape. One paste, then redeploy.
+- **Not merged.** SonarCloud still reports one "C reliability" issue I can't see (sonarcloud.io is blocked from here). Open the PR's Sonar issue list, tell me the file + rule, and I'll fix it and merge. The `e2e`/`fixtures` red checks are the old app's and were already red on main (runner can't install Playwright; #91).
+- Open the preview once with your Vercel login to confirm it loads (I couldn't).
 - Approve the plan in `plan/PLAN.md` the way seam-v2 intends.
 
 ## Definition of done
